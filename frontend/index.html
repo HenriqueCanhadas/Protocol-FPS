@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PROTOCOL FPS — Dashboard</title>
+
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+<!-- Fontes -->
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+
+<!-- Config centralizado (substitui as vars hardcoded) -->
+<script src="config.js"></script>
+
+<!-- Tema compartilhado -->
+<link rel="stylesheet" href="theme.css"/>
+
+<style>
+/* ── STATS BAR ───────────────────────────────────────────── */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px; background: var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.stat-card {
+  background: var(--bg2); padding: 1rem 1.5rem;
+  display: flex; flex-direction: column; gap: .25rem;
+}
+.stat-label { font-size: .6rem; letter-spacing: .3em; color: var(--text-dim); text-transform: uppercase; }
+.stat-value { font-family: var(--display); font-size: 2rem; letter-spacing: .05em; color: var(--green); line-height: 1; }
+.stat-sub   { font-size: .65rem; color: var(--text-dim); }
+
+/* ── MAIN ────────────────────────────────────────────────── */
+main { flex: 1; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+
+.section-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.section-title  { font-size: .65rem; letter-spacing: .35em; text-transform: uppercase; color: var(--text-dim); }
+.section-line   { flex: 1; height: 1px; background: linear-gradient(to right, var(--border), transparent); }
+
+/* ── FILTROS ─────────────────────────────────────────────── */
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.filter-btn {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text-dim); font-family: var(--mono);
+  font-size: .65rem; letter-spacing: .2em;
+  padding: .4rem .9rem; cursor: pointer; text-transform: uppercase;
+  transition: all .15s;
+}
+.filter-btn:hover { border-color: var(--green-dim); color: var(--text); }
+.filter-btn.active { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+
+/* ── TABELA ──────────────────────────────────────────────── */
+.price-table-wrap { overflow-x: auto; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+thead { background: var(--bg3); }
+th {
+  text-align: left; padding: .65rem 1rem;
+  font-size: .6rem; letter-spacing: .25em; text-transform: uppercase;
+  color: var(--text-dim); border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
+tbody tr:hover { background: rgba(57,255,20,.03); }
+tbody tr:last-child { border-bottom: none; }
+td { padding: .75rem 1rem; vertical-align: middle; }
+.td-produto { font-weight: 500; max-width: 260px; }
+.td-produto small { display: block; font-size: .65rem; color: var(--text-dim); margin-top: .15rem; }
+.loja-badge {
+  display: inline-block; border: 1px solid var(--border);
+  padding: .15rem .5rem; font-size: .6rem; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.price-current { font-family: var(--display); font-size: 1.25rem; letter-spacing: .03em; color: var(--green); }
+.price-unavailable { color: var(--text-dim); font-size: .75rem; }
+.price-change { font-size: .7rem; display: flex; align-items: center; gap: .3rem; }
+.price-change.down { color: var(--green); }
+.price-change.up   { color: var(--red); }
+.price-change.same { color: var(--text-dim); }
+.status-badge {
+  font-size: .6rem; letter-spacing: .15em; text-transform: uppercase;
+  padding: .2rem .6rem; border: 1px solid;
+}
+.status-badge.ok    { color: var(--green); border-color: var(--green-dim); }
+.status-badge.out   { color: var(--text-dim); border-color: var(--border); }
+.status-badge.alert { color: var(--amber); border-color: var(--amber); }
+.btn-link {
+  background: none; border: none; color: var(--text-dim); font-family: var(--mono);
+  font-size: .7rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+  transition: color .15s;
+}
+.btn-link:hover { color: var(--green); }
+
+/* ── ALERTAS ─────────────────────────────────────────────── */
+.alertas-list { display: flex; flex-direction: column; gap: .5rem; }
+.alerta-item {
+  display: grid; grid-template-columns: auto 1fr auto auto;
+  gap: 1rem; align-items: center;
+  padding: .75rem 1rem; background: var(--bg2);
+  border: 1px solid var(--border); border-left: 2px solid var(--green-dim);
+  font-size: .75rem; animation: slideIn .3s ease both;
+}
+.alerta-item.tipo-abaixo_meta { border-left-color: var(--amber); }
+.alerta-item.tipo-queda_preco { border-left-color: var(--green); }
+.alerta-tipo { font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; }
+.alerta-tipo.abaixo_meta { color: var(--amber); }
+.alerta-tipo.queda_preco  { color: var(--green); }
+.alerta-preco { font-family: var(--display); font-size: 1.1rem; color: var(--green); }
+.alerta-data  { font-size: .65rem; color: var(--text-dim); text-align: right; }
+
+/* ── MODAL ───────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.85);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200; animation: fadeIn .2s ease;
+}
+.modal {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-top: 1px solid var(--green-dim);
+  width: min(680px, 95vw); max-height: 85vh; overflow-y: auto;
+  display: flex; flex-direction: column;
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; background: var(--bg2);
+}
+.modal-title { font-size: .65rem; letter-spacing: .3em; text-transform: uppercase; color: var(--green); }
+.btn-close {
+  background: none; border: none; color: var(--text-dim); font-size: 1.2rem;
+  cursor: pointer; line-height: 1; transition: color .15s;
+}
+.btn-close:hover { color: var(--red); }
+.modal-body { padding: 1.5rem; }
+
+.chart-wrap { display: flex; flex-direction: column; gap: .5rem; }
+.chart-row { display: grid; grid-template-columns: 90px 1fr 80px; gap: .75rem; align-items: center; font-size: .7rem; }
+.chart-date { color: var(--text-dim); }
+.bar-track  { height: 18px; background: var(--bg3); position: relative; overflow: hidden; }
+.bar-fill   { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green-dim); transition: width .6s cubic-bezier(.4,0,.2,1); }
+.bar-fill.min-price { background: var(--green); }
+.chart-price { text-align: right; color: var(--text); }
+.chart-price.min-price { color: var(--green); }
+
+.empty { text-align: center; padding: 3rem; color: var(--text-dim); font-size: .75rem; letter-spacing: .1em; }
+
+/* ── RESPONSIVE ──────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .stats-bar { grid-template-columns: 1fr 1fr; }
+  th:nth-child(4), td:nth-child(4),
+  th:nth-child(5), td:nth-child(5) { display: none; }
+  main { padding: 1rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ─────────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div>
+    <div class="login-logo glow">PROTOCOL<br>FPS</div>
+    <div class="login-subtitle" style="text-align:center;margin-top:.5rem">
+      <strong class="green">H</strong>ardware
+      <strong class="green">P</strong>rice
+      <strong class="green">C</strong>ontroller
+    </div>
+  </div>
+  <div class="login-box">
+    <div>
+      <div class="field-label">Acesso</div>
+      <input class="field-input" type="email" id="login-email"
+             placeholder="email@dominio.com" autocomplete="email"/>
+    </div>
+    <div>
+      <div class="field-label">Senha</div>
+      <input class="field-input" type="password" id="login-senha"
+             placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-primary" id="btn-login">INICIAR SESSÃO</button>
+    <div style="font-size:.65rem;color:var(--text-dim);text-align:center;margin-top:.25rem">
+      Acesso restrito — usuários autorizados
+    </div>
+  </div>
+  <div style="font-size:.6rem;color:var(--text-dim);letter-spacing:.2em;text-align:center">
+    <span class="blink">_</span> SYS READY &nbsp;·&nbsp; AWAITING AUTH
+  </div>
+</div>
+
+<!-- ── APP ───────────────────────────────────────────────────── -->
+<div id="app" style="display:none;flex-direction:column;min-height:100vh">
+
+  <header>
+    <a href="index.html" class="header-logo">PROTOCOL FPS</a>
+    <nav class="header-nav">
+      <a href="index.html"        class="nav-link active">Dashboard</a>
+      <a href="novo_produto.html" class="nav-link">+ Novo Produto</a>
+      <a href="usuario.html"      class="nav-link">Conta</a>
+    </nav>
+    <div class="header-meta">
+      <div class="status-dot"></div>
+      <div id="rel-time" style="font-size:.7rem;color:var(--text-dim)"></div>
+      <button class="btn-logout" id="btn-logout">SAIR</button>
+    </div>
+  </header>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-label">Itens monitorados</div>
+      <div class="stat-value green" id="stat-itens">—</div>
+      <div class="stat-sub">produtos ativos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Alertas hoje</div>
+      <div class="stat-value" id="stat-alertas">—</div>
+      <div class="stat-sub">disparos</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Menor preço hoje</div>
+      <div class="stat-value green" id="stat-menor">—</div>
+      <div class="stat-sub" id="stat-menor-nome">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Última coleta</div>
+      <div class="stat-value" id="stat-coleta" style="font-size:1.1rem;padding-top:.4rem">—</div>
+      <div class="stat-sub">horário de Brasília</div>
+    </div>
+  </div>
+
+  <main>
+    <!-- TABELA -->
+    <section>
+      <div class="section-header">
+        <div class="section-title">Monitor de Preços</div>
+        <div class="section-line"></div>
+        <a href="novo_produto.html" class="btn-secondary" style="font-size:.6rem;padding:.3rem .8rem;text-decoration:none">
+          + PRODUTO
+        </a>
+      </div>
+      <div class="filters" id="filtros">
+        <button class="filter-btn active" data-filter="all">Todos</button>
+        <button class="filter-btn" data-filter="GPU">GPU</button>
+        <button class="filter-btn" data-filter="CPU">CPU</button>
+        <button class="filter-btn" data-filter="RAM">RAM</button>
+        <button class="filter-btn" data-filter="PSU">Fonte</button>
+        <button class="filter-btn" data-filter="MOBO">Placa Mãe</button>
+      </div>
+      <div id="tabela-wrap" class="price-table-wrap">
+        <div class="loading"><div class="spinner"></div> CARREGANDO DADOS...</div>
+      </div>
+    </section>
+
+    <!-- ALERTAS -->
+    <section>
+      <div class="section-header">
+        <div class="section-title">Alertas recentes</div>
+        <div class="section-line"></div>
+      </div>
+      <div id="alertas-wrap">
+        <div class="loading"><div class="spinner"></div> CARREGANDO...</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div id="modal" class="modal-overlay hidden">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-titulo">HISTÓRICO</div>
+      <button class="btn-close" id="btn-close-modal">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <div class="loading"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="hidden"></div>
+
+<script>
+// ── INIT ──────────────────────────────────────────────────────
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+let todosOsDados = []
+let filtroAtivo  = 'all'
+
+setInterval(() => {
+  document.getElementById('rel-time').textContent =
+    new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
+}, 1000)
+
+// ── AUTH ──────────────────────────────────────────────────────
+sb.auth.onAuthStateChange((_, session) => {
+  if (session) mostrarApp()
+  else         mostrarLogin()
+})
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim()
+  const senha  = document.getElementById('login-senha').value
+  if (!email || !senha) { setLoginError('Preencha email e senha.'); return }
+  const btn = document.getElementById('btn-login')
+  btn.disabled = true; btn.textContent = 'AUTENTICANDO...'
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha })
+  if (error) {
+    setLoginError('Credenciais inválidas.')
+    btn.disabled = false; btn.textContent = 'INICIAR SESSÃO'
+  }
+})
+
+document.getElementById('login-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-senha').focus()
+})
+document.getElementById('login-senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click()
+})
+document.getElementById('btn-logout').addEventListener('click', () => sb.auth.signOut())
+
+function setLoginError(msg) { document.getElementById('login-error').textContent = msg }
+
+function mostrarLogin() {
+  document.getElementById('login-screen').style.display = 'flex'
+  document.getElementById('app').style.display = 'none'
+  document.getElementById('btn-login').disabled = false
+  document.getElementById('btn-login').textContent = 'INICIAR SESSÃO'
+  document.getElementById('login-error').textContent = ''
+}
+function mostrarApp() {
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').style.display = 'flex'
+  carregarDados()
+}
+
+// ── DADOS ─────────────────────────────────────────────────────
+async function carregarDados() {
+  await Promise.all([carregarPrecos(), carregarAlertas()])
+}
+
+async function carregarPrecos() {
+  const { data, error } = await sb
+    .from('ultimo_preco').select('*').order('produto', { ascending: true })
+  if (error) {
+    document.getElementById('tabela-wrap').innerHTML =
+      `<div class="empty red">ERRO: ${error.message}</div>`
+    return
+  }
+  todosOsDados = data || []
+  atualizarStats()
+  renderizarTabela()
+}
+
+async function carregarAlertas() {
+  const hoje = new Date(); hoje.setHours(0,0,0,0)
+  const { data, error } = await sb
+    .from('alertas')
+    .select('id, tipo, preco_gatilho, preco_anterior, criado_em, itens(nome_na_loja, url, lojas(nome))')
+    .gte('criado_em', hoje.toISOString())
+    .order('criado_em', { ascending: false })
+    .limit(20)
+  const wrap = document.getElementById('alertas-wrap')
+  if (error || !data?.length) {
+    wrap.innerHTML = '<div class="empty dim">Nenhum alerta disparado hoje.</div>'
+    return
+  }
+  wrap.innerHTML = `<div class="alertas-list">${data.map(renderAlerta).join('')}</div>`
+  document.getElementById('stat-alertas').textContent = data.length
+  document.getElementById('stat-alertas').className = 'stat-value ' + (data.length > 0 ? 'amber' : '')
+}
+
+// ── STATS ─────────────────────────────────────────────────────
+function atualizarStats() {
+  document.getElementById('stat-itens').textContent = todosOsDados.length
+  const disponiveis = todosOsDados.filter(d => d.disponivel && d.preco)
+  if (disponiveis.length) {
+    const menor = disponiveis.reduce((a,b) => a.preco < b.preco ? a : b)
+    document.getElementById('stat-menor').textContent =
+      'R$ ' + menor.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    document.getElementById('stat-menor-nome').textContent =
+      (menor.nome_na_loja || '').substring(0,30) + '…'
+  }
+  const ult = todosOsDados.filter(d => d.coletado_em)
+    .sort((a,b) => new Date(b.coletado_em) - new Date(a.coletado_em))[0]
+  if (ult) document.getElementById('stat-coleta').textContent =
+    new Date(ult.coletado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+}
+
+// ── TABELA ────────────────────────────────────────────────────
+function renderizarTabela() {
+  const dados = filtroAtivo === 'all'
+    ? todosOsDados
+    : todosOsDados.filter(d => d.categoria === filtroAtivo)
+  const wrap = document.getElementById('tabela-wrap')
+  if (!dados.length) { wrap.innerHTML = '<div class="empty">Nenhum item nesta categoria.</div>'; return }
+  wrap.innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Produto</th><th>Loja</th><th>Preço atual</th>
+        <th>Variação</th><th>Status</th><th></th>
+      </tr></thead>
+      <tbody>${dados.map(renderLinha).join('')}</tbody>
+    </table>`
+  wrap.querySelectorAll('[data-hist]').forEach(btn =>
+    btn.addEventListener('click', () => abrirHistorico(btn.dataset.hist, btn.dataset.nome))
+  )
+}
+
+function renderLinha(item) {
+  const precoFmt = item.preco
+    ? 'R$ ' + Number(item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : null
+  const abaixoDaMeta = item.preco_meta && item.preco && item.preco < item.preco_meta
+  const statusClass  = !item.disponivel ? 'out' : abaixoDaMeta ? 'alert' : 'ok'
+  const statusTxt    = !item.disponivel ? 'ESGOTADO' : abaixoDaMeta ? 'ALERTA' : 'OK'
+  return `
+  <tr>
+    <td class="td-produto">
+      <div>${item.nome_na_loja}</div>
+      <small class="dim">${item.categoria}</small>
+    </td>
+    <td><span class="loja-badge">${item.loja}</span></td>
+    <td>
+      ${precoFmt
+        ? `<div class="price-current">${precoFmt}</div>
+           ${item.preco_meta ? `<small class="dim">meta: R$ ${Number(item.preco_meta).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small>` : ''}`
+        : `<div class="price-unavailable">indisponível</div>`}
+    </td>
+    <td><span class="price-change same">—</span></td>
+    <td><span class="status-badge ${statusClass}">${statusTxt}</span></td>
+    <td>
+      <button class="btn-link" data-hist="${item.item_id}" data-nome="${item.nome_na_loja}">
+        histórico
+      </button>
+    </td>
+  </tr>`
+}
+
+function renderAlerta(a) {
+  const nome  = a.itens?.nome_na_loja || '—'
+  const loja  = a.itens?.lojas?.nome  || '—'
+  const preco = Number(a.preco_gatilho).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+  const dt    = new Date(a.criado_em).toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+  const tipoLabel = a.tipo === 'abaixo_meta' ? '↓ META' : '↓ QUEDA'
+  return `
+  <div class="alerta-item tipo-${a.tipo}">
+    <span class="alerta-tipo ${a.tipo}">${tipoLabel}</span>
+    <div>
+      <div style="font-size:.8rem">${nome}</div>
+      <div style="font-size:.65rem;color:var(--text-dim)">${loja}</div>
+    </div>
+    <div class="alerta-preco">R$ ${preco}</div>
+    <div class="alerta-data">${dt}</div>
+  </div>`
+}
+
+// ── FILTROS ───────────────────────────────────────────────────
+document.getElementById('filtros').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-btn')
+  if (!btn) return
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'))
+  btn.classList.add('active')
+  filtroAtivo = btn.dataset.filter
+  renderizarTabela()
+})
+
+// ── MODAL ─────────────────────────────────────────────────────
+async function abrirHistorico(itemId, nome) {
+  document.getElementById('modal-titulo').textContent = 'HISTÓRICO — ' + nome.substring(0,40)
+  document.getElementById('modal-body').innerHTML = '<div class="loading"><div class="spinner"></div></div>'
+  document.getElementById('modal').classList.remove('hidden')
+  const { data, error } = await sb
+    .from('historico_precos').select('preco, disponivel, coletado_em')
+    .eq('item_id', itemId).order('coletado_em', { ascending: false }).limit(30)
+  if (error || !data?.length) {
+    document.getElementById('modal-body').innerHTML = '<div class="empty">Sem histórico disponível.</div>'
+    return
+  }
+  const precos = data.filter(d => d.preco).map(d => d.preco)
+  const minPreco = Math.min(...precos), maxPreco = Math.max(...precos)
+  const amplitude = maxPreco - minPreco || 1
+  const linhas = data.map(d => {
+    const dt = new Date(d.coletado_em).toLocaleDateString('pt-BR')
+    const pct = d.preco ? ((d.preco - minPreco) / amplitude) * 70 + 10 : 0
+    const isMin = d.preco === minPreco
+    const precoFmt = d.preco
+      ? 'R$ ' + Number(d.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      : 'esgotado'
+    return `
+    <div class="chart-row">
+      <div class="chart-date dim">${dt}</div>
+      <div class="bar-track">
+        <div class="bar-fill ${isMin ? 'min-price' : ''}" style="width:${pct}%"></div>
+      </div>
+      <div class="chart-price ${isMin ? 'min-price' : ''}">${precoFmt}</div>
+    </div>`
+  }).join('')
+  document.getElementById('modal-body').innerHTML = `
+    <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:1rem;letter-spacing:.15em">
+      ★ MENOR PREÇO: <span class="green">R$ ${minPreco.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
+    </div>
+    <div class="chart-wrap">${linhas}</div>`
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.bar-fill').forEach(b => {
+      const w = b.style.width; b.style.width = '0'
+      requestAnimationFrame(() => { b.style.width = w })
+    })
+  })
+}
+
+document.getElementById('btn-close-modal').addEventListener('click', () =>
+  document.getElementById('modal').classList.add('hidden')
+)
+document.getElementById('modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('modal'))
+    document.getElementById('modal').classList.add('hidden')
+})
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToast(msg, tipo = 'ok') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = tipo === 'error' ? 'error' : ''
+  t.classList.remove('hidden')
+  setTimeout(() => t.classList.add('hidden'), 3500)
+}
+</script>
+</body>
+</html>

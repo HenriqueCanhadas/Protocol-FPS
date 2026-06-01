@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>PROTOCOL FPS — Conta</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
+<script src="config.js"></script>
+<link rel="stylesheet" href="theme.css"/>
+
+<style>
+#app { display: none; flex-direction: column; min-height: 100vh; }
+#app.visible { display: flex; }
+
+main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
+.page-wrap { width: min(640px, 100%); display: flex; flex-direction: column; gap: 2rem; }
+
+.breadcrumb {
+  display: flex; align-items: center; gap: .5rem;
+  font-size: .65rem; letter-spacing: .2em; color: var(--text-dim); text-transform: uppercase;
+}
+.breadcrumb a { color: var(--text-dim); text-decoration: none; transition: color .15s; }
+.breadcrumb a:hover { color: var(--green); }
+
+.page-title {
+  font-family: var(--display); font-size: clamp(2rem, 6vw, 3.5rem);
+  letter-spacing: .08em; color: var(--green);
+  text-shadow: 0 0 20px var(--green-dim); line-height: 1;
+}
+
+.info-card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-top: 1px solid var(--green-dim); position: relative;
+}
+.info-card::before {
+  content: attr(data-label); position: absolute; top: -1px; left: 1.5rem;
+  background: var(--bg2); color: var(--green-dim);
+  font-size: .6rem; letter-spacing: .3em; padding: 0 .5rem; transform: translateY(-50%);
+  text-transform: uppercase;
+}
+.info-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: .65rem 0; border-bottom: 1px solid var(--border);
+}
+.info-row:last-child { border-bottom: none; }
+.info-key   { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+.info-value { font-size: .82rem; color: var(--text); }
+
+.badge-active {
+  font-size: .6rem; letter-spacing: .15em; text-transform: uppercase;
+  padding: .2rem .6rem; border: 1px solid var(--green-dim); color: var(--green);
+}
+
+.field-group { display: flex; flex-direction: column; }
+
+.form-actions {
+  display: flex; gap: .75rem; justify-content: flex-end;
+  padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); background: var(--bg3);
+}
+
+.danger-zone {
+  border-top-color: var(--red) !important;
+}
+.danger-zone::before { color: var(--red) !important; }
+
+@media (max-width: 600px) {
+  main { padding: 1.25rem 1rem; }
+  .info-body { padding: 1.25rem; }
+  .form-actions { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div>
+    <div class="login-logo glow">PROTOCOL<br>FPS</div>
+    <div class="login-subtitle" style="text-align:center;margin-top:.5rem">
+      <strong class="green">H</strong>ardware
+      <strong class="green">P</strong>rice
+      <strong class="green">C</strong>ontroller
+    </div>
+  </div>
+  <div class="login-box">
+    <div>
+      <div class="field-label">Acesso</div>
+      <input class="field-input" type="email" id="login-email"
+             placeholder="email@dominio.com" autocomplete="email"/>
+    </div>
+    <div>
+      <div class="field-label">Senha</div>
+      <input class="field-input" type="password" id="login-senha"
+             placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn-primary" id="btn-login">INICIAR SESSÃO</button>
+  </div>
+  <div style="font-size:.6rem;color:var(--text-dim);letter-spacing:.2em;text-align:center">
+    <span class="blink">_</span> SYS READY &nbsp;·&nbsp; AWAITING AUTH
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header>
+    <a href="index.html" class="header-logo">PROTOCOL FPS</a>
+    <nav class="header-nav">
+      <a href="index.html"        class="nav-link">Dashboard</a>
+      <a href="novo_produto.html" class="nav-link">+ Novo Produto</a>
+      <a href="usuario.html"      class="nav-link active">Conta</a>
+    </nav>
+    <div class="header-meta">
+      <div class="status-dot"></div>
+      <button class="btn-logout" id="btn-logout">SAIR</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-wrap">
+
+      <nav class="breadcrumb">
+        <a href="index.html">Dashboard</a>
+        <span>›</span>
+        <span>Conta</span>
+      </nav>
+
+      <div class="page-title">CONTA</div>
+
+      <!-- INFO -->
+      <div class="info-card" data-label="SESSÃO ATIVA">
+        <div class="info-body">
+          <div class="info-row">
+            <div class="info-key">Email</div>
+            <div class="info-value" id="user-email">—</div>
+          </div>
+          <div class="info-row">
+            <div class="info-key">ID</div>
+            <div class="info-value dim" id="user-id" style="font-size:.7rem">—</div>
+          </div>
+          <div class="info-row">
+            <div class="info-key">Status</div>
+            <div class="info-value"><span class="badge-active">ATIVO</span></div>
+          </div>
+          <div class="info-row">
+            <div class="info-key">Último acesso</div>
+            <div class="info-value" id="user-last-login">—</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALTERAR SENHA -->
+      <div class="info-card" data-label="SEGURANÇA">
+        <div class="info-body">
+          <div class="field-group">
+            <div class="field-label">Nova senha</div>
+            <input class="field-input" type="password" id="input-nova-senha"
+                   placeholder="••••••••" autocomplete="new-password"/>
+            <div class="field-hint">Mínimo 8 caracteres</div>
+            <div class="field-error hidden" id="err-senha">Senha deve ter pelo menos 8 caracteres</div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Confirmar nova senha</div>
+            <input class="field-input" type="password" id="input-conf-senha"
+                   placeholder="••••••••" autocomplete="new-password"/>
+            <div class="field-error hidden" id="err-conf">As senhas não coincidem</div>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-primary" id="btn-salvar-senha">ATUALIZAR SENHA</button>
+        </div>
+      </div>
+
+      <!-- ZONA DE PERIGO -->
+      <div class="info-card danger-zone" data-label="SESSÃO">
+        <div class="info-body">
+          <div style="font-size:.75rem;color:var(--text-dim)">
+            Encerra a sessão atual em todos os dispositivos.
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn-secondary" id="btn-sair-tudo" style="border-color:var(--red);color:var(--red)">
+            ENCERRAR TODAS AS SESSÕES
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script>
+const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+sb.auth.onAuthStateChange((_, session) => {
+  if (session) mostrarApp(session.user)
+  else         mostrarLogin()
+})
+
+document.getElementById('btn-login').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim()
+  const senha  = document.getElementById('login-senha').value
+  if (!email || !senha) { document.getElementById('login-error').textContent = 'Preencha os campos.'; return }
+  const btn = document.getElementById('btn-login')
+  btn.disabled = true; btn.textContent = 'AUTENTICANDO...'
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha })
+  if (error) {
+    document.getElementById('login-error').textContent = 'Credenciais inválidas.'
+    btn.disabled = false; btn.textContent = 'INICIAR SESSÃO'
+  }
+})
+document.getElementById('login-email').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('login-senha').focus()
+})
+document.getElementById('login-senha').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-login').click()
+})
+document.getElementById('btn-logout').addEventListener('click', () => sb.auth.signOut())
+
+function mostrarLogin() {
+  document.getElementById('login-screen').style.display = 'flex'
+  document.getElementById('app').classList.remove('visible')
+}
+function mostrarApp(user) {
+  document.getElementById('login-screen').style.display = 'none'
+  document.getElementById('app').classList.add('visible')
+
+  document.getElementById('user-email').textContent = user.email || '—'
+  document.getElementById('user-id').textContent    = user.id   || '—'
+
+  const lastLogin = user.last_sign_in_at
+    ? new Date(user.last_sign_in_at).toLocaleString('pt-BR')
+    : '—'
+  document.getElementById('user-last-login').textContent = lastLogin
+}
+
+// Alterar senha
+document.getElementById('btn-salvar-senha').addEventListener('click', async () => {
+  const nova  = document.getElementById('input-nova-senha').value
+  const conf  = document.getElementById('input-conf-senha').value
+  let ok = true
+
+  document.getElementById('err-senha').classList.add('hidden')
+  document.getElementById('err-conf').classList.add('hidden')
+
+  if (nova.length < 8) { document.getElementById('err-senha').classList.remove('hidden'); ok = false }
+  if (nova !== conf)   { document.getElementById('err-conf').classList.remove('hidden');  ok = false }
+  if (!ok) return
+
+  const btn = document.getElementById('btn-salvar-senha')
+  btn.disabled = true; btn.textContent = 'SALVANDO...'
+
+  const { error } = await sb.auth.updateUser({ password: nova })
+
+  btn.disabled = false; btn.textContent = 'ATUALIZAR SENHA'
+
+  if (error) showToast('Erro: ' + error.message, 'error')
+  else {
+    document.getElementById('input-nova-senha').value = ''
+    document.getElementById('input-conf-senha').value = ''
+    showToast('✓ Senha atualizada com sucesso!')
+  }
+})
+
+// Encerrar todas as sessões
+document.getElementById('btn-sair-tudo').addEventListener('click', async () => {
+  await sb.auth.signOut({ scope: 'global' })
+})
+
+function showToast(msg, tipo = 'ok') {
+  const t = document.getElementById('toast')
+  t.textContent = msg
+  t.className = tipo === 'error' ? 'error' : ''
+  t.classList.remove('hidden')
+  setTimeout(() => t.classList.add('hidden'), 3500)
+}
+</script>
+</body>
+</html>
