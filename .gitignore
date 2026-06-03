@@ -47,6 +47,7 @@ env/
 .env
 .env.local
 .env.*.local
+todo
 
 # Node/Frontend
 node_modules/
