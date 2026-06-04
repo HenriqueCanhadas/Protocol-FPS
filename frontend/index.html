@@ -137,6 +137,79 @@ td { padding: .9rem 1.1rem; vertical-align: middle; }
 .action-btn.remove { color: var(--text-muted); border-color: transparent; }
 .action-btn.remove:hover { color: var(--red); border-color: rgba(255,68,68,.35); background: rgba(255,68,68,.06); }
 
+.action-btn.meta  { color: var(--text-dim); border-color: var(--border2); }
+.action-btn.meta:hover { color: var(--amber); border-color: rgba(255,184,0,.4); background: rgba(255,184,0,.06); }
+
+/* ── MODAL META ──────────────────────────────────────────── */
+.meta-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 250; animation: fadeIn .2s ease;
+}
+.meta-modal {
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-top: 2px solid var(--amber);
+  width: min(460px, 94vw);
+  display: flex; flex-direction: column;
+  position: relative;
+}
+.meta-modal::before {
+  content: 'EDITAR META DE PREÇO';
+  position: absolute; top: -1px; left: 1.5rem;
+  background: var(--bg2); color: var(--amber);
+  font-size: var(--fs-xs); letter-spacing: .3em;
+  padding: 0 .6rem; transform: translateY(-50%);
+  text-transform: uppercase;
+}
+.meta-modal-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  padding: 1.5rem 1.5rem 0;
+  gap: 1rem;
+}
+.meta-modal-produto {
+  font-size: var(--fs-sm); color: var(--text); line-height: 1.5;
+  flex: 1;
+}
+.meta-modal-produto .mm-label {
+  font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .2em;
+  text-transform: uppercase; margin-bottom: .3rem;
+}
+.meta-modal-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.meta-preco-atual {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1rem; background: var(--bg3); border: 1px solid var(--border2);
+}
+.meta-preco-atual .mpa-label { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .2em; text-transform: uppercase; }
+.meta-preco-atual .mpa-val   { font-family: var(--display); font-size: 1.4rem; color: var(--green); }
+
+.meta-sugestoes {
+  display: flex; gap: .5rem; flex-wrap: wrap;
+}
+.meta-sug-btn {
+  background: var(--bg3); border: 1px solid var(--border2);
+  color: var(--text-dim); font-family: var(--mono);
+  font-size: var(--fs-xs); letter-spacing: .1em; text-transform: uppercase;
+  padding: .35rem .75rem; cursor: pointer;
+  transition: all .15s;
+}
+.meta-sug-btn:hover { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.07); }
+
+.meta-modal-footer {
+  display: flex; gap: .75rem;
+  padding: 1.25rem 1.5rem; border-top: 1px solid var(--border2); background: var(--bg3);
+}
+.meta-modal-footer .btn-primary  { flex: 1; border-color: var(--amber); color: var(--amber); }
+.meta-modal-footer .btn-primary:hover { background: rgba(255,184,0,.1); box-shadow: 0 0 20px rgba(255,184,0,.15); }
+.meta-modal-footer .btn-secondary { flex: 0 0 auto; }
+.btn-remover-meta {
+  background: none; border: none; color: var(--text-muted);
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  text-transform: uppercase; cursor: pointer; padding: 0;
+  transition: color .2s;
+}
+.btn-remover-meta:hover { color: var(--red); }
+
 /* linha inativa fica mais apagada */
 tbody tr.row-off { opacity: .55; }
 tbody tr.row-off:hover { opacity: .75; }
@@ -408,6 +481,46 @@ tbody tr.row-off:hover { opacity: .75; }
   </div>
 </div>
 
+<!-- MODAL META DE PREÇO -->
+<div id="meta-modal" class="meta-modal-overlay hidden">
+  <div class="meta-modal">
+    <div class="meta-modal-header">
+      <div class="meta-modal-produto">
+        <div class="mm-label">Produto</div>
+        <div id="meta-modal-nome">—</div>
+      </div>
+      <button class="btn-close" id="btn-close-meta-modal">✕</button>
+    </div>
+    <div class="meta-modal-body">
+
+      <div class="meta-preco-atual">
+        <div class="mpa-label">Preço atual</div>
+        <div class="mpa-val" id="meta-preco-atual-val">—</div>
+      </div>
+
+      <div class="field-group">
+        <div class="field-label">Nova meta (R$)</div>
+        <input class="field-input" type="number" id="meta-input-valor"
+               placeholder="0,00" min="0" step="0.01"/>
+        <div class="field-hint">Alerta será disparado quando o preço cair abaixo desse valor</div>
+        <div class="field-error hidden" id="meta-input-error">Informe um valor válido maior que zero</div>
+      </div>
+
+      <div>
+        <div class="field-label" style="margin-bottom:.6rem">Sugestões rápidas</div>
+        <div class="meta-sugestoes" id="meta-sugestoes">
+          <!-- preenchido via JS com -5%, -10%, -15% do preço atual -->
+        </div>
+      </div>
+
+    </div>
+    <div class="meta-modal-footer">
+      <button class="btn-secondary" id="btn-cancel-meta">CANCELAR</button>
+      <button class="btn-primary"   id="btn-salvar-meta">SALVAR META</button>
+    </div>
+  </div>
+</div>
+
 <!-- CONFIRM -->
 <div id="confirm-overlay" class="confirm-overlay hidden">
   <div class="confirm-box">
@@ -647,6 +760,9 @@ function renderizarTabela() {
   wrap.querySelectorAll('[data-toggle-id]').forEach(btn =>
     btn.addEventListener('click', () => toggleMonitoramento(btn.dataset.toggleId, btn.dataset.toggleNome, btn.dataset.toggleAtivo === 'true'))
   )
+  wrap.querySelectorAll('[data-meta-id]').forEach(btn =>
+    btn.addEventListener('click', () => abrirModalMeta(btn.dataset.metaId, btn.dataset.metaNome, btn.dataset.metaAtual, btn.dataset.metaPreco))
+  )
 }
 
 function renderLinha(item) {
@@ -682,6 +798,11 @@ function renderLinha(item) {
       <button class="action-btn hist"
         data-hist="${item.item_id}" data-nome="${nomeSafe}">
         <span class="ab-icon">◈</span><span class="ab-label">Histórico</span>
+      </button>
+      <button class="action-btn meta"
+        data-meta-id="${item.item_id}" data-meta-nome="${nomeSafe}"
+        data-meta-atual="${item.preco_meta || ''}" data-meta-preco="${item.preco || ''}">
+        <span class="ab-icon">◎</span><span class="ab-label">Editar Meta</span>
       </button>
       <button class="action-btn ${toggleClass}"
         data-toggle-id="${item.item_id}" data-toggle-nome="${nomeSafe}" data-toggle-ativo="${monitorando}">
@@ -869,6 +990,112 @@ function toggleMonitoramento(itemId, nome, ativoAtual) {
     }
   }, !novoEstado) // danger apenas ao desativar
 }
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL META DE PREÇO
+// ═══════════════════════════════════════════════════════════════
+let _metaItemId = null
+
+function abrirModalMeta(itemId, nome, metaAtual, precoAtual) {
+  _metaItemId = itemId
+
+  document.getElementById('meta-modal-nome').textContent = nome
+
+  const preco = parseFloat(precoAtual) || null
+  const meta  = parseFloat(metaAtual)  || null
+
+  // Preço atual
+  document.getElementById('meta-preco-atual-val').textContent = preco
+    ? 'R$ ' + preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    : 'sem coleta'
+
+  // Campo pré-preenchido com meta atual, se houver
+  const input = document.getElementById('meta-input-valor')
+  input.value = meta ? meta.toFixed(2) : ''
+  document.getElementById('meta-input-error').classList.add('hidden')
+
+  // Sugestões rápidas: -5%, -10%, -15%, -20% do preço atual
+  const sugsEl = document.getElementById('meta-sugestoes')
+  if (preco) {
+    const pcts = [5, 10, 15, 20]
+    sugsEl.innerHTML = pcts.map(p => {
+      const val = (preco * (1 - p / 100)).toFixed(2)
+      const fmt = parseFloat(val).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      return `<button class="meta-sug-btn" data-val="${val}">-${p}% · R$ ${fmt}</button>`
+    }).join('')
+    // Também mostra opção de remover a meta se ela já existe
+    if (meta) {
+      sugsEl.innerHTML += `<button class="btn-remover-meta" id="btn-remover-meta-val">✕ Remover meta</button>`
+      document.getElementById('btn-remover-meta-val')?.addEventListener('click', async () => {
+        await salvarMetaValor(null)
+      })
+    }
+    sugsEl.querySelectorAll('.meta-sug-btn').forEach(b =>
+      b.addEventListener('click', () => {
+        input.value = b.dataset.val
+        input.focus()
+      })
+    )
+  } else {
+    sugsEl.innerHTML = '<span style="font-size:var(--fs-xs);color:var(--text-muted)">Sem preço coletado para sugestões automáticas</span>'
+    if (meta) {
+      sugsEl.innerHTML += ` &nbsp;<button class="btn-remover-meta" id="btn-remover-meta-val">✕ Remover meta</button>`
+      document.getElementById('btn-remover-meta-val')?.addEventListener('click', async () => {
+        await salvarMetaValor(null)
+      })
+    }
+  }
+
+  document.getElementById('meta-modal').classList.remove('hidden')
+  input.focus()
+}
+
+async function salvarMetaValor(valor) {
+  if (!_metaItemId) return
+  try {
+    const { error } = await sb.from('itens')
+      .update({ preco_meta: valor })
+      .eq('id', _metaItemId)
+    if (error) throw error
+    fecharModalMeta()
+    if (valor === null) {
+      showToast('Meta de preço removida.', 'ok')
+    } else {
+      const fmt = valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+      showToast(`✓ Meta definida em R$ ${fmt}`, 'ok')
+    }
+    await carregarPrecos()
+  } catch(e) {
+    showToast('Erro ao salvar: ' + (e.message || e), 'error')
+  }
+}
+
+function fecharModalMeta() {
+  document.getElementById('meta-modal').classList.add('hidden')
+  _metaItemId = null
+}
+
+document.getElementById('btn-salvar-meta').addEventListener('click', async () => {
+  const raw = document.getElementById('meta-input-valor').value.trim().replace(',', '.')
+  const val = parseFloat(raw)
+  if (!raw || isNaN(val) || val <= 0) {
+    document.getElementById('meta-input-error').classList.remove('hidden')
+    return
+  }
+  document.getElementById('meta-input-error').classList.add('hidden')
+  await salvarMetaValor(val)
+})
+
+document.getElementById('btn-cancel-meta').addEventListener('click', fecharModalMeta)
+document.getElementById('btn-close-meta-modal').addEventListener('click', fecharModalMeta)
+document.getElementById('meta-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('meta-modal')) fecharModalMeta()
+})
+
+// Confirma com Enter dentro do input
+document.getElementById('meta-input-valor').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-salvar-meta').click()
+})
 
 // ═══════════════════════════════════════════════════════════════
 // MODAL HISTÓRICO
