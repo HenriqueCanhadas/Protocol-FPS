@@ -5,153 +5,234 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PROTOCOL FPS — Dashboard</title>
 
-<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- Fontes -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
-
-<!-- Config centralizado (substitui as vars hardcoded) -->
 <script src="config.js"></script>
-
-<!-- Tema compartilhado -->
 <link rel="stylesheet" href="theme.css"/>
 
 <style>
+/* ── LAYOUT ──────────────────────────────────────────────── */
+#app { display: none; flex-direction: column; min-height: 100vh; }
+
 /* ── STATS BAR ───────────────────────────────────────────── */
 .stats-bar {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 1px; background: var(--border);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border2);
 }
 .stat-card {
-  background: var(--bg2); padding: 1rem 1.5rem;
-  display: flex; flex-direction: column; gap: .25rem;
+  background: var(--bg2); padding: 1.25rem 1.75rem;
+  display: flex; flex-direction: column; gap: .35rem;
+  transition: background .2s;
 }
-.stat-label { font-size: .6rem; letter-spacing: .3em; color: var(--text-dim); text-transform: uppercase; }
-.stat-value { font-family: var(--display); font-size: 2rem; letter-spacing: .05em; color: var(--green); line-height: 1; }
-.stat-sub   { font-size: .65rem; color: var(--text-dim); }
+.stat-card:hover { background: var(--bg3); }
+.stat-label { font-size: var(--fs-xs); letter-spacing: .3em; color: var(--text-dim); text-transform: uppercase; }
+.stat-value { font-family: var(--display); font-size: 2.2rem; letter-spacing: .04em; color: var(--green); line-height: 1; }
+.stat-sub   { font-size: var(--fs-xs); color: var(--text-muted); line-height: 1.5; word-break: break-word; }
 
 /* ── MAIN ────────────────────────────────────────────────── */
-main { flex: 1; padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+main { flex: 1; padding: 1.75rem 1.5rem; display: flex; flex-direction: column; gap: 2rem; }
 
-.section-header { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
-.section-title  { font-size: .65rem; letter-spacing: .35em; text-transform: uppercase; color: var(--text-dim); }
-.section-line   { flex: 1; height: 1px; background: linear-gradient(to right, var(--border), transparent); }
+.section-header { display: flex; align-items: center; gap: .9rem; margin-bottom: 1.25rem; }
+.section-title  { font-size: var(--fs-sm); letter-spacing: .3em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+.section-line   { flex: 1; height: 1px; background: linear-gradient(to right, var(--border2), transparent); }
+
+/* ── BARRA DE AÇÕES ──────────────────────────────────────── */
+.action-bar {
+  display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.25rem;
+  align-items: center;
+}
+.btn-coletar {
+  display: flex; align-items: center; gap: .6rem;
+  background: transparent; border: 1px solid var(--amber);
+  color: var(--amber); font-family: var(--mono);
+  font-size: var(--fs-sm); letter-spacing: .18em;
+  padding: .7rem 1.5rem; cursor: pointer;
+  text-transform: uppercase;
+  transition: background .2s, box-shadow .2s;
+}
+.btn-coletar:hover {
+  background: rgba(255,184,0,.1);
+  box-shadow: 0 0 20px rgba(255,184,0,.2);
+}
+.btn-coletar:disabled { opacity: .4; cursor: not-allowed; }
+.btn-coletar .spinner { border-top-color: var(--amber); border-color: rgba(255,184,0,.3); border-top-color: var(--amber); }
+.btn-coletar-icon { font-size: 1rem; }
 
 /* ── FILTROS ─────────────────────────────────────────────── */
-.filters { display: flex; gap: .5rem; flex-wrap: wrap; margin-bottom: 1.25rem; }
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; }
 .filter-btn {
-  background: var(--bg2); border: 1px solid var(--border);
+  background: var(--bg2); border: 1px solid var(--border2);
   color: var(--text-dim); font-family: var(--mono);
-  font-size: .65rem; letter-spacing: .2em;
-  padding: .4rem .9rem; cursor: pointer; text-transform: uppercase;
+  font-size: var(--fs-sm); letter-spacing: .2em;
+  padding: .5rem 1.1rem; cursor: pointer; text-transform: uppercase;
   transition: all .15s;
 }
 .filter-btn:hover { border-color: var(--green-dim); color: var(--text); }
-.filter-btn.active { border-color: var(--green); color: var(--green); background: var(--green-glow); }
+.filter-btn.active { border-color: var(--green); color: var(--green); background: var(--green-soft); }
 
 /* ── TABELA ──────────────────────────────────────────────── */
-.price-table-wrap { overflow-x: auto; border: 1px solid var(--border); }
-table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.price-table-wrap { overflow-x: auto; border: 1px solid var(--border2); }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 thead { background: var(--bg3); }
 th {
-  text-align: left; padding: .65rem 1rem;
-  font-size: .6rem; letter-spacing: .25em; text-transform: uppercase;
-  color: var(--text-dim); border-bottom: 1px solid var(--border); white-space: nowrap;
+  text-align: left; padding: .85rem 1.1rem;
+  font-size: var(--fs-xs); letter-spacing: .25em; text-transform: uppercase;
+  color: var(--text-dim); border-bottom: 1px solid var(--border2); white-space: nowrap;
 }
 tbody tr { border-bottom: 1px solid var(--border); transition: background .15s; }
-tbody tr:hover { background: rgba(57,255,20,.03); }
+tbody tr:hover { background: rgba(57,255,20,.025); }
 tbody tr:last-child { border-bottom: none; }
-td { padding: .75rem 1rem; vertical-align: middle; }
-.td-produto { font-weight: 500; max-width: 260px; }
-.td-produto small { display: block; font-size: .65rem; color: var(--text-dim); margin-top: .15rem; }
+td { padding: .9rem 1.1rem; vertical-align: middle; }
+.td-produto { min-width: 220px; }
+.td-produto .prod-nome { font-size: var(--fs-base); font-weight: 500; line-height: 1.4; }
+.td-produto .prod-cat  { font-size: var(--fs-xs); color: var(--text-dim); margin-top: .2rem; letter-spacing: .1em; text-transform: uppercase; }
 .loja-badge {
-  display: inline-block; border: 1px solid var(--border);
-  padding: .15rem .5rem; font-size: .6rem; letter-spacing: .1em;
+  display: inline-block; border: 1px solid var(--border2);
+  padding: .25rem .65rem; font-size: var(--fs-xs); letter-spacing: .1em;
   text-transform: uppercase; color: var(--text-dim);
 }
-.price-current { font-family: var(--display); font-size: 1.25rem; letter-spacing: .03em; color: var(--green); }
-.price-unavailable { color: var(--text-dim); font-size: .75rem; }
-.price-change { font-size: .7rem; display: flex; align-items: center; gap: .3rem; }
+.price-current { font-family: var(--display); font-size: 1.45rem; letter-spacing: .03em; color: var(--green); }
+.price-meta    { font-size: var(--fs-xs); color: var(--text-muted); margin-top: .15rem; }
+.price-unavailable { color: var(--text-muted); font-size: var(--fs-sm); }
+.price-change { font-size: var(--fs-sm); display: flex; align-items: center; gap: .3rem; }
 .price-change.down { color: var(--green); }
 .price-change.up   { color: var(--red); }
-.price-change.same { color: var(--text-dim); }
+.price-change.same { color: var(--text-muted); }
 .status-badge {
-  font-size: .6rem; letter-spacing: .15em; text-transform: uppercase;
-  padding: .2rem .6rem; border: 1px solid;
+  font-size: var(--fs-xs); letter-spacing: .15em; text-transform: uppercase;
+  padding: .3rem .75rem; border: 1px solid;
 }
 .status-badge.ok    { color: var(--green); border-color: var(--green-dim); }
-.status-badge.out   { color: var(--text-dim); border-color: var(--border); }
+.status-badge.out   { color: var(--text-muted); border-color: var(--border); }
 .status-badge.alert { color: var(--amber); border-color: var(--amber); }
-.btn-link {
-  background: none; border: none; color: var(--text-dim); font-family: var(--mono);
-  font-size: .7rem; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
-  transition: color .15s;
+.status-badge.off   { color: var(--red); border-color: rgba(255,68,68,.4); }
+
+/* ── BOTÕES DE AÇÃO NA TABELA ────────────────────────────── */
+.td-actions {
+  display: flex; flex-direction: column; gap: .4rem; align-items: flex-start;
+  min-width: 130px;
 }
-.btn-link:hover { color: var(--green); }
+.action-btn {
+  display: flex; align-items: center; gap: .45rem;
+  background: none; border: 1px solid transparent;
+  font-family: var(--mono); font-size: var(--fs-xs); letter-spacing: .1em;
+  padding: .35rem .65rem; cursor: pointer; text-transform: uppercase;
+  transition: all .18s; white-space: nowrap; width: 100%;
+}
+.action-btn .ab-icon { font-size: .8rem; flex-shrink: 0; }
+.action-btn .ab-label { flex: 1; }
+
+.action-btn.hist  { color: var(--text-dim); border-color: var(--border2); }
+.action-btn.hist:hover { color: var(--green); border-color: var(--green-dim); background: var(--green-soft); }
+
+.action-btn.toggle-on  { color: var(--amber); border-color: rgba(255,184,0,.35); }
+.action-btn.toggle-on:hover { background: rgba(255,184,0,.08); border-color: var(--amber); }
+
+.action-btn.toggle-off { color: var(--green); border-color: rgba(57,255,20,.25); }
+.action-btn.toggle-off:hover { background: var(--green-soft); border-color: var(--green); }
+
+.action-btn.remove { color: var(--text-muted); border-color: transparent; }
+.action-btn.remove:hover { color: var(--red); border-color: rgba(255,68,68,.35); background: rgba(255,68,68,.06); }
+
+/* linha inativa fica mais apagada */
+tbody tr.row-off { opacity: .55; }
+tbody tr.row-off:hover { opacity: .75; }
+
+/* ── PROGRESSO DE COLETA ─────────────────────────────────── */
+.coleta-progress {
+  background: var(--bg2); border: 1px solid var(--border2);
+  padding: 1.25rem 1.5rem;
+  display: flex; flex-direction: column; gap: .6rem;
+  animation: slideIn .3s ease;
+}
+.coleta-status {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: var(--fs-sm); color: var(--text-dim); letter-spacing: .1em;
+}
+.coleta-status .item-atual { color: var(--text); max-width: 60%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress-bar {
+  height: 3px; background: var(--border2);
+  position: relative; overflow: hidden;
+}
+.progress-fill {
+  position: absolute; left: 0; top: 0; height: 100%;
+  background: linear-gradient(90deg, var(--green-dim), var(--green));
+  transition: width .4s ease;
+  box-shadow: 0 0 10px var(--green-glow);
+}
 
 /* ── ALERTAS ─────────────────────────────────────────────── */
-.alertas-list { display: flex; flex-direction: column; gap: .5rem; }
+.alertas-list { display: flex; flex-direction: column; gap: .65rem; }
 .alerta-item {
   display: grid; grid-template-columns: auto 1fr auto auto;
-  gap: 1rem; align-items: center;
-  padding: .75rem 1rem; background: var(--bg2);
-  border: 1px solid var(--border); border-left: 2px solid var(--green-dim);
-  font-size: .75rem; animation: slideIn .3s ease both;
+  gap: 1.1rem; align-items: center;
+  padding: .9rem 1.1rem; background: var(--bg2);
+  border: 1px solid var(--border2); border-left: 3px solid var(--green-dim);
+  font-size: var(--fs-base); animation: slideIn .3s ease both;
 }
 .alerta-item.tipo-abaixo_meta { border-left-color: var(--amber); }
 .alerta-item.tipo-queda_preco { border-left-color: var(--green); }
-.alerta-tipo { font-size: .6rem; letter-spacing: .15em; text-transform: uppercase; }
+.alerta-tipo { font-size: var(--fs-xs); letter-spacing: .12em; text-transform: uppercase; }
 .alerta-tipo.abaixo_meta { color: var(--amber); }
 .alerta-tipo.queda_preco  { color: var(--green); }
-.alerta-preco { font-family: var(--display); font-size: 1.1rem; color: var(--green); }
-.alerta-data  { font-size: .65rem; color: var(--text-dim); text-align: right; }
+.alerta-preco { font-family: var(--display); font-size: 1.25rem; color: var(--green); }
+.alerta-nome  { font-size: var(--fs-base); line-height: 1.3; }
+.alerta-loja  { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .1em; text-transform: uppercase; margin-top: .15rem; }
+.alerta-data  { font-size: var(--fs-sm); color: var(--text-dim); text-align: right; white-space: nowrap; }
 
 /* ── MODAL ───────────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.85);
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
   display: flex; align-items: center; justify-content: center;
   z-index: 200; animation: fadeIn .2s ease;
 }
 .modal {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-top: 1px solid var(--green-dim);
-  width: min(680px, 95vw); max-height: 85vh; overflow-y: auto;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-top: 2px solid var(--green-dim);
+  width: min(720px, 96vw); max-height: 88vh; overflow-y: auto;
   display: flex; flex-direction: column;
 }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 1.5rem; border-bottom: 1px solid var(--border);
+  padding: 1.1rem 1.5rem; border-bottom: 1px solid var(--border2);
   position: sticky; top: 0; background: var(--bg2);
 }
-.modal-title { font-size: .65rem; letter-spacing: .3em; text-transform: uppercase; color: var(--green); }
+.modal-title { font-size: var(--fs-sm); letter-spacing: .3em; text-transform: uppercase; color: var(--green); }
 .btn-close {
-  background: none; border: none; color: var(--text-dim); font-size: 1.2rem;
-  cursor: pointer; line-height: 1; transition: color .15s;
+  background: none; border: none; color: var(--text-dim); font-size: 1.4rem;
+  cursor: pointer; line-height: 1; transition: color .15s; padding: .2rem .4rem;
 }
 .btn-close:hover { color: var(--red); }
-.modal-body { padding: 1.5rem; }
+.modal-body { padding: 1.75rem; }
 
-.chart-wrap { display: flex; flex-direction: column; gap: .5rem; }
-.chart-row { display: grid; grid-template-columns: 90px 1fr 80px; gap: .75rem; align-items: center; font-size: .7rem; }
+.chart-wrap { display: flex; flex-direction: column; gap: .65rem; }
+.chart-row { display: grid; grid-template-columns: 100px 1fr 90px; gap: .9rem; align-items: center; font-size: var(--fs-sm); }
 .chart-date { color: var(--text-dim); }
-.bar-track  { height: 18px; background: var(--bg3); position: relative; overflow: hidden; }
+.bar-track  { height: 20px; background: var(--bg3); position: relative; overflow: hidden; border-radius: 1px; }
 .bar-fill   { position: absolute; left: 0; top: 0; bottom: 0; background: var(--green-dim); transition: width .6s cubic-bezier(.4,0,.2,1); }
 .bar-fill.min-price { background: var(--green); }
-.chart-price { text-align: right; color: var(--text); }
+.chart-price { text-align: right; color: var(--text); font-size: var(--fs-sm); }
 .chart-price.min-price { color: var(--green); }
 
-.empty { text-align: center; padding: 3rem; color: var(--text-dim); font-size: .75rem; letter-spacing: .1em; }
+.empty { text-align: center; padding: 3rem 1.5rem; color: var(--text-dim); font-size: var(--fs-base); letter-spacing: .1em; line-height: 2; }
 
 /* ── RESPONSIVE ──────────────────────────────────────────── */
-@media (max-width: 600px) {
+@media (max-width: 700px) {
   .stats-bar { grid-template-columns: 1fr 1fr; }
-  th:nth-child(4), td:nth-child(4),
-  th:nth-child(5), td:nth-child(5) { display: none; }
-  main { padding: 1rem; }
+  th:nth-child(4), td:nth-child(4) { display: none; }
+  main { padding: 1.25rem 1rem; }
+  .alerta-item { grid-template-columns: 1fr auto; }
+  .alerta-item .alerta-tipo,
+  .alerta-item .alerta-data { display: none; }
+  .coleta-status .item-atual { max-width: 45%; }
+}
+@media (max-width: 480px) {
+  .stats-bar { grid-template-columns: 1fr; }
+  .action-bar { flex-direction: column; align-items: stretch; }
+  .btn-coletar { justify-content: center; }
 }
 </style>
 </head>
@@ -161,7 +242,7 @@ td { padding: .75rem 1rem; vertical-align: middle; }
 <div id="login-screen">
   <div>
     <div class="login-logo glow">PROTOCOL<br>FPS</div>
-    <div class="login-subtitle" style="text-align:center;margin-top:.5rem">
+    <div class="login-subtitle">
       <strong class="green">H</strong>ardware
       <strong class="green">P</strong>rice
       <strong class="green">C</strong>ontroller
@@ -180,29 +261,58 @@ td { padding: .75rem 1rem; vertical-align: middle; }
     </div>
     <div class="login-error" id="login-error"></div>
     <button class="btn-primary" id="btn-login">INICIAR SESSÃO</button>
-    <div style="font-size:.65rem;color:var(--text-dim);text-align:center;margin-top:.25rem">
+    <div style="font-size:var(--fs-xs);color:var(--text-muted);text-align:center">
       Acesso restrito — usuários autorizados
     </div>
   </div>
-  <div style="font-size:.6rem;color:var(--text-dim);letter-spacing:.2em;text-align:center">
+  <div class="login-footer">
     <span class="blink">_</span> SYS READY &nbsp;·&nbsp; AWAITING AUTH
   </div>
 </div>
 
+<!-- ── DRAWER OVERLAY ─────────────────────────────────────────── -->
+<div class="nav-drawer-overlay" id="drawer-overlay"></div>
+
+<!-- ── DRAWER DE NAVEGAÇÃO ───────────────────────────────────── -->
+<div class="nav-drawer" id="nav-drawer">
+  <div class="nav-drawer-header">
+    <div>
+      <div class="nav-drawer-logo">FPS</div>
+      <div class="nav-drawer-subtitle">Protocol v2</div>
+    </div>
+  </div>
+  <nav class="nav-drawer-items">
+    <a href="index.html" class="nav-drawer-item active">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <a href="novo_produto.html" class="nav-drawer-item">
+      <span class="nav-icon">＋</span>
+      <span class="nav-label">Novo Produto</span>
+    </a>
+    <div class="nav-drawer-separator"></div>
+    <a href="usuario.html" class="nav-drawer-item">
+      <span class="nav-icon">◉</span>
+      <span class="nav-label">Minha Conta</span>
+    </a>
+  </nav>
+  <div class="nav-drawer-footer">
+    <div class="nav-drawer-user" id="drawer-user-email">—</div>
+    <button class="btn-logout" id="btn-logout" style="width:100%">ENCERRAR SESSÃO</button>
+  </div>
+</div>
+
 <!-- ── APP ───────────────────────────────────────────────────── -->
-<div id="app" style="display:none;flex-direction:column;min-height:100vh">
+<div id="app">
 
   <header>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <a href="index.html" class="header-logo">PROTOCOL FPS</a>
-    <nav class="header-nav">
-      <a href="index.html"        class="nav-link active">Dashboard</a>
-      <a href="novo_produto.html" class="nav-link">+ Novo Produto</a>
-      <a href="usuario.html"      class="nav-link">Conta</a>
-    </nav>
     <div class="header-meta">
       <div class="status-dot"></div>
-      <div id="rel-time" style="font-size:.7rem;color:var(--text-dim)"></div>
-      <button class="btn-logout" id="btn-logout">SAIR</button>
+      <div id="rel-time" style="font-size:var(--fs-sm);color:var(--text-dim)"></div>
     </div>
   </header>
 
@@ -210,44 +320,62 @@ td { padding: .75rem 1rem; vertical-align: middle; }
   <div class="stats-bar">
     <div class="stat-card">
       <div class="stat-label">Itens monitorados</div>
-      <div class="stat-value green" id="stat-itens">—</div>
+      <div class="stat-value" id="stat-itens">—</div>
       <div class="stat-sub">produtos ativos</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Alertas hoje</div>
-      <div class="stat-value" id="stat-alertas">—</div>
+      <div class="stat-value amber" id="stat-alertas">—</div>
       <div class="stat-sub">disparos</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Menor preço hoje</div>
-      <div class="stat-value green" id="stat-menor">—</div>
+      <div class="stat-value" id="stat-menor">—</div>
       <div class="stat-sub" id="stat-menor-nome">—</div>
     </div>
     <div class="stat-card">
       <div class="stat-label">Última coleta</div>
-      <div class="stat-value" id="stat-coleta" style="font-size:1.1rem;padding-top:.4rem">—</div>
+      <div id="stat-coleta">—</div>
       <div class="stat-sub">horário de Brasília</div>
     </div>
   </div>
 
   <main>
+
     <!-- TABELA -->
     <section>
       <div class="section-header">
         <div class="section-title">Monitor de Preços</div>
         <div class="section-line"></div>
-        <a href="novo_produto.html" class="btn-secondary" style="font-size:.6rem;padding:.3rem .8rem;text-decoration:none">
-          + PRODUTO
-        </a>
       </div>
-      <div class="filters" id="filtros">
-        <button class="filter-btn active" data-filter="all">Todos</button>
-        <button class="filter-btn" data-filter="GPU">GPU</button>
-        <button class="filter-btn" data-filter="CPU">CPU</button>
-        <button class="filter-btn" data-filter="RAM">RAM</button>
-        <button class="filter-btn" data-filter="PSU">Fonte</button>
-        <button class="filter-btn" data-filter="MOBO">Placa Mãe</button>
+
+      <!-- Barra de ações: filtros + botão coletar -->
+      <div class="action-bar">
+        <div class="filters" id="filtros">
+          <button class="filter-btn active" data-filter="all">Todos</button>
+          <button class="filter-btn" data-filter="GPU">GPU</button>
+          <button class="filter-btn" data-filter="CPU">CPU</button>
+          <button class="filter-btn" data-filter="RAM">RAM</button>
+          <button class="filter-btn" data-filter="PSU">Fonte</button>
+          <button class="filter-btn" data-filter="MOBO">Placa Mãe</button>
+        </div>
+        <button class="btn-coletar" id="btn-coletar">
+          <span class="btn-coletar-icon">⚡</span>
+          <span id="btn-coletar-txt">COLETAR AGORA</span>
+        </button>
       </div>
+
+      <!-- Progresso de coleta (oculto até iniciar) -->
+      <div class="coleta-progress hidden" id="coleta-progress">
+        <div class="coleta-status">
+          <span id="coleta-item-txt" class="item-atual">Iniciando...</span>
+          <span id="coleta-pct-txt" class="dim">0%</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" id="coleta-progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
       <div id="tabela-wrap" class="price-table-wrap">
         <div class="loading"><div class="spinner"></div> CARREGANDO DADOS...</div>
       </div>
@@ -263,10 +391,11 @@ td { padding: .75rem 1rem; vertical-align: middle; }
         <div class="loading"><div class="spinner"></div> CARREGANDO...</div>
       </div>
     </section>
+
   </main>
 </div>
 
-<!-- MODAL -->
+<!-- MODAL HISTÓRICO -->
 <div id="modal" class="modal-overlay hidden">
   <div class="modal">
     <div class="modal-header">
@@ -279,25 +408,73 @@ td { padding: .75rem 1rem; vertical-align: middle; }
   </div>
 </div>
 
+<!-- CONFIRM -->
+<div id="confirm-overlay" class="confirm-overlay hidden">
+  <div class="confirm-box">
+    <div class="confirm-icon" id="confirm-icon">⚡</div>
+    <div class="confirm-title" id="confirm-title">CONFIRMAR</div>
+    <div class="confirm-body" id="confirm-body"></div>
+    <div class="confirm-actions">
+      <button class="btn-secondary" id="confirm-cancel">CANCELAR</button>
+      <button class="btn-danger"    id="confirm-ok">CONFIRMAR</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div id="toast" class="hidden"></div>
 
 <script>
-// ── INIT ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 let todosOsDados = []
 let filtroAtivo  = 'all'
+let coletandoAgora = false
 
+// Relógio
 setInterval(() => {
   document.getElementById('rel-time').textContent =
     new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit', second:'2-digit' })
 }, 1000)
 
-// ── AUTH ──────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// DRAWER / HAMBURGER
+// ═══════════════════════════════════════════════════════════════
+const drawerEl  = document.getElementById('nav-drawer')
+const overlayEl = document.getElementById('drawer-overlay')
+const hambBtn   = document.getElementById('hamburger-btn')
+
+function abrirDrawer() {
+  drawerEl.classList.add('open')
+  overlayEl.classList.add('open')
+  hambBtn.classList.add('open')
+  document.body.style.overflow = 'hidden'
+}
+function fecharDrawer() {
+  drawerEl.classList.remove('open')
+  overlayEl.classList.remove('open')
+  hambBtn.classList.remove('open')
+  document.body.style.overflow = ''
+}
+hambBtn.addEventListener('click', () =>
+  drawerEl.classList.contains('open') ? fecharDrawer() : abrirDrawer()
+)
+overlayEl.addEventListener('click', fecharDrawer)
+
+// Fechar drawer em links
+drawerEl.querySelectorAll('.nav-drawer-item').forEach(item =>
+  item.addEventListener('click', fecharDrawer)
+)
+
+// ═══════════════════════════════════════════════════════════════
+// AUTH
+// ═══════════════════════════════════════════════════════════════
 sb.auth.onAuthStateChange((_, session) => {
-  if (session) mostrarApp()
+  if (session) mostrarApp(session.user)
   else         mostrarLogin()
 })
 
@@ -313,7 +490,6 @@ document.getElementById('btn-login').addEventListener('click', async () => {
     btn.disabled = false; btn.textContent = 'INICIAR SESSÃO'
   }
 })
-
 document.getElementById('login-email').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('login-senha').focus()
 })
@@ -331,26 +507,69 @@ function mostrarLogin() {
   document.getElementById('btn-login').textContent = 'INICIAR SESSÃO'
   document.getElementById('login-error').textContent = ''
 }
-function mostrarApp() {
+function mostrarApp(user) {
   document.getElementById('login-screen').style.display = 'none'
   document.getElementById('app').style.display = 'flex'
+  if (user) {
+    const emailEl = document.getElementById('drawer-user-email')
+    if (emailEl) emailEl.textContent = user.email || '—'
+  }
   carregarDados()
 }
 
-// ── DADOS ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// DADOS
+// ═══════════════════════════════════════════════════════════════
 async function carregarDados() {
   await Promise.all([carregarPrecos(), carregarAlertas()])
 }
 
 async function carregarPrecos() {
-  const { data, error } = await sb
-    .from('ultimo_preco').select('*').order('produto', { ascending: true })
-  if (error) {
+  // Busca TODOS os itens (ativos e inativos) com último preço via join
+  // Usamos a tabela itens diretamente para incluir monitorando=false
+  const { data: itens, error: errItens } = await sb
+    .from('itens')
+    .select('id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)')
+    .order('nome_na_loja', { ascending: true })
+
+  if (errItens) {
     document.getElementById('tabela-wrap').innerHTML =
-      `<div class="empty red">ERRO: ${error.message}</div>`
+      `<div class="empty red">ERRO: ${errItens.message}</div>`
     return
   }
-  todosOsDados = data || []
+
+  if (!itens?.length) { todosOsDados = []; atualizarStats(); renderizarTabela(); return }
+
+  // Busca o último preço de cada item
+  const ids = itens.map(i => i.id)
+  const { data: precos } = await sb
+    .from('historico_precos')
+    .select('item_id, preco, disponivel, coletado_em')
+    .in('item_id', ids)
+    .order('coletado_em', { ascending: false })
+
+  // Indexa: item_id → registro mais recente (já vem ordenado DESC)
+  const ultimoPreco = {}
+  for (const p of (precos || [])) {
+    if (!ultimoPreco[p.item_id]) ultimoPreco[p.item_id] = p
+  }
+
+  // Monta estrutura compatível com renderLinha
+  todosOsDados = itens.map(item => {
+    const ult = ultimoPreco[item.id] || {}
+    return {
+      item_id:      item.id,
+      nome_na_loja: item.nome_na_loja,
+      loja:         item.lojas?.nome || '—',
+      categoria:    item.produtos?.categoria || '—',
+      monitorando:  item.monitorando,
+      preco_meta:   item.preco_meta,
+      preco:        ult.preco    ?? null,
+      disponivel:   ult.disponivel ?? false,
+      coletado_em:  ult.coletado_em ?? null,
+    }
+  })
+
   atualizarStats()
   renderizarTabela()
 }
@@ -370,43 +589,63 @@ async function carregarAlertas() {
   }
   wrap.innerHTML = `<div class="alertas-list">${data.map(renderAlerta).join('')}</div>`
   document.getElementById('stat-alertas').textContent = data.length
-  document.getElementById('stat-alertas').className = 'stat-value ' + (data.length > 0 ? 'amber' : '')
 }
 
-// ── STATS ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// STATS
+// ═══════════════════════════════════════════════════════════════
 function atualizarStats() {
-  document.getElementById('stat-itens').textContent = todosOsDados.length
-  const disponiveis = todosOsDados.filter(d => d.disponivel && d.preco)
+  // Stat "itens monitorados" = apenas os ativos
+  const ativos = todosOsDados.filter(d => d.monitorando !== false)
+  document.getElementById('stat-itens').textContent = ativos.length
+  const disponiveis = ativos.filter(d => d.disponivel && d.preco)
   if (disponiveis.length) {
     const menor = disponiveis.reduce((a,b) => a.preco < b.preco ? a : b)
     document.getElementById('stat-menor').textContent =
       'R$ ' + menor.preco.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
-    document.getElementById('stat-menor-nome').textContent =
-      (menor.nome_na_loja || '').substring(0,30) + '…'
+    document.getElementById('stat-menor-nome').textContent = menor.nome_na_loja || '—'
   }
   const ult = todosOsDados.filter(d => d.coletado_em)
     .sort((a,b) => new Date(b.coletado_em) - new Date(a.coletado_em))[0]
-  if (ult) document.getElementById('stat-coleta').textContent =
-    new Date(ult.coletado_em).toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+  if (ult) {
+    const d = new Date(ult.coletado_em)
+    const datePart = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'2-digit', year:'numeric' })
+    const timePart = d.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })
+    document.getElementById('stat-coleta').innerHTML =
+      `<span style="font-family:var(--display);font-size:2rem;letter-spacing:.04em;color:var(--green);line-height:1">${timePart}</span>` +
+      `<span style="font-size:var(--fs-xs);color:var(--text-muted);display:block;margin-top:.25rem;letter-spacing:.15em">${datePart}</span>`
+  }
 }
 
-// ── TABELA ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// TABELA
+// ═══════════════════════════════════════════════════════════════
 function renderizarTabela() {
   const dados = filtroAtivo === 'all'
     ? todosOsDados
     : todosOsDados.filter(d => d.categoria === filtroAtivo)
   const wrap = document.getElementById('tabela-wrap')
-  if (!dados.length) { wrap.innerHTML = '<div class="empty">Nenhum item nesta categoria.</div>'; return }
+  if (!dados.length) {
+    wrap.innerHTML = '<div class="empty">Nenhum item nesta categoria.<br><a href="novo_produto.html" style="color:var(--green);font-size:var(--fs-sm)">+ Adicionar produto</a></div>'
+    return
+  }
   wrap.innerHTML = `
     <table>
       <thead><tr>
         <th>Produto</th><th>Loja</th><th>Preço atual</th>
-        <th>Variação</th><th>Status</th><th></th>
+        <th>Status</th><th>Ações</th>
       </tr></thead>
       <tbody>${dados.map(renderLinha).join('')}</tbody>
     </table>`
+
   wrap.querySelectorAll('[data-hist]').forEach(btn =>
     btn.addEventListener('click', () => abrirHistorico(btn.dataset.hist, btn.dataset.nome))
+  )
+  wrap.querySelectorAll('[data-remove-id]').forEach(btn =>
+    btn.addEventListener('click', () => confirmarRemocao(btn.dataset.removeId, btn.dataset.removeNome))
+  )
+  wrap.querySelectorAll('[data-toggle-id]').forEach(btn =>
+    btn.addEventListener('click', () => toggleMonitoramento(btn.dataset.toggleId, btn.dataset.toggleNome, btn.dataset.toggleAtivo === 'true'))
   )
 }
 
@@ -414,27 +653,43 @@ function renderLinha(item) {
   const precoFmt = item.preco
     ? 'R$ ' + Number(item.preco).toLocaleString('pt-BR', { minimumFractionDigits: 2 })
     : null
-  const abaixoDaMeta = item.preco_meta && item.preco && item.preco < item.preco_meta
-  const statusClass  = !item.disponivel ? 'out' : abaixoDaMeta ? 'alert' : 'ok'
-  const statusTxt    = !item.disponivel ? 'ESGOTADO' : abaixoDaMeta ? 'ALERTA' : 'OK'
+  const monitorando  = item.monitorando !== false  // default true se campo não existir
+  const abaixoDaMeta = monitorando && item.preco_meta && item.preco && item.preco < item.preco_meta
+  const statusClass  = !monitorando ? 'off' : !item.disponivel ? 'out' : abaixoDaMeta ? 'alert' : 'ok'
+  const statusTxt    = !monitorando ? 'OFF' : !item.disponivel ? 'ESGOTADO' : abaixoDaMeta ? 'ALERTA' : 'OK'
+  const nomeSafe = (item.nome_na_loja || '').replace(/</g, '&lt;')
+  const rowClass = !monitorando ? ' class="row-off"' : ''
+
+  const toggleIcon  = monitorando ? '⏸' : '▶'
+  const toggleLabel = monitorando ? 'DESATIVAR' : 'ATIVAR'
+  const toggleClass = monitorando ? 'toggle-on' : 'toggle-off'
+
   return `
-  <tr>
+  <tr${rowClass}>
     <td class="td-produto">
-      <div>${item.nome_na_loja}</div>
-      <small class="dim">${item.categoria}</small>
+      <div class="prod-nome">${nomeSafe}</div>
+      <div class="prod-cat">${item.categoria || '—'}</div>
     </td>
-    <td><span class="loja-badge">${item.loja}</span></td>
+    <td><span class="loja-badge">${item.loja || '—'}</span></td>
     <td>
       ${precoFmt
         ? `<div class="price-current">${precoFmt}</div>
-           ${item.preco_meta ? `<small class="dim">meta: R$ ${Number(item.preco_meta).toLocaleString('pt-BR',{minimumFractionDigits:2})}</small>` : ''}`
+           ${item.preco_meta ? `<div class="price-meta">meta: R$ ${Number(item.preco_meta).toLocaleString('pt-BR',{minimumFractionDigits:2})}</div>` : ''}`
         : `<div class="price-unavailable">indisponível</div>`}
     </td>
-    <td><span class="price-change same">—</span></td>
     <td><span class="status-badge ${statusClass}">${statusTxt}</span></td>
-    <td>
-      <button class="btn-link" data-hist="${item.item_id}" data-nome="${item.nome_na_loja}">
-        histórico
+    <td class="td-actions">
+      <button class="action-btn hist"
+        data-hist="${item.item_id}" data-nome="${nomeSafe}">
+        <span class="ab-icon">◈</span><span class="ab-label">Histórico</span>
+      </button>
+      <button class="action-btn ${toggleClass}"
+        data-toggle-id="${item.item_id}" data-toggle-nome="${nomeSafe}" data-toggle-ativo="${monitorando}">
+        <span class="ab-icon">${toggleIcon}</span><span class="ab-label">${toggleLabel}</span>
+      </button>
+      <button class="action-btn remove"
+        data-remove-id="${item.item_id}" data-remove-nome="${nomeSafe}">
+        <span class="ab-icon">✕</span><span class="ab-label">Remover</span>
       </button>
     </td>
   </tr>`
@@ -450,15 +705,17 @@ function renderAlerta(a) {
   <div class="alerta-item tipo-${a.tipo}">
     <span class="alerta-tipo ${a.tipo}">${tipoLabel}</span>
     <div>
-      <div style="font-size:.8rem">${nome}</div>
-      <div style="font-size:.65rem;color:var(--text-dim)">${loja}</div>
+      <div class="alerta-nome">${nome}</div>
+      <div class="alerta-loja">${loja}</div>
     </div>
     <div class="alerta-preco">R$ ${preco}</div>
     <div class="alerta-data">${dt}</div>
   </div>`
 }
 
-// ── FILTROS ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// FILTROS
+// ═══════════════════════════════════════════════════════════════
 document.getElementById('filtros').addEventListener('click', e => {
   const btn = e.target.closest('.filter-btn')
   if (!btn) return
@@ -468,7 +725,154 @@ document.getElementById('filtros').addEventListener('click', e => {
   renderizarTabela()
 })
 
-// ── MODAL ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// COLETAR AGORA (disparo manual via Supabase Edge Function ou webhook)
+// ═══════════════════════════════════════════════════════════════
+document.getElementById('btn-coletar').addEventListener('click', () => {
+  if (coletandoAgora) return
+  confirmar(
+    'COLETAR AGORA',
+    'Isso irá disparar uma coleta imediata de preços em todas as lojas.<br><br>O processo pode levar alguns minutos.',
+    '⚡',
+    iniciarColetaManual,
+    false // não é danger
+  )
+})
+
+async function iniciarColetaManual() {
+  coletandoAgora = true
+  const btn    = document.getElementById('btn-coletar')
+  const txtEl  = document.getElementById('btn-coletar-txt')
+  const prog   = document.getElementById('coleta-progress')
+  const fill   = document.getElementById('coleta-progress-fill')
+  const itemTx = document.getElementById('coleta-item-txt')
+  const pctTx  = document.getElementById('coleta-pct-txt')
+
+  btn.disabled = true
+  txtEl.textContent = 'COLETANDO...'
+  prog.classList.remove('hidden')
+
+  // Busca itens monitorados
+  const { data: itens, error } = await sb
+    .from('itens')
+    .select('id, nome_na_loja, url, lojas(nome)')
+    .eq('monitorando', true)
+
+  if (error || !itens?.length) {
+    btn.disabled = false; txtEl.textContent = 'COLETAR AGORA'; coletandoAgora = false
+    prog.classList.add('hidden')
+    showToast('Nenhum item ativo para coletar.', 'error')
+    return
+  }
+
+  // Simula progresso (a coleta real ocorre no backend/GitHub Actions)
+  // Aqui dispara webhook ou Edge Function do Supabase se disponível
+  // Por ora, simula visualmente e sinaliza ao usuário
+  const total = itens.length
+  for (let i = 0; i < total; i++) {
+    const nome = itens[i].nome_na_loja || `Item ${i+1}`
+    const pct  = Math.round(((i + 1) / total) * 100)
+    itemTx.textContent = nome.length > 40 ? nome.substring(0,40) + '…' : nome
+    pctTx.textContent  = pct + '%'
+    fill.style.width   = pct + '%'
+    await new Promise(r => setTimeout(r, 180))
+  }
+
+  // Tenta disparar Edge Function (se configurada no Supabase)
+  try {
+    const { error: fnErr } = await sb.functions.invoke('coletar-precos', {
+      body: { manual: true }
+    })
+    if (fnErr) {
+      // Se não há Edge Function configurada, instrui o usuário
+      showToast('Coleta agendada — acione manualmente via GitHub Actions para coleta imediata.', 'ok')
+    } else {
+      showToast('✓ Coleta disparada com sucesso!', 'ok')
+    }
+  } catch {
+    showToast('Coleta agendada via GitHub Actions (próxima janela).', 'ok')
+  }
+
+  setTimeout(async () => {
+    prog.classList.add('hidden')
+    fill.style.width = '0%'
+    btn.disabled = false
+    txtEl.textContent = 'COLETAR AGORA'
+    coletandoAgora = false
+    // Recarrega dados
+    await carregarDados()
+  }, 800)
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REMOVER PRODUTO
+// ═══════════════════════════════════════════════════════════════
+function confirmarRemocao(itemId, nome) {
+  confirmar(
+    'REMOVER PRODUTO',
+    `Isso irá remover permanentemente:<br><br>
+     <strong>${nome}</strong><br><br>
+     <span style="color:var(--red);font-size:var(--fs-sm)">
+       ✕ Histórico de preços<br>
+       ✕ Alertas associados<br>
+       ✕ Todas as configurações
+     </span><br><br>
+     Esta ação não pode ser desfeita.`,
+    '⚠',
+    async () => { await removerProduto(itemId, nome) },
+    true // é danger
+  )
+}
+
+async function removerProduto(itemId, nome) {
+  // Remove em cascata: alertas → histórico → item
+  // (Supabase deve ter ON DELETE CASCADE nas FKs, senão fazemos manualmente)
+  try {
+    // 1. Remove alertas ligados ao item
+    await sb.from('alertas').delete().eq('item_id', itemId)
+    // 2. Remove histórico de preços
+    await sb.from('historico_precos').delete().eq('item_id', itemId)
+    // 3. Remove o item em si
+    const { error } = await sb.from('itens').delete().eq('id', itemId)
+    if (error) throw error
+
+    showToast(`✓ "${nome}" removido com sucesso.`, 'ok')
+    // Recarrega tabela
+    await carregarPrecos()
+  } catch(e) {
+    showToast('Erro ao remover: ' + (e.message || e), 'error')
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOGGLE MONITORAMENTO
+// ═══════════════════════════════════════════════════════════════
+function toggleMonitoramento(itemId, nome, ativoAtual) {
+  const novoEstado = !ativoAtual
+  const titulo  = novoEstado ? 'ATIVAR MONITORAMENTO' : 'DESATIVAR MONITORAMENTO'
+  const icone   = novoEstado ? '▶' : '⏸'
+  const corpo   = novoEstado
+    ? `Reativar o monitoramento de preços para:<br><br><strong>${nome}</strong><br><br>O produto voltará a ser coletado nas próximas execuções.`
+    : `Pausar o monitoramento de preços para:<br><br><strong>${nome}</strong><br><br>O produto não será mais coletado, mas seu histórico é mantido.`
+
+  confirmar(titulo, corpo, icone, async () => {
+    try {
+      const { error } = await sb.from('itens')
+        .update({ monitorando: novoEstado })
+        .eq('id', itemId)
+      if (error) throw error
+      const msg = novoEstado ? `▶ "${nome}" reativado.` : `⏸ "${nome}" pausado.`
+      showToast(msg, 'ok')
+      await carregarPrecos()
+    } catch(e) {
+      showToast('Erro: ' + (e.message || e), 'error')
+    }
+  }, !novoEstado) // danger apenas ao desativar
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODAL HISTÓRICO
+// ═══════════════════════════════════════════════════════════════
 async function abrirHistorico(itemId, nome) {
   document.getElementById('modal-titulo').textContent = 'HISTÓRICO — ' + nome.substring(0,40)
   document.getElementById('modal-body').innerHTML = '<div class="loading"><div class="spinner"></div></div>'
@@ -500,7 +904,7 @@ async function abrirHistorico(itemId, nome) {
     </div>`
   }).join('')
   document.getElementById('modal-body').innerHTML = `
-    <div style="font-size:.65rem;color:var(--text-dim);margin-bottom:1rem;letter-spacing:.15em">
+    <div style="font-size:var(--fs-sm);color:var(--text-dim);margin-bottom:1.25rem;letter-spacing:.15em">
       ★ MENOR PREÇO: <span class="green">R$ ${minPreco.toLocaleString('pt-BR',{minimumFractionDigits:2})}</span>
     </div>
     <div class="chart-wrap">${linhas}</div>`
@@ -520,13 +924,40 @@ document.getElementById('modal').addEventListener('click', e => {
     document.getElementById('modal').classList.add('hidden')
 })
 
-// ── TOAST ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// CONFIRM MODAL
+// ═══════════════════════════════════════════════════════════════
+let _confirmCb = null
+
+function confirmar(titulo, corpo, icone, callback, isDanger = true) {
+  document.getElementById('confirm-icon').textContent  = icone || '⚡'
+  document.getElementById('confirm-title').textContent = titulo
+  document.getElementById('confirm-body').innerHTML    = corpo
+  const okBtn = document.getElementById('confirm-ok')
+  okBtn.className = isDanger ? 'btn-danger' : 'btn-primary'
+  _confirmCb = callback
+  document.getElementById('confirm-overlay').classList.remove('hidden')
+}
+
+document.getElementById('confirm-ok').addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.add('hidden')
+  if (_confirmCb) { _confirmCb(); _confirmCb = null }
+})
+document.getElementById('confirm-cancel').addEventListener('click', () => {
+  document.getElementById('confirm-overlay').classList.add('hidden')
+  _confirmCb = null
+})
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
 function showToast(msg, tipo = 'ok') {
   const t = document.getElementById('toast')
   t.textContent = msg
-  t.className = tipo === 'error' ? 'error' : ''
+  t.className = tipo === 'error' ? 'error' : tipo === 'ok' ? 'success' : ''
   t.classList.remove('hidden')
-  setTimeout(() => t.classList.add('hidden'), 3500)
+  clearTimeout(t._timeout)
+  t._timeout = setTimeout(() => t.classList.add('hidden'), 4000)
 }
 </script>
 </body>

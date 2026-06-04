@@ -13,65 +13,63 @@
 
 <style>
 #app { display: none; flex-direction: column; min-height: 100vh; }
-#app.visible { display: flex; }
 
 main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
-.page-wrap { width: min(640px, 100%); display: flex; flex-direction: column; gap: 2rem; }
+.page-wrap { width: min(680px, 100%); display: flex; flex-direction: column; gap: 2rem; }
 
 .breadcrumb {
-  display: flex; align-items: center; gap: .5rem;
-  font-size: .65rem; letter-spacing: .2em; color: var(--text-dim); text-transform: uppercase;
+  display: flex; align-items: center; gap: .6rem;
+  font-size: var(--fs-sm); letter-spacing: .15em; color: var(--text-dim); text-transform: uppercase;
 }
 .breadcrumb a { color: var(--text-dim); text-decoration: none; transition: color .15s; }
 .breadcrumb a:hover { color: var(--green); }
 
 .page-title {
-  font-family: var(--display); font-size: clamp(2rem, 6vw, 3.5rem);
+  font-family: var(--display); font-size: clamp(2.5rem, 7vw, 4rem);
   letter-spacing: .08em; color: var(--green);
-  text-shadow: 0 0 20px var(--green-dim); line-height: 1;
+  text-shadow: 0 0 24px var(--green-dim); line-height: 1;
 }
 
 .info-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-top: 1px solid var(--green-dim); position: relative;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-top: 2px solid var(--green-dim); position: relative;
 }
 .info-card::before {
-  content: attr(data-label); position: absolute; top: -1px; left: 1.5rem;
+  content: attr(data-label); position: absolute; top: -1px; left: 1.75rem;
   background: var(--bg2); color: var(--green-dim);
-  font-size: .6rem; letter-spacing: .3em; padding: 0 .5rem; transform: translateY(-50%);
+  font-size: var(--fs-xs); letter-spacing: .3em; padding: 0 .6rem; transform: translateY(-50%);
   text-transform: uppercase;
 }
-.info-body { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
+.info-body { padding: 1.75rem; display: flex; flex-direction: column; gap: 1.5rem; }
 
 .info-row {
   display: flex; justify-content: space-between; align-items: center;
-  padding: .65rem 0; border-bottom: 1px solid var(--border);
+  padding: .85rem 0; border-bottom: 1px solid var(--border);
 }
 .info-row:last-child { border-bottom: none; }
-.info-key   { font-size: .65rem; letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
-.info-value { font-size: .82rem; color: var(--text); }
+.info-key   { font-size: var(--fs-sm); letter-spacing: .2em; text-transform: uppercase; color: var(--text-dim); }
+.info-value { font-size: var(--fs-md); color: var(--text); }
 
 .badge-active {
-  font-size: .6rem; letter-spacing: .15em; text-transform: uppercase;
-  padding: .2rem .6rem; border: 1px solid var(--green-dim); color: var(--green);
+  font-size: var(--fs-xs); letter-spacing: .15em; text-transform: uppercase;
+  padding: .3rem .75rem; border: 1px solid var(--green-dim); color: var(--green);
 }
 
 .field-group { display: flex; flex-direction: column; }
 
 .form-actions {
-  display: flex; gap: .75rem; justify-content: flex-end;
-  padding: 1.25rem 1.5rem; border-top: 1px solid var(--border); background: var(--bg3);
+  display: flex; gap: .9rem; justify-content: flex-end;
+  padding: 1.4rem 1.75rem; border-top: 1px solid var(--border2); background: var(--bg3);
 }
 
-.danger-zone {
-  border-top-color: var(--red) !important;
-}
+.danger-zone { border-top-color: var(--red) !important; }
 .danger-zone::before { color: var(--red) !important; }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   main { padding: 1.25rem 1rem; }
   .info-body { padding: 1.25rem; }
   .form-actions { flex-direction: column; }
+  .info-row { flex-direction: column; align-items: flex-start; gap: .4rem; }
 }
 </style>
 </head>
@@ -81,7 +79,7 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
 <div id="login-screen">
   <div>
     <div class="login-logo glow">PROTOCOL<br>FPS</div>
-    <div class="login-subtitle" style="text-align:center;margin-top:.5rem">
+    <div class="login-subtitle">
       <strong class="green">H</strong>ardware
       <strong class="green">P</strong>rice
       <strong class="green">C</strong>ontroller
@@ -101,23 +99,52 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
     <div class="login-error" id="login-error"></div>
     <button class="btn-primary" id="btn-login">INICIAR SESSÃO</button>
   </div>
-  <div style="font-size:.6rem;color:var(--text-dim);letter-spacing:.2em;text-align:center">
+  <div class="login-footer">
     <span class="blink">_</span> SYS READY &nbsp;·&nbsp; AWAITING AUTH
+  </div>
+</div>
+
+<!-- DRAWER OVERLAY -->
+<div class="nav-drawer-overlay" id="drawer-overlay"></div>
+
+<!-- DRAWER -->
+<div class="nav-drawer" id="nav-drawer">
+  <div class="nav-drawer-header">
+    <div>
+      <div class="nav-drawer-logo">FPS</div>
+      <div class="nav-drawer-subtitle">Protocol v2</div>
+    </div>
+  </div>
+  <nav class="nav-drawer-items">
+    <a href="index.html" class="nav-drawer-item">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <a href="novo_produto.html" class="nav-drawer-item">
+      <span class="nav-icon">＋</span>
+      <span class="nav-label">Novo Produto</span>
+    </a>
+    <div class="nav-drawer-separator"></div>
+    <a href="usuario.html" class="nav-drawer-item active">
+      <span class="nav-icon">◉</span>
+      <span class="nav-label">Minha Conta</span>
+    </a>
+  </nav>
+  <div class="nav-drawer-footer">
+    <div class="nav-drawer-user" id="drawer-user-email">—</div>
+    <button class="btn-logout" id="btn-logout" style="width:100%">ENCERRAR SESSÃO</button>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app">
   <header>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <a href="index.html" class="header-logo">PROTOCOL FPS</a>
-    <nav class="header-nav">
-      <a href="index.html"        class="nav-link">Dashboard</a>
-      <a href="novo_produto.html" class="nav-link">+ Novo Produto</a>
-      <a href="usuario.html"      class="nav-link active">Conta</a>
-    </nav>
     <div class="header-meta">
       <div class="status-dot"></div>
-      <button class="btn-logout" id="btn-logout">SAIR</button>
     </div>
   </header>
 
@@ -132,7 +159,7 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
 
       <div class="page-title">CONTA</div>
 
-      <!-- INFO -->
+      <!-- INFO DA SESSÃO -->
       <div class="info-card" data-label="SESSÃO ATIVA">
         <div class="info-body">
           <div class="info-row">
@@ -140,8 +167,8 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
             <div class="info-value" id="user-email">—</div>
           </div>
           <div class="info-row">
-            <div class="info-key">ID</div>
-            <div class="info-value dim" id="user-id" style="font-size:.7rem">—</div>
+            <div class="info-key">ID de usuário</div>
+            <div class="info-value dim" id="user-id" style="font-size:var(--fs-sm);word-break:break-all">—</div>
           </div>
           <div class="info-row">
             <div class="info-key">Status</div>
@@ -154,7 +181,7 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
         </div>
       </div>
 
-      <!-- ALTERAR SENHA -->
+      <!-- SEGURANÇA -->
       <div class="info-card" data-label="SEGURANÇA">
         <div class="info-body">
           <div class="field-group">
@@ -179,14 +206,12 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
       <!-- ZONA DE PERIGO -->
       <div class="info-card danger-zone" data-label="SESSÃO">
         <div class="info-body">
-          <div style="font-size:.75rem;color:var(--text-dim)">
-            Encerra a sessão atual em todos os dispositivos.
+          <div style="font-size:var(--fs-base);color:var(--text-dim);line-height:1.7">
+            Encerra a sessão atual em todos os dispositivos conectados.
           </div>
         </div>
         <div class="form-actions">
-          <button class="btn-secondary" id="btn-sair-tudo" style="border-color:var(--red);color:var(--red)">
-            ENCERRAR TODAS AS SESSÕES
-          </button>
+          <button class="btn-danger" id="btn-sair-tudo">ENCERRAR TODAS AS SESSÕES</button>
         </div>
       </div>
 
@@ -200,6 +225,25 @@ main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
+// ── DRAWER ────────────────────────────────────────────────────
+const drawerEl  = document.getElementById('nav-drawer')
+const overlayEl = document.getElementById('drawer-overlay')
+const hambBtn   = document.getElementById('hamburger-btn')
+function abrirDrawer() {
+  drawerEl.classList.add('open'); overlayEl.classList.add('open')
+  hambBtn.classList.add('open'); document.body.style.overflow = 'hidden'
+}
+function fecharDrawer() {
+  drawerEl.classList.remove('open'); overlayEl.classList.remove('open')
+  hambBtn.classList.remove('open'); document.body.style.overflow = ''
+}
+hambBtn.addEventListener('click', () =>
+  drawerEl.classList.contains('open') ? fecharDrawer() : abrirDrawer()
+)
+overlayEl.addEventListener('click', fecharDrawer)
+drawerEl.querySelectorAll('.nav-drawer-item').forEach(i => i.addEventListener('click', fecharDrawer))
+
+// ── AUTH ──────────────────────────────────────────────────────
 sb.auth.onAuthStateChange((_, session) => {
   if (session) mostrarApp(session.user)
   else         mostrarLogin()
@@ -227,41 +271,34 @@ document.getElementById('btn-logout').addEventListener('click', () => sb.auth.si
 
 function mostrarLogin() {
   document.getElementById('login-screen').style.display = 'flex'
-  document.getElementById('app').classList.remove('visible')
+  document.getElementById('app').style.display = 'none'
 }
 function mostrarApp(user) {
   document.getElementById('login-screen').style.display = 'none'
-  document.getElementById('app').classList.add('visible')
-
-  document.getElementById('user-email').textContent = user.email || '—'
-  document.getElementById('user-id').textContent    = user.id   || '—'
-
+  document.getElementById('app').style.display = 'flex'
+  document.getElementById('user-email').textContent     = user.email || '—'
+  document.getElementById('user-id').textContent        = user.id    || '—'
+  const emailEl = document.getElementById('drawer-user-email')
+  if (emailEl) emailEl.textContent = user.email || '—'
   const lastLogin = user.last_sign_in_at
-    ? new Date(user.last_sign_in_at).toLocaleString('pt-BR')
-    : '—'
+    ? new Date(user.last_sign_in_at).toLocaleString('pt-BR') : '—'
   document.getElementById('user-last-login').textContent = lastLogin
 }
 
-// Alterar senha
+// ── ALTERAR SENHA ─────────────────────────────────────────────
 document.getElementById('btn-salvar-senha').addEventListener('click', async () => {
-  const nova  = document.getElementById('input-nova-senha').value
-  const conf  = document.getElementById('input-conf-senha').value
+  const nova = document.getElementById('input-nova-senha').value
+  const conf = document.getElementById('input-conf-senha').value
   let ok = true
-
   document.getElementById('err-senha').classList.add('hidden')
   document.getElementById('err-conf').classList.add('hidden')
-
   if (nova.length < 8) { document.getElementById('err-senha').classList.remove('hidden'); ok = false }
   if (nova !== conf)   { document.getElementById('err-conf').classList.remove('hidden');  ok = false }
   if (!ok) return
-
   const btn = document.getElementById('btn-salvar-senha')
   btn.disabled = true; btn.textContent = 'SALVANDO...'
-
   const { error } = await sb.auth.updateUser({ password: nova })
-
   btn.disabled = false; btn.textContent = 'ATUALIZAR SENHA'
-
   if (error) showToast('Erro: ' + error.message, 'error')
   else {
     document.getElementById('input-nova-senha').value = ''
@@ -270,17 +307,18 @@ document.getElementById('btn-salvar-senha').addEventListener('click', async () =
   }
 })
 
-// Encerrar todas as sessões
 document.getElementById('btn-sair-tudo').addEventListener('click', async () => {
   await sb.auth.signOut({ scope: 'global' })
 })
 
+// ── TOAST ─────────────────────────────────────────────────────
 function showToast(msg, tipo = 'ok') {
   const t = document.getElementById('toast')
   t.textContent = msg
-  t.className = tipo === 'error' ? 'error' : ''
+  t.className = tipo === 'error' ? 'error' : 'success'
   t.classList.remove('hidden')
-  setTimeout(() => t.classList.add('hidden'), 3500)
+  clearTimeout(t._timeout)
+  t._timeout = setTimeout(() => t.classList.add('hidden'), 4000)
 }
 </script>
 </body>
