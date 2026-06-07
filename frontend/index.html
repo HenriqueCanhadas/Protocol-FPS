@@ -61,6 +61,64 @@ main { flex: 1; padding: 1.75rem 1.5rem; display: flex; flex-direction: column; 
 .btn-coletar .spinner { border-top-color: var(--amber); border-color: rgba(255,184,0,.3); border-top-color: var(--amber); }
 .btn-coletar-icon { font-size: 1rem; }
 
+/* ── SEARCH + SORT BAR ───────────────────────────────────── */
+.toolbar {
+  display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1.25rem;
+}
+.toolbar-row {
+  display: flex; gap: .6rem; flex-wrap: wrap; align-items: center;
+}
+
+/* Campo de busca */
+.search-wrap {
+  position: relative; flex: 1; min-width: 200px;
+}
+.search-wrap .search-icon {
+  position: absolute; left: .85rem; top: 50%; transform: translateY(-50%);
+  color: var(--text-muted); font-size: .9rem; pointer-events: none;
+}
+.search-input {
+  width: 100%; background: var(--bg2); border: 1px solid var(--border2);
+  color: var(--text); font-family: var(--mono); font-size: var(--fs-sm);
+  padding: .65rem .9rem .65rem 2.4rem; outline: none;
+  transition: border-color .2s, box-shadow .2s;
+  letter-spacing: .04em;
+}
+.search-input::placeholder { color: var(--text-muted); }
+.search-input:focus {
+  border-color: var(--green-dim);
+  box-shadow: 0 0 0 1px var(--green-dim);
+}
+.btn-search-clear {
+  position: absolute; right: .75rem; top: 50%; transform: translateY(-50%);
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: .9rem; line-height: 1;
+  transition: color .15s; padding: .15rem;
+}
+.btn-search-clear:hover { color: var(--red); }
+
+/* Botões de ordenação */
+.sort-controls {
+  display: flex; gap: .4rem; flex-wrap: wrap;
+}
+.sort-btn {
+  display: flex; align-items: center; gap: .4rem;
+  background: var(--bg2); border: 1px solid var(--border2);
+  color: var(--text-dim); font-family: var(--mono);
+  font-size: var(--fs-xs); letter-spacing: .15em;
+  padding: .55rem .9rem; cursor: pointer; text-transform: uppercase;
+  transition: all .15s; white-space: nowrap;
+}
+.sort-btn:hover { border-color: var(--green-dim); color: var(--text); }
+.sort-btn.active { border-color: var(--green); color: var(--green); background: var(--green-soft); }
+.sort-btn .sort-arrow { font-size: .7rem; opacity: .7; }
+
+/* Contador de resultados */
+.result-count {
+  font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: .15em;
+  margin-left: auto; white-space: nowrap; align-self: center;
+}
+
 /* ── FILTROS ─────────────────────────────────────────────── */
 .filters { display: flex; gap: .5rem; flex-wrap: wrap; }
 .filter-btn {
@@ -209,6 +267,15 @@ td { padding: .9rem 1.1rem; vertical-align: middle; }
   transition: color .2s;
 }
 .btn-remover-meta:hover { color: var(--red); }
+
+/* nome clicável */
+.prod-nome-link {
+  color: inherit; text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: color .15s, border-color .15s;
+  display: inline;
+}
+.prod-nome-link:hover { color: var(--green); border-bottom-color: var(--green-dim); }
 
 /* linha inativa fica mais apagada */
 tbody tr.row-off { opacity: .55; }
@@ -422,20 +489,44 @@ tbody tr.row-off:hover { opacity: .75; }
         <div class="section-line"></div>
       </div>
 
-      <!-- Barra de ações: filtros + botão coletar -->
-      <div class="action-bar">
-        <div class="filters" id="filtros">
-          <button class="filter-btn active" data-filter="all">Todos</button>
-          <button class="filter-btn" data-filter="GPU">GPU</button>
-          <button class="filter-btn" data-filter="CPU">CPU</button>
-          <button class="filter-btn" data-filter="RAM">RAM</button>
-          <button class="filter-btn" data-filter="PSU">Fonte</button>
-          <button class="filter-btn" data-filter="MOBO">Placa Mãe</button>
+      <!-- Toolbar: busca + ordenação + filtros + coletar -->
+      <div class="toolbar">
+
+        <!-- Linha 1: busca + coletar -->
+        <div class="toolbar-row">
+          <div class="search-wrap">
+            <span class="search-icon">⌕</span>
+            <input class="search-input" type="text" id="search-input"
+                   placeholder="Buscar por produto ou loja..."/>
+            <button class="btn-search-clear hidden" id="btn-search-clear" title="Limpar">✕</button>
+          </div>
+          <button class="btn-coletar" id="btn-coletar">
+            <span class="btn-coletar-icon">⚡</span>
+            <span id="btn-coletar-txt">COLETAR AGORA</span>
+          </button>
         </div>
-        <button class="btn-coletar" id="btn-coletar">
-          <span class="btn-coletar-icon">⚡</span>
-          <span id="btn-coletar-txt">COLETAR AGORA</span>
-        </button>
+
+        <!-- Linha 2: filtros por categoria + ordenação + contador -->
+        <div class="toolbar-row">
+          <div class="filters" id="filtros">
+            <button class="filter-btn active" data-filter="all">Todos</button>
+            <button class="filter-btn" data-filter="GPU">GPU</button>
+            <button class="filter-btn" data-filter="CPU">CPU</button>
+            <button class="filter-btn" data-filter="RAM">RAM</button>
+            <button class="filter-btn" data-filter="PSU">Fonte</button>
+            <button class="filter-btn" data-filter="MOBO">Placa Mãe</button>
+          </div>
+          <div class="sort-controls">
+            <button class="sort-btn active" data-sort="nome" data-dir="asc">
+              <span>Nome</span><span class="sort-arrow" id="arr-nome">↑</span>
+            </button>
+            <button class="sort-btn" data-sort="preco" data-dir="asc">
+              <span>Preço</span><span class="sort-arrow" id="arr-preco">↕</span>
+            </button>
+          </div>
+          <div class="result-count" id="result-count"></div>
+        </div>
+
       </div>
 
       <!-- Progresso de coleta (oculto até iniciar) -->
@@ -544,8 +635,11 @@ tbody tr.row-off:hover { opacity: .75; }
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-let todosOsDados = []
-let filtroAtivo  = 'all'
+let todosOsDados   = []
+let filtroAtivo    = 'all'
+let termoBusca     = ''
+let sortCampo      = 'nome'   // 'nome' | 'preco'
+let sortDir        = 'asc'    // 'asc'  | 'desc'
 let coletandoAgora = false
 
 // Relógio
@@ -673,6 +767,7 @@ async function carregarPrecos() {
     return {
       item_id:      item.id,
       nome_na_loja: item.nome_na_loja,
+      url:          item.url || null,
       loja:         item.lojas?.nome || '—',
       categoria:    item.produtos?.categoria || '—',
       monitorando:  item.monitorando,
@@ -733,15 +828,73 @@ function atualizarStats() {
 // ═══════════════════════════════════════════════════════════════
 // TABELA
 // ═══════════════════════════════════════════════════════════════
-function renderizarTabela() {
-  const dados = filtroAtivo === 'all'
-    ? todosOsDados
+function getDadosFiltrados() {
+  // 1. Filtro de categoria
+  let dados = filtroAtivo === 'all'
+    ? [...todosOsDados]
     : todosOsDados.filter(d => d.categoria === filtroAtivo)
-  const wrap = document.getElementById('tabela-wrap')
+
+  // 2. Filtro de busca (nome ou loja, case-insensitive)
+  if (termoBusca.trim()) {
+    const q = termoBusca.toLowerCase().trim()
+    dados = dados.filter(d =>
+      (d.nome_na_loja || '').toLowerCase().includes(q) ||
+      (d.loja         || '').toLowerCase().includes(q) ||
+      (d.categoria    || '').toLowerCase().includes(q)
+    )
+  }
+
+  // 3. Ordenação
+  dados.sort((a, b) => {
+    if (sortCampo === 'nome') {
+      const cmp = (a.nome_na_loja || '').localeCompare(b.nome_na_loja || '', 'pt-BR')
+      return sortDir === 'asc' ? cmp : -cmp
+    }
+    if (sortCampo === 'preco') {
+      const pa = a.preco ?? (sortDir === 'asc' ? Infinity : -Infinity)
+      const pb = b.preco ?? (sortDir === 'asc' ? Infinity : -Infinity)
+      return sortDir === 'asc' ? pa - pb : pb - pa
+    }
+    return 0
+  })
+
+  return dados
+}
+
+function renderizarTabela() {
+  const dados = getDadosFiltrados()
+  const wrap  = document.getElementById('tabela-wrap')
+
+  // Atualiza contador
+  const countEl = document.getElementById('result-count')
+  if (countEl) {
+    countEl.textContent = dados.length === todosOsDados.length
+      ? `${dados.length} produto(s)`
+      : `${dados.length} de ${todosOsDados.length}`
+  }
+
   if (!dados.length) {
-    wrap.innerHTML = '<div class="empty">Nenhum item nesta categoria.<br><a href="novo_produto.html" style="color:var(--green);font-size:var(--fs-sm)">+ Adicionar produto</a></div>'
+    wrap.innerHTML = termoBusca
+      ? `<div class="empty">Nenhum resultado para "<span class="green">${termoBusca}</span>".</div>`
+      : '<div class="empty">Nenhum item nesta categoria.<br><a href="novo_produto.html" style="color:var(--green);font-size:var(--fs-sm)">+ Adicionar produto</a></div>'
     return
   }
+
+  // Atualiza seta de ordenação ativa
+  document.querySelectorAll('.sort-btn').forEach(b => {
+    const isActive = b.dataset.sort === sortCampo
+    b.classList.toggle('active', isActive)
+    const arrId = 'arr-' + b.dataset.sort
+    const arrEl = document.getElementById(arrId)
+    if (arrEl) {
+      if (isActive) {
+        arrEl.textContent = sortDir === 'asc' ? '↑' : '↓'
+      } else {
+        arrEl.textContent = '↕'
+      }
+    }
+  })
+
   wrap.innerHTML = `
     <table>
       <thead><tr>
@@ -780,10 +933,15 @@ function renderLinha(item) {
   const toggleLabel = monitorando ? 'DESATIVAR' : 'ATIVAR'
   const toggleClass = monitorando ? 'toggle-on' : 'toggle-off'
 
+  const urlSafe = item.url ? item.url.replace(/"/g, '&quot;') : ''
   return `
   <tr${rowClass}>
     <td class="td-produto">
-      <div class="prod-nome">${nomeSafe}</div>
+      <div class="prod-nome">
+        ${urlSafe
+          ? `<a class="prod-nome-link" href="${urlSafe}" target="_blank" rel="noopener">${nomeSafe}</a>`
+          : nomeSafe}
+      </div>
       <div class="prod-cat">${item.categoria || '—'}</div>
     </td>
     <td><span class="loja-badge">${item.loja || '—'}</span></td>
@@ -844,6 +1002,36 @@ document.getElementById('filtros').addEventListener('click', e => {
   btn.classList.add('active')
   filtroAtivo = btn.dataset.filter
   renderizarTabela()
+})
+
+// ── BUSCA ─────────────────────────────────────────────────────
+const searchInput = document.getElementById('search-input')
+const clearBtn    = document.getElementById('btn-search-clear')
+
+searchInput.addEventListener('input', () => {
+  termoBusca = searchInput.value
+  clearBtn.classList.toggle('hidden', !termoBusca)
+  renderizarTabela()
+})
+clearBtn.addEventListener('click', () => {
+  searchInput.value = ''
+  termoBusca = ''
+  clearBtn.classList.add('hidden')
+  searchInput.focus()
+  renderizarTabela()
+})
+
+// ── ORDENAÇÃO ─────────────────────────────────────────────────
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (sortCampo === btn.dataset.sort) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc'
+    } else {
+      sortCampo = btn.dataset.sort
+      sortDir   = 'asc'
+    }
+    renderizarTabela()
+  })
 })
 
 // ═══════════════════════════════════════════════════════════════
