@@ -632,7 +632,7 @@ tbody tr.row-off:hover { opacity: .75; }
 // ═══════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════
-const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
+const { SUPABASE_URL, SUPABASE_ANON_KEY, GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_WORKFLOW } = window.APP_CONFIG
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
 let todosOsDados   = []
@@ -1058,48 +1058,63 @@ async function iniciarColetaManual() {
   const pctTx  = document.getElementById('coleta-pct-txt')
 
   btn.disabled = true
-  txtEl.textContent = 'COLETANDO...'
+  txtEl.textContent = 'DISPARANDO...'
   prog.classList.remove('hidden')
+  itemTx.textContent = 'Conectando ao GitHub Actions...'
+  pctTx.textContent  = ''
+  fill.style.width   = '15%'
 
-  // Busca itens monitorados
-  const { data: itens, error } = await sb
-    .from('itens')
-    .select('id, nome_na_loja, url, lojas(nome)')
-    .eq('monitorando', true)
-
-  if (error || !itens?.length) {
-    btn.disabled = false; txtEl.textContent = 'COLETAR AGORA'; coletandoAgora = false
-    prog.classList.add('hidden')
-    showToast('Nenhum item ativo para coletar.', 'error')
+  // ── Valida config ────────────────────────────────────────────
+  if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO || !GITHUB_WORKFLOW) {
+    btn.disabled = false; txtEl.textContent = 'COLETAR AGORA'
+    coletandoAgora = false; prog.classList.add('hidden')
+    showToast('⚠ Configure GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO e GITHUB_WORKFLOW no config.js', 'error')
     return
   }
 
-  // Simula progresso (a coleta real ocorre no backend/GitHub Actions)
-  // Aqui dispara webhook ou Edge Function do Supabase se disponível
-  // Por ora, simula visualmente e sinaliza ao usuário
-  const total = itens.length
-  for (let i = 0; i < total; i++) {
-    const nome = itens[i].nome_na_loja || `Item ${i+1}`
-    const pct  = Math.round(((i + 1) / total) * 100)
-    itemTx.textContent = nome.length > 40 ? nome.substring(0,40) + '…' : nome
-    pctTx.textContent  = pct + '%'
-    fill.style.width   = pct + '%'
-    await new Promise(r => setTimeout(r, 180))
-  }
+  // ── Dispara o workflow_dispatch via API do GitHub ────────────
+  // POST /repos/{owner}/{repo}/actions/workflows/{workflow_id}/dispatches
+  const workflow = GITHUB_WORKFLOW || 'coletar.yml'
+  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${workflow}/dispatches`
 
-  // Tenta disparar Edge Function (se configurada no Supabase)
   try {
-    const { error: fnErr } = await sb.functions.invoke('coletar-precos', {
-      body: { manual: true }
+    fill.style.width = '40%'
+    itemTx.textContent = `Disparando ${workflow}...`
+
+    const resp = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Accept':        'application/vnd.github+json',
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type':  'application/json',
+      },
+      body: JSON.stringify({ ref: 'main' }),  // branch principal
     })
-    if (fnErr) {
-      // Se não há Edge Function configurada, instrui o usuário
-      showToast('Coleta agendada — acione manualmente via GitHub Actions para coleta imediata.', 'ok')
+
+    fill.style.width = '80%'
+
+    if (resp.status === 204) {
+      // 204 No Content = sucesso
+      fill.style.width = '100%'
+      itemTx.textContent = 'Workflow disparado com sucesso!'
+      pctTx.textContent  = '✓'
+      showToast('⚡ Coleta iniciada no GitHub Actions!', 'ok')
+    } else if (resp.status === 401) {
+      throw new Error('Token inválido ou expirado (401). Verifique GITHUB_TOKEN no config.js.')
+    } else if (resp.status === 404) {
+      throw new Error(`Workflow "${workflow}" não encontrado. Verifique GITHUB_OWNER, GITHUB_REPO e GITHUB_WORKFLOW.`)
+    } else if (resp.status === 422) {
+      throw new Error('Branch "main" não encontrada. Ajuste o campo "ref" em iniciarColetaManual().')
     } else {
-      showToast('✓ Coleta disparada com sucesso!', 'ok')
+      const body = await resp.text()
+      throw new Error(`GitHub retornou ${resp.status}: ${body}`)
     }
-  } catch {
-    showToast('Coleta agendada via GitHub Actions (próxima janela).', 'ok')
+  } catch(e) {
+    fill.style.width = '100%'
+    itemTx.textContent = 'Erro ao disparar coleta'
+    showToast('Erro: ' + e.message, 'error')
+    console.error('[FPS] GitHub Actions dispatch error:', e)
   }
 
   setTimeout(async () => {
@@ -1108,9 +1123,9 @@ async function iniciarColetaManual() {
     btn.disabled = false
     txtEl.textContent = 'COLETAR AGORA'
     coletandoAgora = false
-    // Recarrega dados
-    await carregarDados()
-  }, 800)
+    // Aguarda ~5s antes de recarregar (o workflow leva tempo para iniciar)
+    // Os dados novos só aparecerão depois que o scraper terminar
+  }, 2500)
 }
 
 // ═══════════════════════════════════════════════════════════════

@@ -1,28 +1,29 @@
 /**
  * config.js — PROTOCOL FPS
- * Configuração centralizada. Em produção, injete as variáveis via
- * seu servidor/CI (Netlify env vars, Vercel env vars, GitHub Pages +
- * build step) em vez de hardcodá-las aqui.
+ * Configuração centralizada. Em produção, os placeholders %%VAR%%
+ * são substituídos automaticamente pelo build.py (Netlify/Vercel)
+ * ou pelo serve.py (desenvolvimento local).
  *
- * Para desenvolvimento local, crie um arquivo `.env` na raiz do
- * frontend e use um bundler (Vite, Parcel) ou um script de build
- * que substitua os placeholders abaixo.
- *
- * Variáveis esperadas (espelho do .env Python):
- *   SUPABASE_URL
- *   SUPABASE_ANON_KEY
+ * Variáveis disponíveis:
+ *   SUPABASE_URL        → URL do projeto Supabase
+ *   SUPABASE_ANON_KEY   → Chave pública do Supabase
+ *   GITHUB_TOKEN        → Personal Access Token (permissão: actions:write)
+ *   GITHUB_OWNER        → Seu usuário ou org do GitHub (ex: "HenriqueCanhadas")
+ *   GITHUB_REPO         → Nome do repositório (ex: "protocol-fps")
+ *   GITHUB_WORKFLOW     → Nome do arquivo do workflow (ex: "coletar.yml")
  */
 
 window.APP_CONFIG = {
-  SUPABASE_URL:      "%%SUPABASE_URL%%",      // substituído no build
-  SUPABASE_ANON_KEY: "%%SUPABASE_ANON_KEY%%", // substituído no build
+  SUPABASE_URL:      "%%SUPABASE_URL%%",
+  SUPABASE_ANON_KEY: "%%SUPABASE_ANON_KEY%%",
+
+  // GitHub Actions — disparo manual do botão "COLETAR AGORA"
+  GITHUB_TOKEN:    "%%GITHUB_TOKEN%%",      // PAT com scope: actions:write
+  GITHUB_OWNER:    "%%GITHUB_OWNER%%",      // ex: "HenriqueCanhadas"
+  GITHUB_REPO:     "%%GITHUB_REPO%%",       // ex: "protocol-fps"
+  GITHUB_WORKFLOW: "%%GITHUB_WORKFLOW%%",   // ex: "coletar.yml"
 };
 
-/**
- * Retorna a config com fallback para valores padrão de dev.
- * Se os placeholders não foram substituídos (dev sem build),
- * lança erro para avisar o desenvolvedor.
- */
 (function validateConfig() {
   const c = window.APP_CONFIG;
   const missing = Object.entries(c)
@@ -30,17 +31,15 @@ window.APP_CONFIG = {
     .map(([k]) => k);
 
   if (missing.length > 0) {
-    // Dev fallback: lê de meta tags injetadas pelo script de dev
     const urlMeta  = document.querySelector('meta[name="supabase-url"]');
     const keyMeta  = document.querySelector('meta[name="supabase-anon-key"]');
     if (urlMeta && keyMeta) {
       c.SUPABASE_URL      = urlMeta.content;
       c.SUPABASE_ANON_KEY = keyMeta.content;
     } else {
-      console.error(
-        "[PROTOCOL FPS] Variáveis de ambiente não configuradas:",
-        missing.join(", "),
-        "\nVeja frontend/README.md para instruções de setup."
+      console.warn(
+        "[PROTOCOL FPS] Variáveis não configuradas:", missing.join(", "),
+        "\nVeja frontend/config.js para instruções."
       );
     }
   }
