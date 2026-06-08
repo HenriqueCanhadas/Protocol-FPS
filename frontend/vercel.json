@@ -1,0 +1,36 @@
+{
+  "comment": "PROTOCOL FPS — Frontend deploy config para Vercel",
+
+  "buildCommand": "python build.py",
+  "outputDirectory": ".",
+  "installCommand": "echo 'No npm install needed'",
+  "framework": null,
+
+  "env": {
+    "SUPABASE_URL":      "@supabase_url",
+    "SUPABASE_ANON_KEY": "@supabase_anon_key"
+  },
+
+  "routes": [
+    { "src": "/",              "dest": "/index.html"        },
+    { "src": "/novo_produto",  "dest": "/novo_produto.html" },
+    { "src": "/usuario",       "dest": "/usuario.html"      }
+  ],
+
+  "headers": [
+    {
+      "source":  "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options",        "value": "DENY"                          },
+        { "key": "X-Content-Type-Options", "value": "nosniff"                       },
+        { "key": "Referrer-Policy",        "value": "strict-origin-when-cross-origin" }
+      ]
+    },
+    {
+      "source":  "/config.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
+}

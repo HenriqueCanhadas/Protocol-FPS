@@ -1,2 +1,26 @@
-supabase==2.21.1
-python-dotenv==1.0.0
+# ============================================================
+# PROTOCOL FPS — Backend / Scraper
+# Instalado pelo GitHub Actions antes de rodar o main.py
+#
+# Uso local:
+#   pip install -r requirements_backend.txt
+#   playwright install chromium --with-deps
+#
+# Python >= 3.9  (recomendado: 3.11, conforme .github/workflows/coletar.yml)
+# ============================================================
+
+# ── Supabase ─────────────────────────────────────────────────
+# Cliente oficial Python — acesso ao banco, auth e RPC
+# ATENÇÃO: 2.21.1 foi yanked do PyPI; mínimo recomendado é 2.22.x
+supabase>=2.22.0,<3.0.0
+
+# ── Playwright ───────────────────────────────────────────────
+# Browser headless (Chromium) para scraping de páginas com JS
+# Após instalar, rode: playwright install chromium --with-deps
+playwright>=1.50.0,<2.0.0
+
+# ── Variáveis de ambiente ─────────────────────────────────────
+# Carrega o arquivo .env em desenvolvimento local
+# Em produção (GitHub Actions) as vars vêm dos Secrets — não é necessário,
+# mas mantém a importação do main.py funcionando sem ajuste de código
+python-dotenv>=1.0.0,<2.0.0

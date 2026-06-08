@@ -5,254 +5,187 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>PROTOCOL FPS — Novo Produto</title>
 
-<!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-<!-- Fontes -->
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Bebas+Neue&display=swap" rel="stylesheet"/>
-
-<!-- Config centralizado -->
 <script src="config.js"></script>
-
-<!-- Tema compartilhado -->
 <link rel="stylesheet" href="theme.css"/>
 
 <style>
-/* ── LAYOUT ───────────────────────────────────────────────── */
 #app { display: none; flex-direction: column; min-height: 100vh; }
-#app.visible { display: flex; }
 
-main {
-  flex: 1; padding: 2rem 1.5rem;
-  display: flex; justify-content: center;
-}
+main { flex: 1; padding: 2rem 1.5rem; display: flex; justify-content: center; }
+.page-wrap { width: min(800px, 100%); display: flex; flex-direction: column; gap: 2rem; }
 
-.page-wrap {
-  width: min(780px, 100%);
-  display: flex; flex-direction: column; gap: 2rem;
-}
-
-/* ── BREADCRUMB ───────────────────────────────────────────── */
 .breadcrumb {
-  display: flex; align-items: center; gap: .5rem;
-  font-size: .65rem; letter-spacing: .2em; color: var(--text-dim);
-  text-transform: uppercase;
+  display: flex; align-items: center; gap: .6rem;
+  font-size: var(--fs-sm); letter-spacing: .15em; color: var(--text-dim); text-transform: uppercase;
 }
 .breadcrumb a { color: var(--text-dim); text-decoration: none; transition: color .15s; }
 .breadcrumb a:hover { color: var(--green); }
 .breadcrumb span { color: var(--text); }
 
-/* ── PAGE HEADER ──────────────────────────────────────────── */
-.page-header { display: flex; flex-direction: column; gap: .5rem; }
 .page-title {
-  font-family: var(--display); font-size: clamp(2rem, 6vw, 3.5rem);
+  font-family: var(--display); font-size: clamp(2.5rem, 7vw, 4rem);
   letter-spacing: .08em; color: var(--green);
-  text-shadow: 0 0 20px var(--green-dim);
-  line-height: 1;
+  text-shadow: 0 0 24px var(--green-dim); line-height: 1;
 }
-.page-subtitle { font-size: .7rem; color: var(--text-dim); letter-spacing: .15em; }
+.page-subtitle { font-size: var(--fs-base); color: var(--text-dim); letter-spacing: .1em; margin-top: .4rem; }
 
-/* ── FORM CARD ────────────────────────────────────────────── */
+/* ── FORM CARD ─────────────────────────────────────────────── */
 .form-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-top: 1px solid var(--green-dim);
-  position: relative;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-top: 2px solid var(--green-dim); position: relative;
 }
 .form-card::before {
   content: attr(data-label);
-  position: absolute; top: -1px; left: 1.5rem;
+  position: absolute; top: -1px; left: 1.75rem;
   background: var(--bg2); color: var(--green-dim);
-  font-size: .6rem; letter-spacing: .3em;
-  padding: 0 .5rem; transform: translateY(-50%);
-  text-transform: uppercase;
+  font-size: var(--fs-xs); letter-spacing: .3em;
+  padding: 0 .6rem; transform: translateY(-50%); text-transform: uppercase;
 }
-.form-body { padding: 2rem; display: flex; flex-direction: column; gap: 1.5rem; }
+.form-body { padding: 2rem; display: flex; flex-direction: column; gap: 1.75rem; }
 
-/* ── GRID DE CAMPOS ───────────────────────────────────────── */
-.fields-grid { display: grid; gap: 1.25rem; }
+.fields-grid { display: grid; gap: 1.5rem; }
 .fields-grid.cols-2 { grid-template-columns: 1fr 1fr; }
 .fields-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .fields-grid.cols-2,
   .fields-grid.cols-3 { grid-template-columns: 1fr; }
 }
 
 .field-group { display: flex; flex-direction: column; }
 
-/* ── CAMPO URL COM PREVIEW ────────────────────────────────── */
+/* ── URL FIELD ─────────────────────────────────────────────── */
 .url-wrap { position: relative; }
 .btn-fetch-url {
   position: absolute; right: 0; top: 0; bottom: 0;
-  background: var(--bg3); border: none; border-left: 1px solid var(--border);
+  background: var(--bg3); border: none; border-left: 1px solid var(--border2);
   color: var(--text-dim); font-family: var(--mono);
-  font-size: .65rem; letter-spacing: .15em;
-  padding: 0 .9rem; cursor: pointer; text-transform: uppercase;
+  font-size: var(--fs-xs); letter-spacing: .15em;
+  padding: 0 1.1rem; cursor: pointer; text-transform: uppercase;
   transition: color .2s, background .2s; white-space: nowrap;
 }
 .btn-fetch-url:hover { background: var(--green-glow); color: var(--green); }
 .btn-fetch-url:disabled { opacity: .4; cursor: not-allowed; }
 
-/* ── URL PREVIEW BOX ──────────────────────────────────────── */
 .url-preview {
-  margin-top: .5rem;
-  background: var(--bg3); border: 1px solid var(--border);
-  padding: .65rem .9rem;
-  font-size: .72rem; color: var(--text-dim);
-  display: flex; align-items: center; gap: .6rem;
+  margin-top: .6rem;
+  background: var(--bg3); border: 1px solid var(--border2);
+  padding: .8rem 1rem;
+  font-size: var(--fs-sm); color: var(--text-dim);
+  display: flex; align-items: center; gap: .75rem;
   animation: slideDown .2s ease;
 }
 .url-preview .loja-tag {
-  color: var(--green); font-size: .6rem; letter-spacing: .15em;
+  color: var(--green); font-size: var(--fs-xs); letter-spacing: .15em;
   text-transform: uppercase; white-space: nowrap;
-  border: 1px solid var(--green-dim); padding: .1rem .4rem;
+  border: 1px solid var(--green-dim); padding: .2rem .55rem;
 }
-.url-preview .preview-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.url-preview .preview-text { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-xs); }
 .url-preview.invalid { border-color: var(--red); color: var(--red); }
 
-/* ── LOJA CHIPS ───────────────────────────────────────────── */
-.loja-chips { display: flex; gap: .5rem; flex-wrap: wrap; }
-.loja-chip {
-  background: var(--bg3); border: 1px solid var(--border);
+/* ── CHIPS ─────────────────────────────────────────────────── */
+.loja-chips, .cat-chips { display: flex; gap: .6rem; flex-wrap: wrap; }
+
+.loja-chip, .cat-chip {
+  background: var(--bg3); border: 1px solid var(--border2);
   color: var(--text-dim); font-family: var(--mono);
-  font-size: .65rem; letter-spacing: .15em; text-transform: uppercase;
-  padding: .4rem .85rem; cursor: pointer;
+  font-size: var(--fs-sm); letter-spacing: .12em; text-transform: uppercase;
+  padding: .55rem 1rem; cursor: pointer;
   transition: all .15s; user-select: none;
 }
-.loja-chip:hover { border-color: var(--green-dim); color: var(--text); }
+.loja-chip:hover, .cat-chip:hover { border-color: var(--green-dim); color: var(--text); }
 .loja-chip.selected {
-  border-color: var(--green); color: var(--green);
-  background: var(--green-glow);
+  border-color: var(--green); color: var(--green); background: var(--green-soft);
 }
-.loja-chip-input { display: none; }
-
-/* ── CATEGORIA CHIPS ──────────────────────────────────────── */
-.cat-chips { display: flex; gap: .5rem; flex-wrap: wrap; }
-.cat-chip {
-  background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text-dim); font-family: var(--mono);
-  font-size: .65rem; letter-spacing: .1em; text-transform: uppercase;
-  padding: .4rem .85rem; cursor: pointer;
-  transition: all .15s; user-select: none;
-}
-.cat-chip:hover { border-color: var(--green-dim); color: var(--text); }
 .cat-chip.selected {
-  border-color: var(--amber); color: var(--amber);
-  background: rgba(255,184,0,.1);
+  border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08);
 }
 
-/* ── DIVIDER ──────────────────────────────────────────────── */
-.form-divider {
-  height: 1px; background: var(--border); margin: .25rem 0;
-}
+.form-divider { height: 1px; background: var(--border2); margin: .25rem 0; }
 
-/* ── PRECO META TOGGLE ────────────────────────────────────── */
+/* ── TOGGLES ───────────────────────────────────────────────── */
 .toggle-row {
-  display: flex; align-items: center; gap: .75rem;
-  padding: .75rem; background: var(--bg3); border: 1px solid var(--border);
+  display: flex; align-items: center; gap: 1rem;
+  padding: .9rem 1.1rem; background: var(--bg3); border: 1px solid var(--border2);
   cursor: pointer; transition: border-color .15s;
 }
 .toggle-row:hover { border-color: var(--green-dim); }
 
 .toggle-switch {
-  width: 34px; height: 18px; background: var(--border);
-  border-radius: 9px; position: relative; flex-shrink: 0;
+  width: 38px; height: 20px; background: var(--border2);
+  border-radius: 10px; position: relative; flex-shrink: 0;
   transition: background .2s;
 }
 .toggle-switch::after {
-  content: ''; position: absolute;
-  top: 2px; left: 2px;
+  content: ''; position: absolute; top: 3px; left: 3px;
   width: 14px; height: 14px; border-radius: 50%;
-  background: var(--text-dim);
+  background: var(--text-muted);
   transition: transform .2s, background .2s;
 }
 .toggle-switch.on { background: var(--green-dim); }
-.toggle-switch.on::after { transform: translateX(16px); background: var(--green); }
+.toggle-switch.on::after { transform: translateX(18px); background: var(--green); }
 
-.toggle-label { font-size: .72rem; color: var(--text); }
-.toggle-sublabel { font-size: .62rem; color: var(--text-dim); margin-left: auto; }
+.toggle-label { font-size: var(--fs-base); color: var(--text); }
+.toggle-sublabel { font-size: var(--fs-xs); color: var(--text-muted); margin-left: auto; letter-spacing: .1em; }
 
 .preco-meta-fields {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;
   overflow: hidden; max-height: 0; opacity: 0;
   transition: max-height .35s ease, opacity .25s ease, margin .25s;
 }
-.preco-meta-fields.visible { max-height: 200px; opacity: 1; margin-top: .25rem; }
+.preco-meta-fields.visible { max-height: 220px; opacity: 1; margin-top: .25rem; }
 
-/* ── BOTÕES DE AÇÃO ───────────────────────────────────────── */
+/* ── BOTÕES DE AÇÃO ─────────────────────────────────────────── */
 .form-actions {
-  display: flex; gap: .75rem; justify-content: flex-end;
-  padding: 1.25rem 2rem; border-top: 1px solid var(--border);
+  display: flex; gap: .9rem; justify-content: flex-end;
+  padding: 1.4rem 2rem; border-top: 1px solid var(--border2);
   background: var(--bg3);
 }
 
-/* ── ITENS ADICIONADOS ────────────────────────────────────── */
-.itens-list { display: flex; flex-direction: column; gap: .5rem; }
-
+/* ── ITENS NA FILA ──────────────────────────────────────────── */
 .item-row {
   display: grid;
   grid-template-columns: 1fr auto auto auto;
-  gap: 1rem; align-items: center;
-  padding: .75rem 1rem;
-  background: var(--bg2); border: 1px solid var(--border);
-  border-left: 2px solid var(--green-dim);
-  font-size: .75rem;
+  gap: 1.1rem; align-items: center;
+  padding: .9rem 1.1rem;
+  background: var(--bg2); border: 1px solid var(--border2);
+  border-left: 3px solid var(--green-dim);
+  font-size: var(--fs-base);
   animation: slideDown .25s ease both;
 }
 .item-row .item-nome { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.item-row .item-loja { font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
-.item-row .item-meta { font-size: .65rem; color: var(--amber); }
+.item-row .item-cat  { font-size: var(--fs-xs); color: var(--text-dim); letter-spacing: .1em; text-transform: uppercase; margin-top: .15rem; }
+.item-row .item-loja { font-size: var(--fs-xs); letter-spacing: .1em; text-transform: uppercase; color: var(--text-dim); }
+.item-row .item-meta { font-size: var(--fs-sm); color: var(--amber); }
 .btn-remove-item {
-  background: none; border: none; color: var(--text-dim);
-  cursor: pointer; font-size: .85rem; padding: .2rem .4rem;
+  background: none; border: none; color: var(--text-muted);
+  cursor: pointer; font-size: 1rem; padding: .25rem .5rem;
   transition: color .15s;
 }
 .btn-remove-item:hover { color: var(--red); }
 
-/* ── EMPTY ITENS ──────────────────────────────────────────── */
 .empty-itens {
-  padding: 2rem; text-align: center;
-  color: var(--text-dim); font-size: .72rem; letter-spacing: .15em;
-  border: 1px dashed var(--border);
+  padding: 2.5rem; text-align: center;
+  color: var(--text-dim); font-size: var(--fs-base); letter-spacing: .12em;
+  border: 1px dashed var(--border2); line-height: 1.8;
 }
 
-/* ── CONFIRMAÇÃO ──────────────────────────────────────────── */
-.confirm-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,.9);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 300; animation: fadeIn .2s ease;
-}
-.confirm-box {
-  background: var(--bg2); border: 1px solid var(--green-dim);
-  padding: 2rem; width: min(420px, 92vw);
-  display: flex; flex-direction: column; gap: 1.25rem;
-  text-align: center;
-}
-.confirm-icon { font-size: 2rem; line-height: 1; }
-.confirm-title { font-family: var(--display); font-size: 1.8rem; letter-spacing: .08em; color: var(--green); }
-.confirm-body { font-size: .75rem; color: var(--text-dim); line-height: 1.8; }
-.confirm-body strong { color: var(--text); }
-.confirm-actions { display: flex; gap: .75rem; }
-.confirm-actions .btn-primary,
-.confirm-actions .btn-secondary { flex: 1; }
-
-/* ── PROGRESS BAR ─────────────────────────────────────────── */
-.progress-bar {
-  height: 2px; background: var(--border); margin-top: .75rem;
-  position: relative; overflow: hidden;
-}
+/* ── PROGRESS ───────────────────────────────────────────────── */
+.progress-bar { height: 3px; background: var(--border2); position: relative; overflow: hidden; }
 .progress-fill {
   position: absolute; left: 0; top: 0; height: 100%;
-  background: var(--green);
+  background: linear-gradient(90deg, var(--green-dim), var(--green));
   transition: width .4s ease;
 }
 
-/* ── RESPONSIVE ──────────────────────────────────────────── */
-@media (max-width: 600px) {
+/* ── RESPONSIVE ─────────────────────────────────────────────── */
+@media (max-width: 640px) {
   main { padding: 1.25rem 1rem; }
   .form-body { padding: 1.25rem; }
-  .form-actions { padding: 1rem 1.25rem; flex-direction: column; }
+  .form-actions { padding: 1.1rem 1.25rem; flex-direction: column; }
   .form-actions .btn-primary,
   .form-actions .btn-secondary { width: 100%; }
   .item-row { grid-template-columns: 1fr auto; }
@@ -264,11 +197,11 @@ main {
 </head>
 <body>
 
-<!-- ── LOGIN ─────────────────────────────────────────────────── -->
+<!-- LOGIN -->
 <div id="login-screen">
   <div>
     <div class="login-logo glow">PROTOCOL<br>FPS</div>
-    <div class="login-subtitle" style="text-align:center;margin-top:.5rem">
+    <div class="login-subtitle">
       <strong class="green">H</strong>ardware
       <strong class="green">P</strong>rice
       <strong class="green">C</strong>ontroller
@@ -288,57 +221,82 @@ main {
     <div class="login-error" id="login-error"></div>
     <button class="btn-primary" id="btn-login">INICIAR SESSÃO</button>
   </div>
-  <div style="font-size:.6rem;color:var(--text-dim);letter-spacing:.2em;text-align:center">
+  <div class="login-footer">
     <span class="blink">_</span> SYS READY &nbsp;·&nbsp; AWAITING AUTH
   </div>
 </div>
 
-<!-- ── APP ───────────────────────────────────────────────────── -->
+<!-- DRAWER OVERLAY -->
+<div class="nav-drawer-overlay" id="drawer-overlay"></div>
+
+<!-- DRAWER -->
+<div class="nav-drawer" id="nav-drawer">
+  <div class="nav-drawer-header">
+    <div>
+      <div class="nav-drawer-logo">FPS</div>
+      <div class="nav-drawer-subtitle">Protocol v2</div>
+    </div>
+  </div>
+  <nav class="nav-drawer-items">
+    <a href="index.html" class="nav-drawer-item">
+      <span class="nav-icon">⚡</span>
+      <span class="nav-label">Dashboard</span>
+    </a>
+    <a href="novo_produto.html" class="nav-drawer-item active">
+      <span class="nav-icon">＋</span>
+      <span class="nav-label">Novo Produto</span>
+    </a>
+    <div class="nav-drawer-separator"></div>
+    <a href="usuario.html" class="nav-drawer-item">
+      <span class="nav-icon">◉</span>
+      <span class="nav-label">Minha Conta</span>
+    </a>
+  </nav>
+  <div class="nav-drawer-footer">
+    <div class="nav-drawer-user" id="drawer-user-email">—</div>
+    <button class="btn-logout" id="btn-logout" style="width:100%">ENCERRAR SESSÃO</button>
+  </div>
+</div>
+
+<!-- APP -->
 <div id="app">
 
   <header>
+    <button class="hamburger-btn" id="hamburger-btn" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <a href="index.html" class="header-logo">PROTOCOL FPS</a>
-    <nav class="header-nav">
-      <a href="index.html"        class="nav-link">Dashboard</a>
-      <a href="novo_produto.html" class="nav-link active">+ Novo Produto</a>
-      <a href="usuario.html"      class="nav-link">Conta</a>
-    </nav>
     <div class="header-meta">
       <div class="status-dot"></div>
-      <button class="btn-logout" id="btn-logout">SAIR</button>
     </div>
   </header>
 
   <main>
     <div class="page-wrap">
 
-      <!-- Breadcrumb -->
       <nav class="breadcrumb">
         <a href="index.html">Dashboard</a>
         <span>›</span>
         <span>Novo Produto</span>
       </nav>
 
-      <!-- Título -->
-      <div class="page-header">
+      <div>
         <div class="page-title">NOVO<br>PRODUTO</div>
         <div class="page-subtitle">Adicione URLs para monitorar preços — Kabum, Terabyte ou Pichau</div>
       </div>
 
-      <!-- ── FORMULÁRIO PRINCIPAL ── -->
+      <!-- FORMULÁRIO PRINCIPAL -->
       <div class="form-card" data-label="DADOS DO PRODUTO">
         <div class="form-body">
 
-          <!-- URL + loja detectada -->
+          <!-- URL -->
           <div class="field-group">
             <div class="field-label">URL do produto <span class="red">*</span></div>
             <div class="url-wrap">
               <input class="field-input" type="url" id="input-url"
                      placeholder="https://www.kabum.com.br/produto/..."
-                     style="padding-right:6.5rem"/>
-              <button class="btn-fetch-url" id="btn-detectar" type="button">
-                DETECTAR
-              </button>
+                     style="padding-right:7.5rem"/>
+              <button class="btn-fetch-url" id="btn-detectar" type="button">DETECTAR</button>
             </div>
             <div class="field-hint">Cole a URL completa de uma página de produto</div>
             <div id="url-preview" class="hidden"></div>
@@ -353,7 +311,7 @@ main {
             <div class="field-error hidden" id="err-nome">Informe o nome do produto</div>
           </div>
 
-          <!-- Categoria + Loja (leitura automática mas editável) -->
+          <!-- Categoria + Loja -->
           <div class="fields-grid cols-2">
             <div class="field-group">
               <div class="field-label">Categoria <span class="red">*</span></div>
@@ -369,7 +327,6 @@ main {
               <input type="hidden" id="input-categoria"/>
               <div class="field-error hidden" id="err-categoria">Selecione uma categoria</div>
             </div>
-
             <div class="field-group">
               <div class="field-label">Loja <span class="red">*</span></div>
               <div class="loja-chips" id="loja-chips">
@@ -384,32 +341,31 @@ main {
 
           <div class="form-divider"></div>
 
-          <!-- Toggle: meta de preço -->
+          <!-- Toggle meta -->
           <div>
             <div class="toggle-row" id="toggle-meta-row">
               <div class="toggle-switch" id="toggle-meta"></div>
               <div class="toggle-label">Definir preço-meta para alertas</div>
-              <div class="toggle-sublabel dim">opcional</div>
+              <div class="toggle-sublabel">opcional</div>
             </div>
-
             <div class="preco-meta-fields" id="preco-meta-fields">
-              <div class="field-group" style="margin-top:.75rem">
+              <div class="field-group" style="margin-top:.9rem">
                 <div class="field-label">Preço-meta (R$)</div>
                 <input class="field-input" type="number" id="input-preco-meta"
                        placeholder="2999.99" min="0" step="0.01"/>
-                <div class="field-hint">Alerta quando o preço ficar abaixo desse valor</div>
+                <div class="field-hint">Alerta quando cair abaixo desse valor</div>
                 <div class="field-error hidden" id="err-preco-meta">Valor inválido</div>
               </div>
-              <div class="field-group" style="margin-top:.75rem">
+              <div class="field-group" style="margin-top:.9rem">
                 <div class="field-label">% de queda para alertar</div>
                 <input class="field-input" type="number" id="input-pct-queda"
                        placeholder="5" min="1" max="99" step="1"/>
-                <div class="field-hint">Alerta ao cair X% do último preço registrado</div>
+                <div class="field-hint">Alerta ao cair X% do último preço</div>
               </div>
             </div>
           </div>
 
-          <!-- Monitorando -->
+          <!-- Toggle monitor -->
           <div>
             <div class="toggle-row" id="toggle-monitor-row">
               <div class="toggle-switch on" id="toggle-monitor"></div>
@@ -419,33 +375,30 @@ main {
 
         </div>
 
-        <!-- Progress bar de envio -->
         <div class="progress-bar hidden" id="progress-bar">
           <div class="progress-fill" id="progress-fill" style="width:0%"></div>
         </div>
 
         <div class="form-actions">
           <button class="btn-secondary" id="btn-limpar" type="button">LIMPAR</button>
-          <button class="btn-primary"   id="btn-adicionar" type="button">
-            ADICIONAR À FILA
-          </button>
+          <button class="btn-primary"   id="btn-adicionar" type="button">ADICIONAR À FILA</button>
         </div>
       </div>
 
-      <!-- ── FILA DE ITENS A SALVAR ── -->
+      <!-- FILA DE ENVIO -->
       <div class="form-card" data-label="FILA DE ENVIO">
-        <div class="form-body" style="gap:1rem">
+        <div class="form-body" style="gap:1.1rem">
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <div style="font-size:.65rem;letter-spacing:.2em;color:var(--text-dim)">
-              <span id="qtd-fila">0</span> ITEM(NS) NA FILA
+            <div style="font-size:var(--fs-sm);letter-spacing:.2em;color:var(--text-dim)">
+              <span id="qtd-fila" class="green">0</span> ITEM(NS) NA FILA
             </div>
             <button class="btn-secondary" id="btn-limpar-fila" type="button"
-                    style="font-size:.6rem;padding:.3rem .7rem">
+                    style="font-size:var(--fs-xs);padding:.4rem .8rem">
               LIMPAR FILA
             </button>
           </div>
           <div id="itens-list">
-            <div class="empty-itens">Nenhum produto adicionado. Preencha o formulário acima e clique em "Adicionar à Fila".</div>
+            <div class="empty-itens">Nenhum produto adicionado.<br>Preencha o formulário acima e clique em "Adicionar à Fila".</div>
           </div>
         </div>
         <div class="form-actions">
@@ -459,7 +412,7 @@ main {
   </main>
 </div>
 
-<!-- ── MODAL DE CONFIRMAÇÃO ─────────────────────────────────── -->
+<!-- CONFIRM -->
 <div id="confirm-overlay" class="confirm-overlay hidden">
   <div class="confirm-box">
     <div class="confirm-icon">⚡</div>
@@ -472,47 +425,59 @@ main {
   </div>
 </div>
 
-<!-- TOAST -->
 <div id="toast" class="hidden"></div>
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════════════
 const { SUPABASE_URL, SUPABASE_ANON_KEY } = window.APP_CONFIG
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
 
-// Mapa de lojas: domínio → slug do banco
 const LOJAS_DETECTADAS = {
   'kabum.com.br':       'kabum',
   'terabyteshop.com.br':'terabyteshop',
   'pichau.com.br':      'pichau',
 }
 
-// Mapas de IDs do banco (carregados ao iniciar)
-let lojasDB    = {}   // { kabum: uuid, terabyteshop: uuid, pichau: uuid }
-let produtosDB = {}   // { GPU: uuid, CPU: uuid, RAM: uuid, ... }
-let filaItens  = []   // itens prontos para salvar
+let lojasDB    = {}
+let produtosDB = {}
+let filaItens  = []
 let metaAtivo    = false
 let monitorAtivo = true
 
-// ═══════════════════════════════════════════════════════════════
-// AUTH
-// ═══════════════════════════════════════════════════════════════
+// ── DRAWER ────────────────────────────────────────────────────
+const drawerEl  = document.getElementById('nav-drawer')
+const overlayEl = document.getElementById('drawer-overlay')
+const hambBtn   = document.getElementById('hamburger-btn')
+
+function abrirDrawer() {
+  drawerEl.classList.add('open'); overlayEl.classList.add('open')
+  hambBtn.classList.add('open'); document.body.style.overflow = 'hidden'
+}
+function fecharDrawer() {
+  drawerEl.classList.remove('open'); overlayEl.classList.remove('open')
+  hambBtn.classList.remove('open'); document.body.style.overflow = ''
+}
+hambBtn.addEventListener('click', () =>
+  drawerEl.classList.contains('open') ? fecharDrawer() : abrirDrawer()
+)
+overlayEl.addEventListener('click', fecharDrawer)
+drawerEl.querySelectorAll('.nav-drawer-item').forEach(i => i.addEventListener('click', fecharDrawer))
+
+// ── AUTH ──────────────────────────────────────────────────────
 sb.auth.onAuthStateChange((_, session) => {
-  if (session) mostrarApp()
+  if (session) mostrarApp(session.user)
   else         mostrarLogin()
 })
 
 document.getElementById('btn-login').addEventListener('click', async () => {
   const email = document.getElementById('login-email').value.trim()
   const senha  = document.getElementById('login-senha').value
-  if (!email || !senha) { setLoginError('Preencha email e senha.'); return }
+  if (!email || !senha) { document.getElementById('login-error').textContent = 'Preencha os campos.'; return }
   const btn = document.getElementById('btn-login')
   btn.disabled = true; btn.textContent = 'AUTENTICANDO...'
   const { error } = await sb.auth.signInWithPassword({ email, password: senha })
   if (error) {
-    setLoginError('Credenciais inválidas.')
+    document.getElementById('login-error').textContent = 'Credenciais inválidas.'
     btn.disabled = false; btn.textContent = 'INICIAR SESSÃO'
   }
 })
@@ -524,53 +489,31 @@ document.getElementById('login-senha').addEventListener('keydown', e => {
 })
 document.getElementById('btn-logout').addEventListener('click', () => sb.auth.signOut())
 
-function setLoginError(m) { document.getElementById('login-error').textContent = m }
-
 function mostrarLogin() {
   document.getElementById('login-screen').style.display = 'flex'
-  document.getElementById('app').classList.remove('visible')
+  document.getElementById('app').style.display = 'none'
 }
-async function mostrarApp() {
+async function mostrarApp(user) {
   document.getElementById('login-screen').style.display = 'none'
-  document.getElementById('app').classList.add('visible')
+  document.getElementById('app').style.display = 'flex'
+  if (user) {
+    const emailEl = document.getElementById('drawer-user-email')
+    if (emailEl) emailEl.textContent = user.email || '—'
+  }
   await carregarLojas()
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LOJAS E PRODUTOS DO BANCO
-// ═══════════════════════════════════════════════════════════════
+// ── LOJAS ─────────────────────────────────────────────────────
 async function carregarLojas() {
-  // Lojas: mapeia slug → UUID
-  // O nome no banco é "Kabum", "Terabyteshop", "Pichau"
-  // O slug detectado é "kabum", "terabyteshop", "pichau"
-  const { data: lojas, error: errLojas } = await sb.from('lojas').select('id, nome')
-  if (errLojas) {
-    console.error('[FPS] Erro ao carregar lojas:', errLojas.message)
-    return
-  }
-  if (lojas) {
-    lojas.forEach(l => {
-      const key = l.nome.toLowerCase().replace(/\s/g, '')
-      lojasDB[key] = l.id
-    })
-  }
-  console.log('[FPS] lojasDB:', lojasDB)
-
-  // Produtos: mapeia categoria → UUID
-  const { data: prods, error: errProds } = await sb.from('produtos').select('id, categoria')
-  if (errProds) {
-    console.error('[FPS] Erro ao carregar produtos:', errProds.message)
-    return
-  }
-  if (prods) {
-    prods.forEach(p => { produtosDB[p.categoria] = p.id })
-  }
-  console.log('[FPS] produtosDB:', produtosDB)
+  const { data: lojas } = await sb.from('lojas').select('id, nome')
+  if (lojas) lojas.forEach(l => {
+    lojasDB[l.nome.toLowerCase().replace(/\s/g, '')] = l.id
+  })
+  const { data: prods } = await sb.from('produtos').select('id, categoria')
+  if (prods) prods.forEach(p => { produtosDB[p.categoria] = p.id })
 }
 
-// ═══════════════════════════════════════════════════════════════
-// DETECÇÃO DE LOJA PELA URL
-// ═══════════════════════════════════════════════════════════════
+// ── DETECÇÃO DE LOJA ──────────────────────────────────────────
 function detectarLoja(url) {
   try {
     const host = new URL(url).hostname.replace('www.', '')
@@ -584,23 +527,16 @@ function detectarLoja(url) {
 document.getElementById('btn-detectar').addEventListener('click', () => {
   const url = document.getElementById('input-url').value.trim()
   const preview = document.getElementById('url-preview')
-  const errUrl  = document.getElementById('err-url')
-
+  document.getElementById('err-url').classList.add('hidden')
   preview.className = ''
-  errUrl.classList.add('hidden')
-
-  if (!url) { errUrl.classList.remove('hidden'); return }
-
+  if (!url) { document.getElementById('err-url').classList.remove('hidden'); return }
   const slug = detectarLoja(url)
   if (!slug) {
     preview.className = 'url-preview invalid'
     preview.innerHTML = '✗ Loja não suportada. Use: Kabum, Terabyte ou Pichau'
     return
   }
-
-  // Seleciona automaticamente a loja
   selecionarLoja(slug)
-
   const labels = { kabum:'KaBuM', terabyteshop:'Terabyte', pichau:'Pichau' }
   preview.className = 'url-preview'
   preview.innerHTML = `
@@ -610,31 +546,25 @@ document.getElementById('btn-detectar').addEventListener('click', () => {
   `
 })
 
-// Detecta automaticamente ao colar
-document.getElementById('input-url').addEventListener('paste', e => {
+document.getElementById('input-url').addEventListener('paste', () => {
   setTimeout(() => document.getElementById('btn-detectar').click(), 50)
 })
 
-// ═══════════════════════════════════════════════════════════════
-// CHIPS: LOJA
-// ═══════════════════════════════════════════════════════════════
+// ── CHIPS LOJA ────────────────────────────────────────────────
 document.getElementById('loja-chips').addEventListener('click', e => {
   const chip = e.target.closest('.loja-chip')
   if (!chip) return
   selecionarLoja(chip.dataset.loja)
 })
-
 function selecionarLoja(slug) {
-  document.querySelectorAll('.loja-chip').forEach(c => {
+  document.querySelectorAll('.loja-chip').forEach(c =>
     c.classList.toggle('selected', c.dataset.loja === slug)
-  })
+  )
   document.getElementById('input-loja').value = slug
   document.getElementById('err-loja').classList.add('hidden')
 }
 
-// ═══════════════════════════════════════════════════════════════
-// CHIPS: CATEGORIA
-// ═══════════════════════════════════════════════════════════════
+// ── CHIPS CATEGORIA ───────────────────────────────────────────
 document.getElementById('cat-chips').addEventListener('click', e => {
   const chip = e.target.closest('.cat-chip')
   if (!chip) return
@@ -644,108 +574,69 @@ document.getElementById('cat-chips').addEventListener('click', e => {
   document.getElementById('err-categoria').classList.add('hidden')
 })
 
-// ═══════════════════════════════════════════════════════════════
-// TOGGLE META
-// ═══════════════════════════════════════════════════════════════
+// ── TOGGLES ───────────────────────────────────────────────────
 document.getElementById('toggle-meta-row').addEventListener('click', () => {
   metaAtivo = !metaAtivo
   document.getElementById('toggle-meta').classList.toggle('on', metaAtivo)
   document.getElementById('preco-meta-fields').classList.toggle('visible', metaAtivo)
 })
-
-// ═══════════════════════════════════════════════════════════════
-// TOGGLE MONITOR
-// ═══════════════════════════════════════════════════════════════
 document.getElementById('toggle-monitor-row').addEventListener('click', () => {
   monitorAtivo = !monitorAtivo
   document.getElementById('toggle-monitor').classList.toggle('on', monitorAtivo)
 })
 
-// ═══════════════════════════════════════════════════════════════
-// VALIDAÇÃO
-// ═══════════════════════════════════════════════════════════════
+// ── VALIDAÇÃO ─────────────────────────────────────────────────
 function validarFormulario() {
   let ok = true
-
   const url  = document.getElementById('input-url').value.trim()
   const nome = document.getElementById('input-nome').value.trim()
   const cat  = document.getElementById('input-categoria').value
   const loja = document.getElementById('input-loja').value
-
-  if (!url || !detectarLoja(url)) {
-    document.getElementById('err-url').classList.remove('hidden')
-    ok = false
-  }
-  if (!nome) {
-    document.getElementById('err-nome').classList.remove('hidden')
-    ok = false
-  }
-  if (!cat) {
-    document.getElementById('err-categoria').classList.remove('hidden')
-    ok = false
-  }
-  if (!loja) {
-    document.getElementById('err-loja').classList.remove('hidden')
-    ok = false
-  }
-
+  if (!url || !detectarLoja(url)) { document.getElementById('err-url').classList.remove('hidden'); ok = false }
+  if (!nome) { document.getElementById('err-nome').classList.remove('hidden'); ok = false }
+  if (!cat)  { document.getElementById('err-categoria').classList.remove('hidden'); ok = false }
+  if (!loja) { document.getElementById('err-loja').classList.remove('hidden'); ok = false }
   if (metaAtivo) {
     const meta = document.getElementById('input-preco-meta').value
     if (meta && (isNaN(meta) || Number(meta) <= 0)) {
-      document.getElementById('err-preco-meta').classList.remove('hidden')
-      ok = false
+      document.getElementById('err-preco-meta').classList.remove('hidden'); ok = false
     }
   }
-
   return ok
 }
 
-// ═══════════════════════════════════════════════════════════════
-// ADICIONAR À FILA
-// ═══════════════════════════════════════════════════════════════
+// ── ADICIONAR À FILA ──────────────────────────────────────────
 document.getElementById('btn-adicionar').addEventListener('click', () => {
-  // Limpa erros
   document.querySelectorAll('.field-error').forEach(e => e.classList.add('hidden'))
   if (!validarFormulario()) return
-
   const item = {
-    id_temp:     Date.now(),
-    url:         document.getElementById('input-url').value.trim(),
-    nome_na_loja:document.getElementById('input-nome').value.trim(),
-    categoria:   document.getElementById('input-categoria').value,
-    loja_slug:   document.getElementById('input-loja').value,
-    preco_meta:  metaAtivo && document.getElementById('input-preco-meta').value
-                   ? Number(document.getElementById('input-preco-meta').value)
-                   : null,
-    pct_queda:   metaAtivo && document.getElementById('input-pct-queda').value
-                   ? Number(document.getElementById('input-pct-queda').value)
-                   : null,
-    monitorando: monitorAtivo,
+    id_temp:      Date.now(),
+    url:          document.getElementById('input-url').value.trim(),
+    nome_na_loja: document.getElementById('input-nome').value.trim(),
+    categoria:    document.getElementById('input-categoria').value,
+    loja_slug:    document.getElementById('input-loja').value,
+    preco_meta:   metaAtivo && document.getElementById('input-preco-meta').value
+                    ? Number(document.getElementById('input-preco-meta').value) : null,
+    pct_queda:    metaAtivo && document.getElementById('input-pct-queda').value
+                    ? Number(document.getElementById('input-pct-queda').value) : null,
+    monitorando:  monitorAtivo,
   }
-
   filaItens.push(item)
   renderizarFila()
   limparFormulario()
   showToast(`"${item.nome_na_loja}" adicionado à fila`)
 })
 
-// ═══════════════════════════════════════════════════════════════
-// FILA
-// ═══════════════════════════════════════════════════════════════
+// ── FILA ──────────────────────────────────────────────────────
 function renderizarFila() {
   const list = document.getElementById('itens-list')
   document.getElementById('qtd-fila').textContent = filaItens.length
   document.getElementById('btn-salvar').disabled = filaItens.length === 0
-
   if (!filaItens.length) {
-    list.innerHTML = '<div class="empty-itens">Nenhum produto adicionado. Preencha o formulário acima e clique em "Adicionar à Fila".</div>'
+    list.innerHTML = '<div class="empty-itens">Nenhum produto adicionado.<br>Preencha o formulário acima e clique em "Adicionar à Fila".</div>'
     return
   }
-
-  list.innerHTML = `<div class="itens-list">
-    ${filaItens.map(renderItemFila).join('')}
-  </div>`
-
+  list.innerHTML = `<div style="display:flex;flex-direction:column;gap:.6rem">${filaItens.map(renderItemFila).join('')}</div>`
   list.querySelectorAll('[data-remove]').forEach(btn =>
     btn.addEventListener('click', () => {
       filaItens = filaItens.filter(i => i.id_temp !== Number(btn.dataset.remove))
@@ -763,7 +654,7 @@ function renderItemFila(item) {
   <div class="item-row">
     <div>
       <div class="item-nome">${item.nome_na_loja}</div>
-      <div style="font-size:.62rem;color:var(--text-dim);margin-top:.15rem">${item.categoria} · ${item.url.substring(0,50)}…</div>
+      <div class="item-cat">${item.categoria} · ${item.url.substring(0,45)}…</div>
     </div>
     <div class="item-loja">${labels[item.loja_slug] || item.loja_slug}</div>
     <div class="item-meta">${metaTxt}</div>
@@ -771,166 +662,102 @@ function renderItemFila(item) {
   </div>`
 }
 
-// ═══════════════════════════════════════════════════════════════
-// SALVAR NO BANCO
-// ═══════════════════════════════════════════════════════════════
+// ── SALVAR ────────────────────────────────────────────────────
 document.getElementById('btn-salvar').addEventListener('click', () => {
   if (!filaItens.length) return
-
   confirmar(
     'SALVAR PRODUTOS',
-    `Confirma o envio de <strong>${filaItens.length} produto(s)</strong> para o banco de dados?<br><br>
-     O monitoramento iniciará na próxima execução do scraper.`,
-    async () => {
-      await salvarFila()
-    }
+    `Confirma o envio de <strong>${filaItens.length} produto(s)</strong> para o banco de dados?`,
+    async () => { await salvarFila() }
   )
 })
 
 async function salvarFila() {
   const btn = document.getElementById('btn-salvar')
-  const progressBar = document.getElementById('progress-bar')
+  const progressBar  = document.getElementById('progress-bar')
   const progressFill = document.getElementById('progress-fill')
-
-  btn.disabled = true
-  btn.textContent = 'SALVANDO...'
+  btn.disabled = true; btn.textContent = 'SALVANDO...'
   progressBar.classList.remove('hidden')
-
-  let salvos = 0
-  const erros = []
-
-  console.log('[FPS] lojasDB disponível:', lojasDB)
-  console.log('[FPS] produtosDB disponível:', produtosDB)
+  let salvos = 0; const erros = []
 
   for (let i = 0; i < filaItens.length; i++) {
     const item = filaItens[i]
     progressFill.style.width = `${((i + 1) / filaItens.length) * 100}%`
-
-    // Resolve loja_id — chave é o slug em minúsculo sem espaços
     const lojaKey = item.loja_slug.toLowerCase().replace(/\s/g, '')
     const lojaId  = lojasDB[lojaKey]
-    if (!lojaId) {
-      const msg = `Loja "${item.loja_slug}" (key: ${lojaKey}) não encontrada. lojasDB: ${JSON.stringify(lojasDB)}`
-      erros.push(msg)
-      console.error('[FPS]', msg)
-      continue
-    }
-
-    // Resolve produto_id — a tabela itens usa FK para produtos,
-    // não tem coluna categoria direta
+    if (!lojaId) { erros.push(`Loja "${item.loja_slug}" não encontrada`); continue }
     const produtoId = produtosDB[item.categoria]
-    if (!produtoId) {
-      const msg = `Categoria "${item.categoria}" não encontrada. produtosDB: ${JSON.stringify(produtosDB)}`
-      erros.push(msg)
-      console.error('[FPS]', msg)
-      continue
-    }
-
-    const payload = {
-      url:          item.url,
-      nome_na_loja: item.nome_na_loja,
-      loja_id:      lojaId,
-      produto_id:   produtoId,
-      preco_meta:   item.preco_meta,
-      monitorando:  item.monitorando,
-    }
-
-    console.log('[FPS] Inserindo payload:', payload)
-    const { data: inserted, error } = await sb.from('itens').insert(payload).select()
-    if (error) {
-      const msg = `${item.nome_na_loja}: [${error.code}] ${error.message} — ${error.details || ''} ${error.hint || ''}`
-      erros.push(msg)
-      console.error('[FPS] Erro no insert:', error)
-    } else {
-      console.log('[FPS] Inserido com sucesso:', inserted)
-      salvos++
-    }
+    if (!produtoId) { erros.push(`Categoria "${item.categoria}" não encontrada`); continue }
+    const { error } = await sb.from('itens').insert({
+      url: item.url, nome_na_loja: item.nome_na_loja,
+      loja_id: lojaId, produto_id: produtoId,
+      preco_meta: item.preco_meta, monitorando: item.monitorando,
+    })
+    if (error) erros.push(`${item.nome_na_loja}: ${error.message}`)
+    else salvos++
   }
 
   progressFill.style.width = '100%'
-
   setTimeout(() => {
     progressBar.classList.add('hidden')
     progressFill.style.width = '0%'
     btn.textContent = 'SALVAR NO BANCO DE DADOS'
     btn.disabled = filaItens.length === 0
-
     if (erros.length === 0) {
-      filaItens = []
-      renderizarFila()
-      showToast(`✓ ${salvos} produto(s) salvos com sucesso!`)
+      filaItens = []; renderizarFila()
+      showToast(`✓ ${salvos} produto(s) salvos com sucesso!`, 'ok')
     } else {
-      console.error('[PROTOCOL FPS] Erros ao salvar:', erros)
-      // Mostra o primeiro erro diretamente na tela
-      const primeiroErro = erros[0].length > 80 ? erros[0].substring(0, 80) + '…' : erros[0]
-      showToast(`ERRO: ${primeiroErro}`, 'error')
+      showToast(`ERRO: ${erros[0].substring(0,70)}`, 'error')
     }
   }, 600)
 }
 
-// ═══════════════════════════════════════════════════════════════
-// LIMPAR FORMULÁRIO
-// ═══════════════════════════════════════════════════════════════
+// ── LIMPAR ────────────────────────────────────────────────────
 function limparFormulario() {
-  document.getElementById('input-url').value      = ''
-  document.getElementById('input-nome').value     = ''
-  document.getElementById('input-categoria').value = ''
-  document.getElementById('input-loja').value     = ''
-  document.getElementById('input-preco-meta').value = ''
-  document.getElementById('input-pct-queda').value  = ''
-
+  ['input-url','input-nome','input-categoria','input-loja','input-preco-meta','input-pct-queda']
+    .forEach(id => { document.getElementById(id).value = '' })
   document.querySelectorAll('.cat-chip, .loja-chip').forEach(c => c.classList.remove('selected'))
   document.querySelectorAll('.field-error').forEach(e => e.classList.add('hidden'))
-
   document.getElementById('url-preview').className = 'hidden'
-
   if (metaAtivo) {
     metaAtivo = false
     document.getElementById('toggle-meta').classList.remove('on')
     document.getElementById('preco-meta-fields').classList.remove('visible')
   }
 }
-
 document.getElementById('btn-limpar').addEventListener('click', limparFormulario)
-
 document.getElementById('btn-limpar-fila').addEventListener('click', () => {
   if (!filaItens.length) return
   confirmar('LIMPAR FILA', 'Remover todos os itens da fila?', () => {
-    filaItens = []
-    renderizarFila()
+    filaItens = []; renderizarFila()
   })
 })
 
-// ═══════════════════════════════════════════════════════════════
-// MODAL DE CONFIRMAÇÃO
-// ═══════════════════════════════════════════════════════════════
-let _confirmCallback = null
-
+// ── CONFIRM ───────────────────────────────────────────────────
+let _confirmCb = null
 function confirmar(titulo, corpo, callback) {
   document.getElementById('confirm-title').textContent = titulo
   document.getElementById('confirm-body').innerHTML   = corpo
-  _confirmCallback = callback
+  _confirmCb = callback
   document.getElementById('confirm-overlay').classList.remove('hidden')
 }
-
 document.getElementById('confirm-ok').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.add('hidden')
-  if (_confirmCallback) { _confirmCallback(); _confirmCallback = null }
+  if (_confirmCb) { _confirmCb(); _confirmCb = null }
 })
 document.getElementById('confirm-cancel').addEventListener('click', () => {
   document.getElementById('confirm-overlay').classList.add('hidden')
-  _confirmCallback = null
+  _confirmCb = null
 })
 
-// ═══════════════════════════════════════════════════════════════
-// TOAST
-// ═══════════════════════════════════════════════════════════════
+// ── TOAST ─────────────────────────────────────────────────────
 function showToast(msg, tipo = 'ok') {
   const t = document.getElementById('toast')
   t.textContent = msg
-  t.className = tipo === 'error' ? 'error' : ''
+  t.className = tipo === 'error' ? 'error' : tipo === 'ok' ? 'success' : ''
   t.classList.remove('hidden')
-  setTimeout(() => t.classList.add('hidden'), 3500)
+  clearTimeout(t._timeout)
+  t._timeout = setTimeout(() => t.classList.add('hidden'), 4000)
 }
 </script>
 </body>
