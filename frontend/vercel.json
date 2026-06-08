@@ -1,6 +1,4 @@
 {
-  "comment": "PROTOCOL FPS — Frontend deploy config para Vercel",
-
   "buildCommand": "python build.py",
   "outputDirectory": ".",
   "installCommand": "echo 'No npm install needed'",
