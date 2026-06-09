@@ -11,9 +11,8 @@
 
 # ── Supabase ─────────────────────────────────────────────────
 # Cliente oficial Python — acesso ao banco, auth e RPC
-# Sub-dependência declarada explicitamente para evitar conflitos de cache no Actions
-supabase-auth>=2.30.0
-supabase>=2.43.0,<3.0.0
+# Atualizado para a última versão estável real (2.31.0) para resolver módulos
+supabase==2.31.0
 
 # ── Playwright ───────────────────────────────────────────────
 # Browser headless (Chromium) para scraping de páginas com JS
