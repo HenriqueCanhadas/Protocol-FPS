@@ -5,8 +5,14 @@ Herda ScraperBase e implementa a lógica específica do site.
 Seletores atualizados para o HTML da Kabum (junho/2025).
 Estratégia em camadas:
   1. JSON-LD  (mais estável — dados estruturados do Google)
+     → lê também offers.availability para detectar esgotamento
   2. Meta tags og:price (segundo mais estável)
   3. Seletores CSS com múltiplos candidatos (frágil, mas último recurso)
+
+Correções v2 (junho/2026):
+  - JSON-LD: offers.availability "OutOfStock" agora detecta esgotamento
+  - SELETOR_ESGOTADO expandido para cobrir variações de botão/texto
+  - Lógica de esgotamento executada ANTES de decidir disponivel=True
 """
 from __future__ import annotations
 import json
@@ -18,21 +24,40 @@ from .base import ScraperBase, DadosProduto
 
 logger = logging.getLogger(__name__)
 
-# Seletores CSS — múltiplos candidatos ordenados por confiabilidade
-SELETOR_PRECO = ", ".join([
-    # JSON-LD price (via atributo)
-    "script[type='application/ld+json']",
-    # Meta tags (og / microdata)
-    "meta[property='product:price:amount']",
-    "meta[itemprop='price']",
-    # Elementos visíveis — Kabum usa classes geradas, pegamos por padrão de conteúdo
-    "[class*='finalPrice']",
-    "[class*='priceCard']",
-    "[class*='productPrice']",
-    "[data-smash-price]",
-    # Genérico — último recurso
-    "h4[class*='sc-']",
-    "span[class*='sc-']",
+# Valores que indicam produto fora de estoque no schema.org
+_AVAILABILITY_ESGOTADO = {
+    "https://schema.org/outofstock",
+    "outofstock",
+    "out of stock",
+    "https://schema.org/soldout",
+    "soldout",
+    "sold out",
+    "https://schema.org/discontinued",
+}
+
+# Seletores CSS de esgotamento — múltiplos padrões observados na Kabum
+SELETOR_ESGOTADO = ", ".join([
+    # Botões desabilitados / textos explícitos
+    "button[class*='unavailable']",
+    "button:has-text('Avise-me')",
+    "button:has-text('Esgotado')",
+    "button:has-text('Indisponível')",
+    "button:has-text('ESGOTADO')",
+    "button:has-text('INDISPONÍVEL')",
+    "button:has-text('Produto Esgotado')",
+    # Classes geradas pelo React/Next da Kabum
+    "[class*='outOfStock']",
+    "[class*='out-of-stock']",
+    "[class*='OutOfStock']",
+    "[class*='esgotado']",
+    "[class*='Esgotado']",
+    # Spans/divs com badge de esgotamento
+    "span:has-text('Esgotado')",
+    "div:has-text('Produto Esgotado')",
+    "[data-testid*='esgotado']",
+    "[data-testid*='out-of-stock']",
+    # Fallback: qualquer elemento com "Avise" visível
+    "a:has-text('Avise-me')",
 ])
 
 SELETOR_NOME = ", ".join([
@@ -40,15 +65,6 @@ SELETOR_NOME = ", ".join([
     "h1[class*='product']",
     "h1[itemprop='name']",
     "h1",
-])
-
-SELETOR_ESGOTADO = ", ".join([
-    "button[class*='unavailable']",
-    "button:has-text('Avise-me')",
-    "button:has-text('Esgotado')",
-    "button:has-text('Indisponível')",
-    "[class*='outOfStock']",
-    "[class*='out-of-stock']",
 ])
 
 
@@ -60,10 +76,13 @@ class KabumScraper(ScraperBase):
             page.wait_for_load_state("networkidle", timeout=15_000)
         except Exception:
             pass
-        # Tenta aguardar qualquer elemento de preço
+        # Tenta aguardar qualquer elemento de preço ou esgotamento
         try:
             page.wait_for_selector(
-                "meta[property='product:price:amount'], [class*='finalPrice'], [class*='priceCard']",
+                "meta[property='product:price:amount'], "
+                "[class*='finalPrice'], [class*='priceCard'], "
+                "button:has-text('Avise-me'), [class*='outOfStock'], "
+                "script[type='application/ld+json']",
                 timeout=8_000,
             )
         except Exception:
@@ -72,22 +91,28 @@ class KabumScraper(ScraperBase):
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
         nome = self._extrair_nome(page)
 
-        # 1. Tenta JSON-LD primeiro (mais estável)
-        preco = self._extrair_preco_jsonld(page)
+        # 1. JSON-LD — extrai preço E availability de uma vez
+        preco, disponivel_jsonld = self._extrair_jsonld_completo(page)
 
-        # 2. Meta tag fallback
+        # 2. Meta tag fallback (preço)
         if preco is None:
             preco = self._extrair_preco_meta(page)
 
-        # 3. CSS fallback
+        # 3. CSS fallback (preço)
         if preco is None:
             preco = self._extrair_preco_css(page)
 
-        # Verifica esgotamento
-        esgotado = self._esta_esgotado(page)
+        # Verifica esgotamento via DOM (botões/classes CSS)
+        esgotado_dom = self._esta_esgotado(page)
 
-        if esgotado and preco is None:
-            logger.info("Produto esgotado na Kabum: %s", nome)
+        # Decisão final: esgotado se JSON-LD diz OutOfStock OU DOM confirma
+        esgotado = (not disponivel_jsonld) or esgotado_dom
+
+        if esgotado:
+            logger.info(
+                "Produto esgotado na Kabum [jsonld_ok=%s, dom_esgotado=%s]: %s",
+                disponivel_jsonld, esgotado_dom, nome
+            )
             return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
 
         if preco is None:
@@ -98,7 +123,7 @@ class KabumScraper(ScraperBase):
         return DadosProduto(
             nome=nome,
             preco=preco,
-            disponivel=not esgotado,
+            disponivel=True,
             url=url,
         )
 
@@ -124,6 +149,16 @@ class KabumScraper(ScraperBase):
         except Exception:
             pass
 
+        # Meta og:title
+        try:
+            el = page.query_selector("meta[property='og:title']")
+            if el:
+                val = (el.get_attribute("content") or "").strip()
+                if val:
+                    return val
+        except Exception:
+            pass
+
         # Fallback CSS
         try:
             el = page.query_selector(SELETOR_NOME)
@@ -133,14 +168,34 @@ class KabumScraper(ScraperBase):
             return "Nome não encontrado"
 
     def _esta_esgotado(self, page: Page) -> bool:
+        """Verifica esgotamento via seletores DOM."""
         try:
             el = page.query_selector(SELETOR_ESGOTADO)
-            return el is not None
+            if el:
+                return True
         except Exception:
-            return False
+            pass
 
-    def _extrair_preco_jsonld(self, page: Page) -> float | None:
-        """Extrai preço do JSON-LD — o mais estável pois é para SEO/Google."""
+        # Fallback: varredura de texto por palavras-chave de esgotamento
+        try:
+            texto_pagina = page.evaluate(
+                "() => document.body.innerText.toLowerCase()"
+            )
+            for kw in ("produto esgotado", "avise-me quando disponível", "avise-me quando chegar"):
+                if kw in texto_pagina:
+                    logger.debug("Esgotamento detectado por keyword: '%s'", kw)
+                    return True
+        except Exception:
+            pass
+
+        return False
+
+    def _extrair_jsonld_completo(self, page: Page) -> tuple[float | None, bool]:
+        """
+        Extrai preço e disponibilidade do JSON-LD em uma única passagem.
+        Retorna (preco, disponivel).
+        disponivel=True por padrão — só False quando JSON-LD explicitamente diz OutOfStock.
+        """
         try:
             scripts = page.query_selector_all("script[type='application/ld+json']")
             for script in scripts:
@@ -150,21 +205,42 @@ class KabumScraper(ScraperBase):
                     if isinstance(data, list):
                         data = data[0]
 
-                    # Schema.org Product
-                    if data.get("@type") in ("Product", "product"):
-                        offers = data.get("offers", {})
-                        if isinstance(offers, list):
-                            offers = offers[0]
-                        price = offers.get("price") or offers.get("lowPrice")
-                        if price:
+                    if data.get("@type") not in ("Product", "product"):
+                        continue
+
+                    offers = data.get("offers", {})
+                    if isinstance(offers, list):
+                        offers = offers[0]
+
+                    # — Disponibilidade —
+                    availability = (offers.get("availability") or "").lower().strip()
+                    disponivel = availability not in _AVAILABILITY_ESGOTADO if availability else True
+
+                    # — Preço —
+                    price = offers.get("price") or offers.get("lowPrice")
+                    preco = None
+                    if price:
+                        try:
                             valor = float(str(price).replace(",", "."))
                             if valor > 10:
-                                return valor
+                                preco = valor
+                        except (ValueError, TypeError):
+                            pass
+
+                    if preco is not None or availability:
+                        logger.debug(
+                            "JSON-LD: price=%.2f, availability='%s', disponivel=%s",
+                            preco or 0, availability, disponivel
+                        )
+                        return preco, disponivel
+
                 except Exception:
                     continue
         except Exception as exc:
             logger.debug("Erro no JSON-LD: %s", exc)
-        return None
+
+        # Não encontrou JSON-LD de produto — assume disponível (DOM decidirá)
+        return None, True
 
     def _extrair_preco_meta(self, page: Page) -> float | None:
         """Fallback: lê meta tags de preço."""
@@ -178,7 +254,6 @@ class KabumScraper(ScraperBase):
                 el = page.query_selector(seletor)
                 if el:
                     conteudo = el.get_attribute("content") or ""
-                    # Remove "R$" e espaços, normaliza vírgula
                     conteudo = re.sub(r"[R$\s]", "", conteudo).replace(",", ".")
                     valor = float(conteudo)
                     if valor > 10:
@@ -188,13 +263,12 @@ class KabumScraper(ScraperBase):
         return None
 
     def _extrair_preco_css(self, page: Page) -> float | None:
-        """Último recurso: percorre candidatos CSS e pega o menor preço."""
+        """Último recurso: percorre candidatos CSS e pega o menor preço válido."""
         candidatos = [
             "[class*='finalPrice']",
             "[class*='priceCard']",
             "[class*='productPrice']",
             "[data-smash-price]",
-            # Fallback genérico: qualquer elemento com "R$" no texto
         ]
         precos = []
         for seletor in candidatos:
@@ -204,24 +278,21 @@ class KabumScraper(ScraperBase):
                     texto = el.inner_text()
                     if "R$" in texto or re.search(r"\d{3,}", texto):
                         valor = self._limpar_preco(texto)
-                        if valor and valor > 50:  # filtra valores espúrios
+                        if valor and valor > 50:
                             precos.append(valor)
             except Exception:
                 continue
 
-        # Fallback final: busca qualquer texto que pareça preço na página
+        # Fallback JS — scan completo
         if not precos:
             try:
-                # Pega o preço do título da página ou breadcrumb
                 body_text = page.evaluate("""() => {
                     const els = document.querySelectorAll('h4, span, div');
                     const prices = [];
                     for (const el of els) {
                         const text = el.innerText || '';
                         const match = text.match(/R\\$\\s*([\\d.]+,[\\d]{2})/);
-                        if (match) {
-                            prices.push(match[0]);
-                        }
+                        if (match) prices.push(match[0]);
                     }
                     return prices.slice(0, 10);
                 }""")
