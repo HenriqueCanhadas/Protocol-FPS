@@ -359,6 +359,22 @@ tbody tr.row-off:hover { opacity: .75; }
 
 .empty { text-align: center; padding: 3rem 1.5rem; color: var(--text-dim); font-size: var(--fs-base); letter-spacing: .1em; line-height: 2; }
 
+/* ── FOOTER ──────────────────────────────────────────────── */
+.site-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .75rem 1.5rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg2);
+  font-size: .75rem; letter-spacing: .08em;
+  color: var(--text-dim); text-transform: uppercase;
+  user-select: none;
+}
+.footer-phrase { display: flex; align-items: center; gap: .2rem; }
+.footer-dots {
+  flex: 1; margin: 0 1.5rem;
+  border-top: 1px dashed var(--border);
+}
+
 /* ── RESPONSIVE ──────────────────────────────────────────── */
 @media (max-width: 700px) {
   .stats-bar { grid-template-columns: 1fr 1fr; }
@@ -557,6 +573,17 @@ tbody tr.row-off:hover { opacity: .75; }
     </section>
 
   </main>
+
+  <footer class="site-footer">
+    <div class="footer-phrase">
+      <strong class="green">L</strong>ive&nbsp;<strong class="green">M</strong>onitor
+    </div>
+    <div class="footer-dots"></div>
+    <div class="footer-phrase">
+      <strong class="green">G</strong>uard&nbsp;<strong class="green">M</strong>arket
+    </div>
+  </footer>
+
 </div>
 
 <!-- MODAL HISTÓRICO -->

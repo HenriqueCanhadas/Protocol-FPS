@@ -8,6 +8,12 @@ Fluxo:
   3. Salva o preço coletado em historico_precos
   4. Chama a function verificar_alertas() do Supabase
   5. Se houver alerta, dispara Email + Telegram e marca como notificado
+
+Logs coloridos (ANSI):
+  🟢 Verde  — preço encontrado, operação bem-sucedida
+  🔴 Vermelho — produto esgotado, erro, preço não encontrado
+  🟡 Amarelo — aviso (loja desconhecida, alerta disparado etc.)
+  ⚪ Cinza   — informações gerais (coleta iniciada, histórico salvo)
 """
 import logging
 import os
@@ -23,12 +29,134 @@ from scrapers.pichau   import PichauScraper
 from notificacoes.email    import enviar_email
 from notificacoes.telegram import enviar_telegram
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-logger = logging.getLogger("main")
+# ══════════════════════════════════════════════════════════════════════
+# LOGGING COLORIDO
+# ══════════════════════════════════════════════════════════════════════
+
+class ColorFormatter(logging.Formatter):
+    """
+    Formata logs com cores ANSI.
+    Compatível com GitHub Actions (que suporta ANSI) e terminais modernos.
+    """
+    RESET  = "\033[0m"
+    BOLD   = "\033[1m"
+
+    LEVEL_COLORS = {
+        logging.DEBUG:    "\033[90m",   # cinza escuro
+        logging.INFO:     "\033[37m",   # branco
+        logging.WARNING:  "\033[33m",   # amarelo
+        logging.ERROR:    "\033[31m",   # vermelho
+        logging.CRITICAL: "\033[1;31m", # vermelho bold
+    }
+
+    # Prefixos por nível
+    LEVEL_PREFIX = {
+        logging.DEBUG:    "  ·",
+        logging.INFO:     "  ·",
+        logging.WARNING:  " ⚠ ",
+        logging.ERROR:    " ✗ ",
+        logging.CRITICAL: " ✗✗",
+    }
+
+    def format(self, record: logging.LogRecord) -> str:
+        color  = self.LEVEL_COLORS.get(record.levelno, self.RESET)
+        prefix = self.LEVEL_PREFIX.get(record.levelno, "  ·")
+
+        # Timestamp reduzido: HH:MM:SS
+        timestamp = self.formatTime(record, "%H:%M:%S")
+
+        # Nome do módulo abreviado
+        name_short = record.name.split(".")[-1]
+
+        base = f"{color}{timestamp}{self.RESET} {prefix} [{name_short}] "
+
+        # Colorização semântica da mensagem
+        msg = record.getMessage()
+        msg = self._colorir_mensagem(msg, record.levelno)
+
+        return base + msg
+
+    def _colorir_mensagem(self, msg: str, level: int) -> str:
+        """Aplica cores extras com base no conteúdo da mensagem."""
+        GREEN  = "\033[32m"
+        RED    = "\033[31m"
+        YELLOW = "\033[33m"
+        CYAN   = "\033[36m"
+        BOLD   = "\033[1m"
+        DIM    = "\033[2m"
+        RESET  = self.RESET
+
+        # Preço encontrado com sucesso
+        if "Preço encontrado" in msg or "preço:" in msg.lower():
+            if "R$" in msg or "%.2f" in msg or any(c.isdigit() for c in msg):
+                return f"{GREEN}{BOLD}{msg}{RESET}"
+
+        # Esgotado / não encontrado / erro
+        if any(kw in msg.lower() for kw in (
+            "esgotado", "indispon", "não encontrado", "not found",
+            "sem preço", "histórico não salvo", "bloqueado", "falhou",
+            "erro ao", "error"
+        )):
+            return f"{RED}{msg}{RESET}"
+
+        # Alerta disparado
+        if "⚡ alerta" in msg.lower() or "alerta:" in msg.lower():
+            return f"{YELLOW}{BOLD}{msg}{RESET}"
+
+        # Histórico salvo
+        if "histórico salvo" in msg.lower():
+            return f"{GREEN}{msg}{RESET}"
+
+        # Início de coleta (destacar URL e loja)
+        if msg.startswith("Coletando ["):
+            # Colore a loja em ciano e a URL em dim
+            import re
+            m = re.match(r"(Coletando \[)(\w+)(\] )(.*)", msg)
+            if m:
+                return (
+                    f"{m.group(1)}"
+                    f"{CYAN}{BOLD}{m.group(2)}{RESET}"
+                    f"{m.group(3)}"
+                    f"{DIM}{m.group(4)}{RESET}"
+                )
+
+        # Email / Telegram enviado
+        if "enviado com sucesso" in msg.lower():
+            return f"{GREEN}{msg}{RESET}"
+
+        # Coleta finalizada
+        if "coleta finalizada" in msg.lower():
+            return f"{BOLD}{msg}{RESET}"
+
+        # Itens a monitorar
+        if "itens a monitorar" in msg.lower():
+            return f"{CYAN}{msg}{RESET}"
+
+        # Loja desconhecida
+        if "loja desconhecida" in msg.lower():
+            return f"{YELLOW}{msg}{RESET}"
+
+        return msg
+
+
+def _configurar_logging() -> None:
+    """Configura o logging raiz com o formatter colorido."""
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(ColorFormatter())
+
+    root = logging.getLogger()
+    root.setLevel(logging.INFO)
+    root.handlers.clear()
+    root.addHandler(handler)
+
+    # Silencia logs verbose de bibliotecas externas
+    for lib in ("httpx", "httpcore", "urllib3", "supabase", "postgrest"):
+        logging.getLogger(lib).setLevel(logging.WARNING)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# SCRAPERS
+# ══════════════════════════════════════════════════════════════════════
 
 SCRAPERS = {
     "kabum":        KabumScraper,
@@ -36,8 +164,26 @@ SCRAPERS = {
     "pichau":       PichauScraper,
 }
 
+logger = logging.getLogger("main")
+
+
+# ══════════════════════════════════════════════════════════════════════
+# MAIN
+# ══════════════════════════════════════════════════════════════════════
 
 def main() -> None:
+    _configurar_logging()
+
+    # Banner de início
+    print("\033[1;32m")
+    print("  ██████╗ ██████╗  ██████╗ ████████╗ ██████╗  ██████╗ ██╗")
+    print("  ██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝██╔═══██╗██╔════╝ ██║")
+    print("  ██████╔╝██████╔╝██║   ██║   ██║   ██║   ██║██║      ██║")
+    print("  ██╔═══╝ ██╔══██╗██║   ██║   ██║   ██║   ██║██║      ██║")
+    print("  ██║     ██║  ██║╚██████╔╝   ██║   ╚██████╔╝╚██████╗ ███████╗")
+    print("  ╚═╝     ╚═╝  ╚═╝ ╚═════╝    ╚═╝    ╚═════╝  ╚═════╝ ╚══════╝")
+    print("\033[0m")
+
     sb = get_supabase()
 
     resp = (
@@ -48,34 +194,56 @@ def main() -> None:
     )
     itens = resp.data
     logger.info("Itens a monitorar: %d", len(itens))
+    print()
 
-    for item in itens:
+    # Contadores para resumo final
+    total_ok      = 0
+    total_esgotado = 0
+    total_erro    = 0
+    alertas_total = 0
+
+    for idx, item in enumerate(itens, 1):
         item_id   = item["id"]
         url       = item["url"]
         nome_loja = item["lojas"]["nome"].lower().replace(" ", "")
+        nome_item = item.get("nome_na_loja") or url.split("/")[-1][:50]
 
+        # Separador visual entre itens
+        print(f"\033[90m  {'─' * 60}\033[0m")
         logger.info("Coletando [%s] %s", nome_loja, url)
 
         ScraperClass = SCRAPERS.get(nome_loja)
         if not ScraperClass:
             logger.warning("Loja desconhecida: %s — pulando", nome_loja)
+            total_erro += 1
             continue
 
         dados = ScraperClass().coletar(url)
-        logger.info(
-            "  → %s | R$ %.2f | disponível=%s",
-            dados.nome,
-            dados.preco or 0,
-            dados.disponivel,
-        )
 
-        # ── Salva histórico ───────────────────────────────────────────
-        # IMPORTANTE: a coluna 'preco' em historico_precos é NOT NULL
-        # quando o produto está indisponível, não salvamos registro
-        # (não há preço a registrar — o histórico ficará sem entry nessa coleta)
+        # ── Log do resultado de coleta ───────────────────────────────
+        if dados.preco is not None and dados.disponivel:
+            logger.info(
+                "\033[32m  ✓ PREÇO: R$ %.2f\033[0m  |  %s",
+                dados.preco, dados.nome[:70]
+            )
+            total_ok += 1
+        elif not dados.disponivel and dados.preco is None:
+            logger.error(
+                "\033[31m  ✗ ESGOTADO / NÃO ENCONTRADO\033[0m  |  %s",
+                dados.nome[:70]
+            )
+            total_esgotado += 1
+        else:
+            logger.warning(
+                "\033[33m  ⚠ disponível=%s, preço=%s\033[0m  |  %s",
+                dados.disponivel, dados.preco, dados.nome[:70]
+            )
+            total_erro += 1
+
+        # ── Salva histórico ──────────────────────────────────────────
         if dados.preco is None:
             logger.info(
-                "  → Sem preço coletado (disponivel=%s) — histórico não salvo",
+                "Sem preço coletado (disponivel=%s) — histórico não salvo",
                 dados.disponivel,
             )
             continue
@@ -93,16 +261,16 @@ def main() -> None:
                 .execute()
             )
             historico_id = hist_resp.data[0]["id"]
-            logger.info("  → Histórico salvo (id=%s, preço=R$%.2f)", historico_id, dados.preco)
+            logger.info("Histórico salvo (id=%s)", historico_id)
         except Exception as exc:
-            logger.error("  → Erro ao salvar histórico: %s", exc)
+            logger.error("Erro ao salvar histórico: %s", exc)
             continue
 
         if not dados.disponivel:
-            logger.info("  → Produto indisponível — sem verificação de alertas")
+            logger.info("Produto indisponível — sem verificação de alertas")
             continue
 
-        # ── Verifica alertas ──────────────────────────────────────────
+        # ── Verifica alertas ─────────────────────────────────────────
         try:
             alertas_resp = sb.rpc(
                 "verificar_alertas",
@@ -110,20 +278,36 @@ def main() -> None:
             ).execute()
             alertas = alertas_resp.data or []
         except Exception as exc:
-            logger.warning("  → verificar_alertas indisponível: %s", exc)
+            logger.warning("verificar_alertas indisponível: %s", exc)
             alertas = []
 
         for alerta in alertas:
             tipo           = alerta["tipo"]
             preco_gatilho  = alerta["preco_gatilho"]
             preco_anterior = alerta.get("preco_anterior")
+            alertas_total += 1
 
-            logger.info("  ⚡ Alerta: %s (R$ %.2f)", tipo, preco_gatilho)
+            logger.warning(
+                "⚡ Alerta: %s  →  R$ %.2f  (era R$ %.2f)",
+                tipo.upper(),
+                preco_gatilho,
+                preco_anterior or 0,
+            )
 
             mensagem = _montar_mensagem(dados, tipo, preco_gatilho, preco_anterior)
 
             ok_email    = enviar_email(mensagem, dados.nome)
             ok_telegram = enviar_telegram(mensagem)
+
+            if ok_email:
+                logger.info("📧 Email enviado com sucesso")
+            else:
+                logger.error("📧 Falha ao enviar email")
+
+            if ok_telegram:
+                logger.info("📱 Telegram enviado com sucesso")
+            else:
+                logger.error("📱 Falha ao enviar Telegram")
 
             try:
                 sb.table("alertas").insert({
@@ -136,7 +320,18 @@ def main() -> None:
                     "notificado_telegram": ok_telegram,
                 }).execute()
             except Exception as exc:
-                logger.error("  → Erro ao salvar alerta: %s", exc)
+                logger.error("Erro ao salvar alerta: %s", exc)
+
+    # ── Resumo final ─────────────────────────────────────────────────
+    print(f"\n\033[90m  {'═' * 60}\033[0m")
+    print(f"\033[1m  RESUMO DA COLETA\033[0m")
+    print(f"  \033[32m✓ Com preço:    {total_ok}\033[0m")
+    print(f"  \033[31m✗ Esgotados:    {total_esgotado}\033[0m")
+    if total_erro:
+        print(f"  \033[33m⚠ Erros:        {total_erro}\033[0m")
+    if alertas_total:
+        print(f"  \033[33m⚡ Alertas:      {alertas_total}\033[0m")
+    print(f"\033[90m  {'═' * 60}\033[0m\n")
 
     logger.info("Coleta finalizada.")
 
