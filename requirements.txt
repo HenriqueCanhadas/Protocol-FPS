@@ -3,7 +3,7 @@
 # Instalado pelo GitHub Actions antes de rodar o main.py
 #
 # Uso local:
-#   pip install -r requirements_backend.txt
+#   pip install -r requirements.txt
 #   playwright install chromium --with-deps
 #
 # Python >= 3.9  (recomendado: 3.11, conforme .github/workflows/coletar.yml)
@@ -11,8 +11,8 @@
 
 # ── Supabase ─────────────────────────────────────────────────
 # Cliente oficial Python — acesso ao banco, auth e RPC
-# ATENÇÃO: 2.21.1 foi yanked do PyPI; mínimo recomendado é 2.22.x
-supabase==2.21.1
+# Atualizado para a última versão estável real (2.31.0) para resolver módulos
+supabase==2.31.0
 
 # ── Playwright ───────────────────────────────────────────────
 # Browser headless (Chromium) para scraping de páginas com JS
