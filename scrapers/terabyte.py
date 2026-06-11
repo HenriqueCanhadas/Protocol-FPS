@@ -6,27 +6,33 @@ O preço é injetado dinamicamente após o carregamento da página.
 
 Estratégia em camadas (da mais para a menos estável):
   1. JSON-LD  — schema.org/Product (mais estável)
-  2. Itemprop — microdata HTML (segundo mais estável)
-  3. ID/classe específica da Terabyte (frágil mas necessário como fallback)
+  2. Itemprop — microdata HTML
+  3. ID/classe específica da Terabyte
   4. JS evaluation — scan do DOM por padrão R$ X.XXX,XX
 
-v2 (junho/2026):
-  - Timeout networkidle aumentado para 30s em CI (era 20s)
-  - Retry automático de wait_for_selector com 3 seletores prioritários
-  - Delay explícito de 2s após networkidle para JS de preço terminar de injetar
-  - ScraperBase com stealth já aplicado antes de _aguardar_preco
+Comportamento no CI (GitHub Actions / Azure IP):
+  - Terabyte tem bot protection que restringe IPs de datacenter
+  - O JS que injeta os preços pode não executar em ambiente bloqueado
+  - Sleep adaptativo: 2.5s local → 5.0s CI para dar tempo ao JS
+  - Debug logging do título da página para detectar challenge
 """
 from __future__ import annotations
+
 import json
 import re
-import logging
 import time
+import logging
+
 from playwright.sync_api import Page
 
-from .base import ScraperBase, DadosProduto, TIMEOUT_NETWORKIDLE, TIMEOUT_SELECTOR
+from .base import ScraperBase, DadosProduto, IS_CI, TIMEOUT_GOTO, TIMEOUT_NETWORK, TIMEOUT_SELETOR
 
 logger = logging.getLogger(__name__)
 
+# Sleep após networkidle — JS de preço precisa de mais tempo no CI
+_SLEEP_POS_NETWORK = 5.0 if IS_CI else 2.5
+
+# Seletores específicos da Terabyteshop
 SELETORES_PRECO = [
     "#product-price",
     "#priceDe",
@@ -57,20 +63,10 @@ SELETOR_ESGOTADO = ", ".join([
     "button:has-text('Indisponível')",
     "button:has-text('Avise-me')",
     "button:has-text('Esgotado')",
-    "button:has-text('INDISPONÍVEL')",
-    "button:has-text('ESGOTADO')",
     ".btn-esgotado",
     "[class*='esgotado']",
     "[class*='unavailable']",
 ])
-
-# Seletores de preço mais prováveis para o wait inicial
-_WAIT_SELECTORS = [
-    "#product-price",
-    ".prod-new-price",
-    "[itemprop='price']",
-    "script[type='application/ld+json']",
-]
 
 
 class TerabyteScraper(ScraperBase):
@@ -78,61 +74,85 @@ class TerabyteScraper(ScraperBase):
     def _aguardar_preco(self, page: Page) -> None:
         """
         Terabyte carrega preços via JS após o DOM.
-        Em GitHub Actions (datacenter), o JS demora mais para executar.
-        Estratégia: networkidle + wait_for_selector + delay de segurança.
+        No CI o servidor pode ser mais lento para responder a IPs de datacenter.
         """
-        # 1. Aguarda JS terminar completamente
+        # 1. Aguarda o JS terminar (networkidle)
         try:
-            page.wait_for_load_state("networkidle", timeout=TIMEOUT_NETWORKIDLE)
+            page.wait_for_load_state("networkidle", timeout=TIMEOUT_NETWORK)
         except Exception:
             try:
-                page.wait_for_load_state("load", timeout=15_000)
+                page.wait_for_load_state("load", timeout=10_000)
             except Exception:
                 pass
 
-        # 2. Tenta aguardar um seletor de preço conhecido
-        achou = False
-        for seletor in _WAIT_SELECTORS:
+        # 2. Sleep adaptativo (JS de preço precisa de tempo para injetar o valor)
+        logger.debug("[terabyte] aguardando %.1fs para JS de preço...", _SLEEP_POS_NETWORK)
+        time.sleep(_SLEEP_POS_NETWORK)
+
+        # 3. Tenta aguardar seletor de preço (melhora confiabilidade)
+        for seletor in ["#product-price", ".prod-new-price", "[itemprop='price']"]:
             try:
-                page.wait_for_selector(seletor, timeout=TIMEOUT_SELECTOR)
-                logger.debug("Seletor de preço Terabyte encontrado: %s", seletor)
-                achou = True
-                break
+                page.wait_for_selector(seletor, timeout=TIMEOUT_SELETOR)
+                logger.debug("[terabyte] Seletor encontrado: %s", seletor)
+                return
             except Exception:
                 continue
 
-        if not achou:
-            logger.warning("Seletor de preço Terabyte não apareceu")
-
-        # 3. Delay de segurança — garante que o JS de preço terminou de injetar
-        #    Especialmente importante em CI onde o JS executa mais devagar
-        time.sleep(2.5)
+        logger.warning("[terabyte] Seletor de preço não apareceu após %.1fs", _SLEEP_POS_NETWORK)
 
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
+        # Log do título para diagnóstico no CI
+        titulo = ""
+        try:
+            titulo = page.title()
+            logger.info("[terabyte] título da página: '%s'", titulo[:80])
+        except Exception:
+            pass
+
+        # Detecta challenge antes de tentar extrair
+        body_snip = ""
+        try:
+            body_snip = page.evaluate(
+                "() => document.body?.innerText?.substring(0, 300) || ''"
+            )
+        except Exception:
+            pass
+
+        if self._detectar_challenge(titulo, page.url, body_snip):
+            logger.warning(
+                "[terabyte] Challenge/bot protection detectada: título='%s'", titulo
+            )
+            logger.warning("[terabyte] body snippet: %s", body_snip[:200])
+            return DadosProduto(
+                nome="Challenge/Bloqueio Terabyte",
+                preco=None,
+                disponivel=False,
+                url=url,
+            )
+
         nome = self._extrair_nome(page)
 
-        # 1. JSON-LD (mais estável)
+        # Extração em camadas
         preco = self._extrair_preco_jsonld(page)
 
-        # 2. Itemprop microdata
         if preco is None:
             preco = self._extrair_preco_itemprop(page)
 
-        # 3. Seletores CSS específicos da Terabyte
         if preco is None:
             preco = self._extrair_preco_css(page)
 
-        # 4. JS scan — último recurso
         if preco is None:
             preco = self._extrair_preco_js(page)
 
         esgotado = self._esta_esgotado(page)
 
         if preco is None:
-            logger.warning("Preço não encontrado na Terabyte: %s", url)
+            logger.warning("[terabyte] Preço não encontrado: %s", url)
+            if IS_CI:
+                logger.warning("[terabyte] CI Debug - body snippet: %s", body_snip[:300])
             return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
 
-        logger.info("Terabyte — preço: R$ %.2f | esgotado: %s", preco, esgotado)
+        logger.info("[terabyte] preço: R$ %.2f | esgotado: %s", preco, esgotado)
         return DadosProduto(
             nome=nome,
             preco=preco,
@@ -141,8 +161,11 @@ class TerabyteScraper(ScraperBase):
         )
 
     # ------------------------------------------------------------------
+    # Extratores
+    # ------------------------------------------------------------------
 
     def _extrair_nome(self, page: Page) -> str:
+        # JSON-LD primeiro
         try:
             scripts = page.query_selector_all("script[type='application/ld+json']")
             for script in scripts:
@@ -158,6 +181,16 @@ class TerabyteScraper(ScraperBase):
                     continue
         except Exception:
             pass
+        # Meta og:title
+        try:
+            el = page.query_selector("meta[property='og:title']")
+            if el:
+                nome = (el.get_attribute("content") or "").strip()
+                if nome:
+                    return nome
+        except Exception:
+            pass
+        # CSS
         try:
             el = page.query_selector(SELETOR_NOME)
             return el.inner_text().strip() if el else "Nome não encontrado"
@@ -190,16 +223,12 @@ class TerabyteScraper(ScraperBase):
                 except Exception:
                     continue
         except Exception as exc:
-            logger.debug("Erro no JSON-LD Terabyte: %s", exc)
+            logger.debug("[terabyte] Erro no JSON-LD: %s", exc)
         return None
 
     def _extrair_preco_itemprop(self, page: Page) -> float | None:
-        seletores = [
-            "[itemprop='price']",
-            "[itemprop='lowPrice']",
-            "meta[itemprop='price']",
-        ]
-        for seletor in seletores:
+        """Lê microdata itemprop='price'."""
+        for seletor in ["[itemprop='price']", "[itemprop='lowPrice']", "meta[itemprop='price']"]:
             try:
                 el = page.query_selector(seletor)
                 if not el:
@@ -220,10 +249,8 @@ class TerabyteScraper(ScraperBase):
     def _extrair_preco_css(self, page: Page) -> float | None:
         for seletor in SELETORES_PRECO:
             try:
-                elementos = page.query_selector_all(seletor)
-                for el in elementos:
-                    texto = el.inner_text()
-                    v = self._limpar_preco_br(texto)
+                for el in page.query_selector_all(seletor):
+                    v = self._limpar_preco_br(el.inner_text())
                     if v and v > 50:
                         return v
                     content = el.get_attribute("content")
@@ -237,7 +264,7 @@ class TerabyteScraper(ScraperBase):
 
     def _extrair_preco_js(self, page: Page) -> float | None:
         """
-        Último recurso: avalia o DOM via JS buscando textos 'R$ X.XXX,XX'.
+        Último recurso: scan do DOM via JS buscando textos 'R$ X.XXX,XX'.
         Pega o menor valor para evitar capturar preço parcelado.
         """
         try:
@@ -263,11 +290,15 @@ class TerabyteScraper(ScraperBase):
 
             return min(precos) if precos else None
         except Exception as exc:
-            logger.debug("Erro no JS scan Terabyte: %s", exc)
+            logger.debug("[terabyte] Erro no JS scan: %s", exc)
             return None
 
     @staticmethod
     def _limpar_preco_br(texto: str) -> float | None:
+        """
+        Converte para float (formato BR).
+        'R$ 9.999,99' → 9999.99
+        """
         if not texto:
             return None
         limpo = re.sub(r'[R$\s\xa0]', '', texto).strip()
