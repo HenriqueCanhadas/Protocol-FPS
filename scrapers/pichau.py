@@ -1,114 +1,177 @@
 """
 Scraper da Pichau — PROTOCOL FPS
 
-Estrutura confirmada inspecionando o HTML (junho/2025):
+Estrutura confirmada (junho/2025):
+  - Next.js com SSR → meta tags chegam no HTML inicial
   - Meta tag: <meta property="product:price:amount" content="R$ 7,899.99">
   - Meta tag: <meta name="twitter:data1" content="R$ 7,899.99">
   - Meta tag: <meta property="product:availability" content="instock">
   - JSON-LD: schema.org/Product com offers.price
 
-v2 (junho/2026):
-  - playwright-stealth aplicado via ScraperBase (masca webdriver)
-  - networkidle com timeout adaptativo (30s em CI)
-  - Fallback HTTP com headers completos de Chrome real (inclui Referer e cookies mínimos)
-  - Detecção de bloqueio por corpo curto/WAF antes de tentar extrair
-  - HTTP fallback usa session-like headers para evitar 403
+Comportamento no CI (GitHub Actions / Azure IP):
+  - Cloudflare/bot protection pode interceptar e retornar uma challenge page
+  - NÃO fazemos HTTP fallback (sempre dá 403 em datacenter)
+  - Detectamos challenge pelo título da página e tentamos aguardar/retry
+  - O stealth do base.py ajuda a passar pelo bot protection
 """
 from __future__ import annotations
+
 import json
 import re
-import logging
 import time
-import urllib.request
-import urllib.error
+import logging
+
 from playwright.sync_api import Page
 
-from .base import ScraperBase, DadosProduto, TIMEOUT_NETWORKIDLE, TIMEOUT_SELECTOR
+from .base import ScraperBase, DadosProduto, IS_CI, TIMEOUT_GOTO, TIMEOUT_NETWORK
 
 logger = logging.getLogger(__name__)
 
+# Sleep após carregamento — maior no CI (Cloudflare challenge leva até 5s)
+_SLEEP_POS_LOAD = 5.0 if IS_CI else 1.5
+
+# Retry no CI quando challenge é detectada
+_MAX_TENTATIVAS = 2 if IS_CI else 1
+
+# Seletor de disponibilidade
 SELETOR_ESGOTADO = ", ".join([
     "button:has-text('Indisponível')",
     "button:has-text('Avise-me')",
     "button:has-text('Esgotado')",
-    "button:has-text('INDISPONÍVEL')",
-    "button:has-text('ESGOTADO')",
     "[class*='unavailable']",
     "[class*='out-of-stock']",
-    "[class*='esgotado']",
 ])
-
-# Headers que imitam um Chrome real acessando diretamente — essencial para o HTTP fallback
-_HTTP_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": (
-        "text/html,application/xhtml+xml,application/xml;"
-        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,"
-        "application/signed-exchange;v=b3;q=0.7"
-    ),
-    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-    "Accept-Encoding": "gzip, deflate, br",
-    "sec-ch-ua": (
-        '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"'
-    ),
-    "sec-ch-ua-mobile":   "?0",
-    "sec-ch-ua-platform": '"Windows"',
-    "Sec-Fetch-Dest":     "document",
-    "Sec-Fetch-Mode":     "navigate",
-    "Sec-Fetch-Site":     "none",
-    "Sec-Fetch-User":     "?1",
-    "Upgrade-Insecure-Requests": "1",
-    "Cache-Control":      "max-age=0",
-    # Referer vazio (como numa navegação direta) — sem Referer suspeito de bot
-}
 
 
 class PichauScraper(ScraperBase):
 
     def _aguardar_preco(self, page: Page) -> None:
         """
-        Pichau usa Next.js com SSR + hidratação.
-        networkidle garante que as meta tags e JSON-LD estejam prontos.
+        Pichau usa Next.js SSR — as meta tags chegam cedo.
+        Aguarda o DOM e depois um sleep fixo para garantir que
+        eventuais challenges do Cloudflare tenham tempo de resolver.
         """
+        # Aguarda DOM pronto
         try:
-            page.wait_for_load_state("networkidle", timeout=TIMEOUT_NETWORKIDLE)
+            page.wait_for_load_state("domcontentloaded", timeout=TIMEOUT_NETWORK)
         except Exception:
-            try:
-                page.wait_for_load_state("domcontentloaded", timeout=10_000)
-            except Exception:
-                pass
+            pass
 
-        # Aguarda meta de preço ou qualquer indicador de produto
-        for seletor in [
-            "meta[property='product:price:amount']",
-            "meta[name='twitter:data1']",
-            "script[type='application/ld+json']",
-            "h1",
-        ]:
-            try:
-                page.wait_for_selector(seletor, timeout=TIMEOUT_SELECTOR)
-                logger.debug("Seletor Pichau pronto: %s", seletor)
-                return
-            except Exception:
-                continue
+        # Aguarda a meta tag de preço (confirmação de que é a página do produto)
+        # Se for uma challenge page, esse seletor não vai aparecer
+        meta_apareceu = False
+        try:
+            page.wait_for_selector(
+                "meta[property='product:price:amount'], meta[name='twitter:data1']",
+                timeout=8_000,
+            )
+            meta_apareceu = True
+        except Exception:
+            logger.warning("[pichau] Meta tag de preço não apareceu em 8s")
 
-        logger.warning("Nenhum seletor Pichau apareceu — tentando prosseguir mesmo assim")
+        if not meta_apareceu and IS_CI:
+            # Possível challenge — aguarda mais para Cloudflare resolver
+            logger.info("[pichau] CI: aguardando %ss (possível challenge)...", _SLEEP_POS_LOAD)
+            time.sleep(_SLEEP_POS_LOAD)
+        else:
+            time.sleep(_SLEEP_POS_LOAD)
+
+    def coletar(self, url: str) -> DadosProduto:
+        """
+        Override do coletar do base para suportar retry quando challenge detectada.
+        """
+        from playwright.sync_api import sync_playwright
+        from .base import _STEALTH, _BROWSER_ARGS
+
+        for tentativa in range(1, _MAX_TENTATIVAS + 1):
+            if tentativa > 1:
+                logger.info("[pichau] Tentativa %d/%d para %s", tentativa, _MAX_TENTATIVAS, url)
+                time.sleep(3.0)  # delay entre tentativas
+
+            try:
+                with _STEALTH.use_sync(sync_playwright()) as pw:
+                    browser = pw.chromium.launch(
+                        headless=self.headless,
+                        args=_BROWSER_ARGS,
+                    )
+                    ctx  = self._criar_contexto(browser)
+                    page = ctx.new_page()
+                    self._bloquear_midias(page)
+
+                    try:
+                        page.goto(url, wait_until="domcontentloaded", timeout=TIMEOUT_GOTO)
+                        self._aguardar_preco(page)
+
+                        # Verifica se recebemos uma challenge page
+                        titulo = ""
+                        try:
+                            titulo = page.title()
+                        except Exception:
+                            pass
+
+                        url_real  = page.url
+                        body_snip = ""
+                        try:
+                            body_snip = page.evaluate(
+                                "() => document.body?.innerText?.substring(0, 300) || ''"
+                            )
+                        except Exception:
+                            pass
+
+                        eh_challenge = self._detectar_challenge(titulo, url_real, body_snip)
+
+                        if eh_challenge:
+                            logger.warning(
+                                "[pichau] Challenge detectada (tentativa %d/%d): título='%s'",
+                                tentativa, _MAX_TENTATIVAS, titulo
+                            )
+                            logger.warning("[pichau] body snippet: %s", body_snip[:200])
+                            if tentativa < _MAX_TENTATIVAS:
+                                continue  # tenta de novo
+                            # Última tentativa — retorna sem dados
+                            return DadosProduto(
+                                nome="Challenge/Bloqueio Pichau",
+                                preco=None,
+                                disponivel=False,
+                                url=url,
+                            )
+
+                        logger.info("[pichau] Página carregada: '%s'", titulo[:60])
+                        return self.extrair_dados(page, url)
+
+                    except Exception as exc:
+                        logger.error("[pichau] Erro na tentativa %d: %s", tentativa, exc)
+                        try:
+                            self._debug_page(page, url, forcado=True)
+                        except Exception:
+                            pass
+                        if tentativa >= _MAX_TENTATIVAS:
+                            return DadosProduto(
+                                nome="Erro ao coletar",
+                                preco=None,
+                                disponivel=False,
+                                url=url,
+                            )
+                    finally:
+                        browser.close()
+
+            except Exception as exc:
+                logger.error("[pichau] Erro ao inicializar browser (tentativa %d): %s", tentativa, exc)
+                if tentativa >= _MAX_TENTATIVAS:
+                    return DadosProduto(
+                        nome="Erro ao coletar",
+                        preco=None,
+                        disponivel=False,
+                        url=url,
+                    )
+
+        # Não deve chegar aqui
+        return DadosProduto(nome="Erro ao coletar", preco=None, disponivel=False, url=url)
 
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
-        # Verifica se a página foi bloqueada por anti-bot/WAF
-        if self._esta_bloqueado(page):
-            logger.warning(
-                "Pichau: headless bloqueado — tentando fallback HTTP para %s", url
-            )
-            return self._coletar_via_http(url)
-
         nome = self._extrair_nome(page)
 
-        # 1. Meta tag product:price:amount — FONTE PRIMÁRIA
+        # 1. Meta tag product:price:amount — FONTE PRIMÁRIA (SSR, sempre presente)
         preco = self._extrair_preco_meta(page, "meta[property='product:price:amount']")
 
         # 2. Twitter card fallback
@@ -123,123 +186,20 @@ class PichauScraper(ScraperBase):
         if preco is None:
             preco = self._extrair_preco_css(page)
 
+        # Verifica disponibilidade
         disponivel_meta = self._extrair_disponibilidade_meta(page)
         esgotado_btn   = self._esta_esgotado(page)
         disponivel     = disponivel_meta and not esgotado_btn
 
         if preco is None:
-            logger.warning("Preço não encontrado na Pichau: %s", url)
+            logger.warning("[pichau] Preço não encontrado: %s", url)
             return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
 
-        logger.info("Pichau — preço: R$ %.2f | disponível: %s", preco, disponivel)
+        logger.info("[pichau] preço: R$ %.2f | disponível: %s", preco, disponivel)
         return DadosProduto(nome=nome, preco=preco, disponivel=disponivel, url=url)
 
     # ------------------------------------------------------------------
-    # Anti-bot detection & HTTP fallback
-    # ------------------------------------------------------------------
-
-    def _esta_bloqueado(self, page: Page) -> bool:
-        """Detecta respostas de bloqueio WAF/Cloudflare."""
-        try:
-            body_len = page.evaluate("() => document.body.innerText.length")
-            if body_len < 500:
-                snippet = page.evaluate(
-                    "() => document.body.innerText.substring(0, 150)"
-                ).lower()
-                kws = (
-                    "host not in allowlist", "access denied", "captcha",
-                    "just a moment", "forbidden", "cloudflare", "security check",
-                    "please wait", "checking your browser",
-                )
-                if any(kw in snippet for kw in kws):
-                    logger.debug("Bloqueio WAF detectado: '%s'", snippet[:80])
-                    return True
-                if body_len < 200:
-                    logger.debug("Página suspeita — body muito curto (%d chars)", body_len)
-                    return True
-        except Exception:
-            pass
-        return False
-
-    def _coletar_via_http(self, url: str) -> DadosProduto:
-        """
-        Fallback: requisição HTTP direta com headers completos de Chrome.
-        Extrai meta tags do HTML SSR via regex (sem DOM).
-        """
-        try:
-            req = urllib.request.Request(url, headers=_HTTP_HEADERS, method="GET")
-            # Segue redirecionamentos automaticamente
-            with urllib.request.urlopen(req, timeout=20) as resp:
-                # Lida com gzip/deflate transparentemente
-                raw = resp.read()
-                encoding = resp.headers.get_content_charset() or "utf-8"
-                html = raw.decode(encoding, errors="replace")
-        except urllib.error.HTTPError as exc:
-            logger.error("Pichau HTTP fallback falhou [%d]: %s", exc.code, exc.reason)
-            return DadosProduto(nome="Erro ao coletar", preco=None, disponivel=False, url=url)
-        except urllib.error.URLError as exc:
-            logger.error("Pichau HTTP fallback — conexão falhou: %s", exc)
-            return DadosProduto(nome="Erro ao coletar", preco=None, disponivel=False, url=url)
-
-        # Extrai nome — tenta ambas as ordens de atributos
-        nome = (
-            self._regex_meta(html, "og:title",         attr="property") or
-            self._regex_meta(html, "twitter:title",    attr="name") or
-            "Nome não encontrado"
-        )
-        nome = re.sub(r'\s*\|\s*Pichau.*$', '', nome).strip()
-
-        # Extrai preço
-        preco_str = (
-            self._regex_meta(html, "product:price:amount", attr="property") or
-            self._regex_meta(html, "twitter:data1",        attr="name")
-        )
-        preco = self._normalizar_preco(preco_str) if preco_str else None
-
-        # Disponibilidade
-        avail_str  = self._regex_meta(html, "product:availability", attr="property") or ""
-        disponivel = "instock" in avail_str.lower() if avail_str else True
-
-        if preco:
-            logger.info(
-                "Pichau HTTP fallback — preço: R$ %.2f | disponível: %s", preco, disponivel
-            )
-        else:
-            logger.warning("Pichau HTTP fallback — preço não encontrado para: %s", url)
-
-        return DadosProduto(
-            nome=nome,
-            preco=preco,
-            disponivel=disponivel if preco else False,
-            url=url,
-        )
-
-    @staticmethod
-    def _regex_meta(html: str, key: str, attr: str = "property") -> str | None:
-        """
-        Extrai content de uma meta tag suportando as duas ordens de atributos:
-          <meta property="KEY" content="VALUE">
-          <meta content="VALUE" property="KEY">
-        """
-        key_esc = re.escape(key)
-        # Ordem 1: atributo-chave antes de content
-        m = re.search(
-            rf'{attr}=["\']' + key_esc + r'["\'][^>]+content=["\']([^"\']+)["\']',
-            html, re.IGNORECASE
-        )
-        if m:
-            return m.group(1).strip()
-        # Ordem 2: content antes do atributo-chave
-        m = re.search(
-            r'content=["\']([^"\']+)["\'][^>]+' + attr + r'=["\']' + key_esc + r'["\']',
-            html, re.IGNORECASE
-        )
-        if m:
-            return m.group(1).strip()
-        return None
-
-    # ------------------------------------------------------------------
-    # Extratores Playwright
+    # Extratores
     # ------------------------------------------------------------------
 
     def _extrair_nome(self, page: Page) -> str:
@@ -270,7 +230,7 @@ class PichauScraper(ScraperBase):
             conteudo = el.get_attribute("content") or ""
             return self._normalizar_preco(conteudo)
         except Exception as exc:
-            logger.debug("Erro ao ler meta %s: %s", seletor, exc)
+            logger.debug("[pichau] Erro ao ler meta %s: %s", seletor, exc)
             return None
 
     def _extrair_preco_jsonld(self, page: Page) -> float | None:
@@ -298,9 +258,12 @@ class PichauScraper(ScraperBase):
 
     def _extrair_preco_css(self, page: Page) -> float | None:
         candidatos = [
-            "span[class*='pix']", "div[class*='pix']",
-            "[class*='finalPrice']", "[class*='productPrice']",
-            "[class*='price-box']", "span[class*='price']", "div[class*='price']",
+            "span[class*='pix']",
+            "div[class*='pix']",
+            "[class*='finalPrice']",
+            "[class*='productPrice']",
+            "span[class*='price']",
+            "div[class*='price']",
         ]
         precos = []
         for seletor in candidatos:
@@ -332,7 +295,7 @@ class PichauScraper(ScraperBase):
                     if v and v > 500:
                         precos.append(v)
             except Exception as exc:
-                logger.debug("Erro no JS scan Pichau: %s", exc)
+                logger.debug("[pichau] Erro no JS scan: %s", exc)
 
         return min(precos) if precos else None
 
@@ -354,6 +317,13 @@ class PichauScraper(ScraperBase):
 
     @staticmethod
     def _normalizar_preco(texto: str) -> float | None:
+        """
+        Normaliza diferentes formatos:
+          'R$ 7,899.99'  → 7899.99
+          'R$ 7.899,99'  → 7899.99
+          '7899.99'      → 7899.99
+          '7.899,99'     → 7899.99
+        """
         if not texto:
             return None
         limpo = re.sub(r'[R$\s]', '', texto).strip()

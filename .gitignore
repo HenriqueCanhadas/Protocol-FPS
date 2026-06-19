@@ -48,6 +48,7 @@ env/
 .env.local
 .env.*.local
 todo
+frontend-flask/DEPLOY_VERCEL.md
 
 # Node/Frontend
 node_modules/

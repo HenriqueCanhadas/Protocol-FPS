@@ -5,6 +5,10 @@ on:
     - cron: "0 12 * * *"   # 09:00 horário de Brasília (UTC-3) = 12:00 UTC
   workflow_dispatch:        # permite rodar manualmente pelo GitHub
 
+env:
+  # Força Node.js 24 nas GitHub Actions (obrigatório a partir de 16/06/2026)
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   coletar:
     runs-on: ubuntu-latest
@@ -19,20 +23,24 @@ jobs:
           python-version: "3.11"
 
       - name: Instala dependências Python
-        run: |
-          python -m pip install --upgrade pip
-          pip install --no-cache-dir --upgrade -r requirements.txt
+        run: pip install -r requirements.txt
 
       - name: Instala navegador Chromium do Playwright
         run: playwright install chromium --with-deps
 
       - name: Roda o scraper
         env:
+          # Supabase
           SUPABASE_URL:          ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY:  ${{ secrets.SUPABASE_SERVICE_KEY }}
+          # Email
           EMAIL_REMETENTE:       ${{ secrets.EMAIL_REMETENTE }}
           EMAIL_SENHA_APP:       ${{ secrets.EMAIL_SENHA_APP }}
           EMAIL_DESTINATARIO:    ${{ secrets.EMAIL_DESTINATARIO }}
+          # Telegram
           TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
+          # GITHUB_ACTIONS já é setado automaticamente pelo runner
+          # mas deixamos explícito para garantir que os scrapers detectem o CI
+          GITHUB_ACTIONS:        "true"
         run: python main.py
