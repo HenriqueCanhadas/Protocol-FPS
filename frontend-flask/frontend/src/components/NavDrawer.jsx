@@ -6,7 +6,10 @@ import { Link, useLocation } from "react-router-dom";
 const ITEMS = [
   { href: "/",             icon: "⚡", label: "Dashboard"    },
   { href: "/novo-produto", icon: "＋", label: "Novo Produto" },
-  { href: "/conta",        icon: "◉", label: "Minha Conta"  },
+];
+
+const ITEMS_CONTA = [
+  { href: "/conta", icon: "◉", label: "Minha Conta" },
 ];
 
 export default function NavDrawer({ open, onClose, user, onLogout }) {
@@ -25,6 +28,20 @@ export default function NavDrawer({ open, onClose, user, onLogout }) {
 
         <nav className="nav-drawer-items">
           {ITEMS.map(({ href, icon, label }) => (
+            <Link
+              key={href}
+              to={href}
+              className={`nav-drawer-item${pathname === href ? " active" : ""}`}
+              onClick={onClose}
+            >
+              <span className="nav-icon">{icon}</span>
+              <span className="nav-label">{label}</span>
+            </Link>
+          ))}
+
+          <div className="nav-drawer-separator" />
+
+          {ITEMS_CONTA.map(({ href, icon, label }) => (
             <Link
               key={href}
               to={href}

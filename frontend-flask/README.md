@@ -7,7 +7,7 @@ Frontend reestruturado em **React (Vite)** com **Flask** como servidor de desenv
 ## Estrutura de pastas
 
 ```
-protocol-fps-react/
+frontend-flask/
 ├── app.py                    # Flask: serve o SPA em dev e expõe /api/config
 ├── requirements_flask.txt    # Dependências do Flask
 ├── .env.example              # Template de variáveis de ambiente
@@ -62,10 +62,10 @@ cp .env.example .env
 
 ```bash
 # Backend Flask
-pip install -r protocol-fps-react/requirements_flask.txt
+pip install -r frontend-flask/requirements_flask.txt
 
 # Frontend React
-cd protocol-fps-react/frontend
+cd frontend-flask/frontend
 npm install
 ```
 
@@ -73,14 +73,14 @@ npm install
 
 **Terminal 1 — Flask** (serve `/api/config` com as envs do `.env`):
 ```bash
-cd protocol-fps-react/
+cd frontend-flask/
 python app.py
 # http://127.0.0.1:5000
 ```
 
 **Terminal 2 — Vite** (HMR, proxy `/api` → Flask):
 ```bash
-cd protocol-fps-react/frontend/
+cd frontend-flask/frontend/
 npm run dev
 # http://localhost:3000  ← abra este
 ```
@@ -92,23 +92,32 @@ npm run dev
 
 ## Deploy na Vercel
 
+👉 **Guia passo a passo completo (do zero ao deploy): [`DEPLOY_VERCEL.md`](./DEPLOY_VERCEL.md)**
+
+Resumo:
+
 1. No painel Vercel → **Add New Project** → importe o repo
-2. Configure **Root Directory** como `protocol-fps-react/frontend`
+2. Configure **Root Directory** como `frontend-flask/frontend`
 3. Em **Settings → Environment Variables**, adicione:
 
-| Variável               | Valor                          |
-|------------------------|-------------------------------|
-| `VITE_SUPABASE_URL`    | `https://xxxx.supabase.co`    |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbG...`                 |
-| `VITE_GITHUB_TOKEN`    | PAT com `actions:write`        |
-| `VITE_GITHUB_OWNER`    | `HenriqueCanhadas`            |
-| `VITE_GITHUB_REPO`     | `Protocol-FPS`                |
-| `VITE_GITHUB_WORKFLOW` | `coletar.yml`                 |
+| Variável                 | Exposição        | Valor                       |
+|--------------------------|------------------|-----------------------------|
+| `VITE_SUPABASE_URL`      | 🌐 Cliente (público) | `https://xxxx.supabase.co`  |
+| `VITE_SUPABASE_ANON_KEY` | 🌐 Cliente (público) | `eyJhbG...` (chave **anon**) |
+| `GITHUB_TOKEN`           | 🔒 **Servidor**  | PAT com `actions:write`     |
+| `GITHUB_OWNER`           | 🔒 Servidor      | `HenriqueCanhadas`          |
+| `GITHUB_REPO`            | 🔒 Servidor      | `Protocol-FPS`              |
+| `GITHUB_WORKFLOW`        | 🔒 Servidor      | `coletar.yml`               |
 
-4. **Deploy** — o `vercel.json` cuida do SPA routing automaticamente.
+4. **Deploy** — o `vercel.json` cuida do SPA routing e a função `api/trigger-coleta.js` é detectada automaticamente.
 
-> O Flask **não** é usado em produção. O React chama o Supabase diretamente  
-> via `VITE_*` e o GitHub Actions via API REST.
+> ⚠️ **NUNCA** prefixe as variáveis do GitHub com `VITE_`. Tudo que começa com `VITE_`
+> é embutido no bundle JavaScript e fica **público** no navegador. O `GITHUB_TOKEN`
+> deve ficar **sem prefixo** — ele é lido apenas pela Serverless Function
+> (`api/trigger-coleta.js`), no servidor.
+>
+> O Flask **não** é usado em produção: o React fala direto com o Supabase (via `VITE_*`)
+> e o disparo do workflow passa pela função serverless da Vercel.
 
 ---
 

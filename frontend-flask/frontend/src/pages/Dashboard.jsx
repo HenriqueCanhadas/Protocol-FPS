@@ -3,7 +3,7 @@
  * Página principal: stats, tabela de preços, alertas, botão coletar.
  */
 import { useState, useEffect, useCallback } from "react";
-import { getSupabase, getConfig } from "../services/supabase";
+import { getSupabase } from "../services/supabase";
 import ConfirmModal from "../components/ConfirmModal";
 
 /* ── estilos locais ─────────────────────────────────────────── */
@@ -113,7 +113,9 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 
 /* ações tabela */
 .td-actions { display:flex; flex-direction:column; gap:.4rem; align-items:flex-start; min-width:130px; }
-.action-btn { display:flex; align-items:center; gap:.45rem; background:none; border:1px solid transparent; font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.1em; padding:.35rem .65rem; cursor:pointer; text-transform:uppercase; transition:all .18s; white-space:nowrap; width:100%; }
+.action-btn { position:relative; display:flex; align-items:center; justify-content:center; background:none; border:1px solid transparent; font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.1em; padding:.35rem .65rem .35rem 1.75rem; cursor:pointer; text-transform:uppercase; transition:all .18s; white-space:nowrap; width:100%; }
+.action-btn .ab-icon { position:absolute; left:.6rem; top:50%; transform:translateY(-50%); flex-shrink:0; }
+.action-btn .ab-label { text-align:center; }
 .action-btn.hist  { color:var(--text-dim); border-color:var(--border2); }
 .action-btn.hist:hover { color:var(--green); border-color:var(--green-dim); background:var(--green-soft); }
 .action-btn.toggle-on  { color:var(--amber); border-color:rgba(255,184,0,.35); }
@@ -472,37 +474,26 @@ export default function Dashboard({ showToast }) {
   };
 
   const iniciarColeta = async () => {
-    const cfg = await getConfig();
-    const { GITHUB_TOKEN, GITHUB_OWNER, GITHUB_REPO, GITHUB_WORKFLOW } = cfg;
-    if (!GITHUB_TOKEN || !GITHUB_OWNER || !GITHUB_REPO || !GITHUB_WORKFLOW) {
-      showToast("⚠ Configure as variáveis GITHUB_* no .env", "error"); return;
-    }
     setColetando(true);
-    setProgresso({ visible: true, txt: "Conectando ao GitHub Actions...", pct: 15 });
-    const workflow = GITHUB_WORKFLOW || "coletar.yml";
-    const url = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/actions/workflows/${workflow}/dispatches`;
+    setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
+
     try {
-      setProgresso({ visible: true, txt: `Disparando ${workflow}...`, pct: 40 });
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          Accept: "application/vnd.github+json",
-          Authorization: `Bearer ${GITHUB_TOKEN}`,
-          "X-GitHub-Api-Version": "2022-11-28",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ ref: "main" }),
-      });
-      if (resp.status === 204) {
+      setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
+
+      const resp = await fetch("/api/trigger-coleta", { method: "POST" });
+      const data = await resp.json();
+
+      if (resp.ok && data.ok) {
         setProgresso({ visible: true, txt: "Workflow disparado com sucesso!", pct: 100 });
         showToast("⚡ Coleta iniciada no GitHub Actions!", "ok");
-      } else if (resp.status === 401) throw new Error("Token inválido (401).");
-      else if (resp.status === 404) throw new Error(`Workflow "${workflow}" não encontrado.`);
-      else throw new Error(`GitHub retornou ${resp.status}`);
+      } else {
+        throw new Error(data.error || `Erro ${resp.status}`);
+      }
     } catch (e) {
       setProgresso({ visible: true, txt: "Erro ao disparar coleta", pct: 100 });
       showToast("Erro: " + e.message, "error");
     }
+
     setTimeout(() => {
       setProgresso({ visible: false, txt: "", pct: 0 });
       setColetando(false);
@@ -550,7 +541,7 @@ export default function Dashboard({ showToast }) {
           <div className="stat-label">Última coleta</div>
           {ultColeta ? (
             <>
-              <div style={{ fontFamily: "var(--display)", fontSize: "2rem", color: "var(--green)", lineHeight: 1 }}>
+              <div style={{ fontFamily: "var(--display)", fontSize: "1.85rem", letterSpacing: ".03em", color: "var(--green)", lineHeight: 1 }}>
                 {new Date(ultColeta.coletado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
               </div>
               <div className="stat-sub">
@@ -682,7 +673,9 @@ export default function Dashboard({ showToast }) {
                             <button className={`action-btn ${monitorando ? "toggle-on" : "toggle-off"}`}
                               onClick={() => confirmar(
                                 monitorando ? "DESATIVAR MONITORAMENTO" : "ATIVAR MONITORAMENTO",
-                                monitorando ? `Pausar "${item.nome_na_loja}"?` : `Reativar "${item.nome_na_loja}"?`,
+                                monitorando
+                                  ? `Pausar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto não será mais coletado, mas seu histórico é mantido.`
+                                  : `Reativar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto voltará a ser coletado nas próximas execuções.`,
                                 monitorando ? "⏸" : "▶",
                                 () => toggleMonitoramento(item.item_id, item.nome_na_loja, monitorando),
                                 monitorando,
