@@ -294,10 +294,18 @@ def main() -> None:
                 preco_anterior or 0,
             )
 
-            mensagem = _montar_mensagem(dados, tipo, preco_gatilho, preco_anterior)
+            alerta_info = {
+                "nome":           dados.nome,
+                "url":            dados.url,
+                "loja":           item["lojas"]["nome"],
+                "tipo":           tipo,
+                "preco_atual":    preco_gatilho,
+                "preco_anterior": preco_anterior,
+                "meta":           item.get("preco_meta"),
+            }
 
-            ok_email    = enviar_email(mensagem, dados.nome)
-            ok_telegram = enviar_telegram(mensagem)
+            ok_email    = enviar_email(alerta_info)
+            ok_telegram = enviar_telegram(alerta_info)
 
             if ok_email:
                 logger.info("📧 Email enviado com sucesso")
@@ -334,30 +342,6 @@ def main() -> None:
     print(f"\033[90m  {'═' * 60}\033[0m\n")
 
     logger.info("Coleta finalizada.")
-
-
-def _montar_mensagem(
-    dados,
-    tipo: str,
-    preco_gatilho: float,
-    preco_anterior: float | None,
-) -> str:
-    if tipo == "abaixo_meta":
-        return (
-            f"🎯 *PROTOCOL FPS — Preço abaixo da meta!*\n\n"
-            f"*{dados.nome}*\n"
-            f"💰 Preço atual: R$ {preco_gatilho:,.2f}\n"
-            f"🔗 {dados.url}"
-        )
-    else:
-        queda = (preco_anterior - preco_gatilho) if preco_anterior else 0
-        return (
-            f"📉 *PROTOCOL FPS — Queda de preço detectada!*\n\n"
-            f"*{dados.nome}*\n"
-            f"💰 Novo preço: R$ {preco_gatilho:,.2f}\n"
-            f"📊 Era: R$ {preco_anterior:,.2f}  (↓ R$ {queda:,.2f})\n"
-            f"🔗 {dados.url}"
-        )
 
 
 if __name__ == "__main__":

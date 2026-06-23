@@ -6,6 +6,22 @@ import { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../services/supabase";
 import ConfirmModal from "../components/ConfirmModal";
 
+/**
+ * Remove produtos/coletas via endpoint server-side (/api/remover),
+ * que usa a SERVICE_KEY e ignora o RLS. Retorna a quantidade removida.
+ * Flask atende em dev; Vercel Function em produção.
+ */
+async function removerNoServidor(tipo, ids) {
+  const resp = await fetch("/api/remover", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tipo, ids }),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok || !data.ok) throw new Error(data.error || `Erro ${resp.status}`);
+  return data.removed ?? 0;
+}
+
 /* ── estilos locais ─────────────────────────────────────────── */
 const css = `
 #app { display:flex; flex-direction:column; min-height:100vh; }
@@ -66,8 +82,10 @@ const css = `
 }
 .filter-btn:hover { border-color:var(--green-dim); color:var(--text); }
 .filter-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.filter-btn-loja.active { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08); }
 
 .sort-controls { display:flex; gap:.4rem; flex-wrap:wrap; }
+.sort-controls-right { margin-left:auto; }
 .sort-btn {
   display:flex; align-items:center; gap:.4rem;
   background:var(--bg2); border:1px solid var(--border2);
@@ -87,7 +105,13 @@ const css = `
 
 /* tabela */
 .price-table-wrap { overflow-x:auto; border:1px solid var(--border2); }
-table { width:100%; border-collapse:collapse; font-size:var(--fs-base); }
+table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:760px; }
+/* Larguras fixas das colunas (proporção do padrão "Todos / Todas Lojas") */
+.col-produto { width:41.8%; }
+.col-loja    { width:15.55%; }
+.col-preco   { width:16.2%; }
+.col-status  { width:9.43%; }
+.col-acoes   { width:17.02%; }
 thead { background:var(--bg3); }
 th { text-align:left; padding:.85rem 1.1rem; font-size:var(--fs-xs); letter-spacing:.25em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border2); white-space:nowrap; }
 tbody tr { border-bottom:1px solid var(--border); transition:background .15s; }
@@ -101,7 +125,8 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .prod-cat  { font-size:var(--fs-xs); color:var(--text-dim); margin-top:.2rem; letter-spacing:.1em; text-transform:uppercase; }
 .loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.45rem; letter-spacing:.03em; color:var(--green); }
-.price-meta    { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-meta      { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-timestamp { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.2rem; letter-spacing:.04em; opacity:.75; }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
 .status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
 .status-badge.ok    { color:var(--green); border-color:var(--green-dim); }
@@ -117,7 +142,7 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .action-btn .ab-icon { position:absolute; left:.6rem; top:50%; transform:translateY(-50%); flex-shrink:0; }
 .action-btn .ab-label { text-align:center; }
 .action-btn.hist  { color:var(--text-dim); border-color:var(--border2); }
-.action-btn.hist:hover { color:var(--green); border-color:var(--green-dim); background:var(--green-soft); }
+.action-btn.hist:hover { color:var(--amber); border-color:var(--amber); background:rgba(255,184,0,.08); }
 .action-btn.toggle-on  { color:var(--amber); border-color:rgba(255,184,0,.35); }
 .action-btn.toggle-on:hover { background:rgba(255,184,0,.08); border-color:var(--amber); }
 .action-btn.toggle-off { color:var(--green); border-color:rgba(57,255,20,.25); }
@@ -130,19 +155,42 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 /* modal histórico */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:200; animation:fadeIn .2s ease; }
 .modal { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); width:min(720px,96vw); max-height:88vh; overflow-y:auto; display:flex; flex-direction:column; }
-.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; border-bottom:1px solid var(--border2); position:sticky; top:0; background:var(--bg2); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; border-bottom:1px solid var(--border2); position:sticky; top:0; background:var(--bg2); z-index:1; }
 .modal-title { font-size:var(--fs-sm); letter-spacing:.3em; text-transform:uppercase; color:var(--green); }
 .btn-close { background:none; border:none; color:var(--text-dim); font-size:1.4rem; cursor:pointer; line-height:1; transition:color .15s; padding:.2rem .4rem; }
 .btn-close:hover { color:var(--red); }
 .modal-body { padding:1.75rem; }
-.chart-wrap { display:flex; flex-direction:column; gap:.65rem; }
-.chart-row { display:grid; grid-template-columns:100px 1fr 90px; gap:.9rem; align-items:center; font-size:var(--fs-sm); }
-.chart-date { color:var(--text-dim); }
+.chart-wrap { display:flex; flex-direction:column; gap:.5rem; }
+.chart-row { display:grid; grid-template-columns:78px 1fr 96px 30px; gap:.8rem; align-items:center; font-size:var(--fs-sm); padding:.15rem 0; }
+.chart-date { color:var(--text-dim); line-height:1.25; }
+.chart-hora { font-size:var(--fs-xs); color:var(--text-muted); }
 .bar-track { height:20px; background:var(--bg3); position:relative; overflow:hidden; border-radius:1px; }
 .bar-fill { position:absolute; left:0; top:0; bottom:0; background:var(--green-dim); transition:width .6s cubic-bezier(.4,0,.2,1); }
 .bar-fill.min-price { background:var(--green); }
 .chart-price { text-align:right; color:var(--text); font-size:var(--fs-sm); }
 .chart-price.min-price { color:var(--green); }
+.chart-row.sel { background:var(--green-soft); }
+.hist-check { width:18px; height:18px; padding:0; display:flex; align-items:center; justify-content:center; background:var(--bg3); border:1px solid var(--border2); color:var(--green); font-size:.7rem; line-height:1; cursor:pointer; transition:all .15s; border-radius:1px; }
+.hist-check:hover { border-color:var(--green-dim); }
+.hist-check.on { background:var(--green-soft); border-color:var(--green); }
+
+/* toolbar de seleção do histórico */
+.hist-toolbar { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:1rem; flex-wrap:wrap; }
+.hist-sel-all { display:flex; align-items:center; gap:.55rem; background:none; border:none; color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.12em; text-transform:uppercase; cursor:pointer; transition:color .15s; padding:0; }
+.hist-sel-all:hover { color:var(--text); }
+.hist-bulk { display:flex; align-items:center; gap:.85rem; }
+.hist-sel-count { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.1em; }
+.hist-bulk-remove { background:none; border:1px solid var(--red); color:var(--red); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.12em; text-transform:uppercase; padding:.45rem .9rem; cursor:pointer; transition:all .15s; }
+.hist-bulk-remove:hover { background:rgba(255,68,68,.12); }
+.hist-confirm { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem .9rem; padding:.9rem 1.1rem; margin-bottom:1.1rem; background:rgba(255,68,68,.06); border:1px solid rgba(255,68,68,.4); border-left:3px solid var(--red); animation:slideDown .2s ease; }
+.hist-confirm .hc-txt { flex:1; min-width:200px; font-size:var(--fs-sm); color:var(--text-dim); line-height:1.5; }
+.hist-confirm .hc-txt strong { color:var(--text); }
+.hist-confirm .hc-actions { display:flex; gap:.5rem; }
+.hist-confirm button { font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.12em; text-transform:uppercase; padding:.45rem .9rem; cursor:pointer; transition:all .15s; background:none; }
+.hist-confirm .hc-cancel { border:1px solid var(--border2); color:var(--text-dim); }
+.hist-confirm .hc-cancel:hover { border-color:var(--text-dim); color:var(--text); }
+.hist-confirm .hc-ok { border:1px solid var(--red); color:var(--red); }
+.hist-confirm .hc-ok:hover { background:rgba(255,68,68,.12); }
 
 /* modal meta */
 .meta-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:250; animation:fadeIn .2s ease; }
@@ -164,6 +212,33 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .meta-modal-footer .btn-secondary { flex:0 0 auto; }
 .btn-remover-meta { background:none; border:none; color:var(--text-muted); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; padding:0; transition:color .2s; }
 .btn-remover-meta:hover { color:var(--red); }
+
+/* botão único da coluna Ações */
+.action-btn.opcoes-trigger { color:var(--green); border-color:var(--green-dim); }
+.action-btn.opcoes-trigger:hover { background:var(--green-soft); border-color:var(--green); box-shadow:0 0 12px var(--green-glow); }
+
+/* modal de opções (menu de ações do produto) */
+.opcoes-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:260; animation:fadeIn .2s ease; padding:1rem; }
+.opcoes-box { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); width:min(450px,96vw); display:flex; flex-direction:column; animation:slideDown .25s ease; }
+.opcoes-header { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding:1.25rem 1.5rem; border-bottom:1px solid var(--border2); }
+.opcoes-eyebrow { font-size:var(--fs-xs); letter-spacing:.3em; text-transform:uppercase; color:var(--text-dim); margin-bottom:.4rem; }
+.opcoes-nome { font-size:var(--fs-base); color:var(--text); line-height:1.4; word-break:break-word; }
+.opcoes-list { display:flex; flex-direction:column; padding:.6rem; gap:.25rem; }
+.opcoes-sep { height:1px; background:var(--border); margin:.4rem .6rem; }
+.opcao-btn { display:flex; align-items:center; gap:1rem; width:100%; text-align:left; background:none; border:1px solid transparent; color:var(--text-dim); font-family:var(--mono); padding:.75rem 1rem; cursor:pointer; transition:all .15s; }
+.opcao-btn:hover { background:var(--bg3); }
+.opcao-btn .op-ic { font-size:1.15rem; width:24px; text-align:center; flex-shrink:0; color:var(--text-dim); transition:color .15s; }
+.opcao-btn .op-tx { display:flex; flex-direction:column; flex:1; gap:.15rem; }
+.opcao-btn .op-tt { font-size:var(--fs-sm); letter-spacing:.08em; text-transform:uppercase; color:var(--text); transition:color .15s; }
+.opcao-btn .op-sub { font-size:var(--fs-xs); color:var(--text-muted); letter-spacing:.02em; }
+.opcao-btn .op-arr { color:var(--text-muted); opacity:0; transform:translateX(-5px); transition:all .15s; }
+.opcao-btn:hover .op-arr { opacity:1; transform:translateX(0); }
+.opcao-btn.hist:hover     { border-color:var(--green-dim); }   .opcao-btn.hist:hover .op-ic,     .opcao-btn.hist:hover .op-tt     { color:var(--green); }
+.opcao-btn.meta:hover     { border-color:rgba(255,184,0,.4); } .opcao-btn.meta:hover .op-ic,     .opcao-btn.meta:hover .op-tt     { color:var(--amber); }
+.opcao-btn.coletar:hover  { border-color:var(--amber); }       .opcao-btn.coletar:hover .op-ic,  .opcao-btn.coletar:hover .op-tt  { color:var(--amber); }
+.opcao-btn.toggle-off:hover { border-color:rgba(255,184,0,.4); } .opcao-btn.toggle-off:hover .op-ic, .opcao-btn.toggle-off:hover .op-tt { color:var(--amber); }
+.opcao-btn.toggle-on:hover  { border-color:var(--green-dim); }   .opcao-btn.toggle-on:hover .op-ic,  .opcao-btn.toggle-on:hover .op-tt  { color:var(--green); }
+.opcao-btn.remove:hover { border-color:rgba(255,68,68,.4); background:rgba(255,68,68,.06); } .opcao-btn.remove:hover .op-ic, .opcao-btn.remove:hover .op-tt { color:var(--red); }
 
 /* alertas */
 .alertas-list { display:flex; flex-direction:column; gap:.65rem; }
@@ -197,22 +272,57 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 `;
 
 // ── Componente Modal Histórico ─────────────────────────────────
-function HistoricoModal({ itemId, nome, onClose }) {
-  const [dados, setDados] = useState(null);
+function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
+  const [dados, setDados]           = useState(null);
+  const [reloadKey, setReloadKey]   = useState(0);
+  const [selecionados, setSelecionados] = useState([]);   // ids marcados
+  const [confirmando, setConfirmando]   = useState(false); // confirmar remoção em massa
+  const [removendo, setRemovendo]       = useState(false);
 
   useEffect(() => {
     if (!itemId) return;
+    setDados(null);
+    setSelecionados([]);
+    setConfirmando(false);
     getSupabase().then((sb) =>
       sb.from("historico_precos")
-        .select("preco, disponivel, coletado_em")
+        .select("id, preco, disponivel, coletado_em")
         .eq("item_id", itemId)
         .order("coletado_em", { ascending: false })
         .limit(30)
         .then(({ data }) => setDados(data || []))
     );
-  }, [itemId]);
+  }, [itemId, reloadKey]);
 
   if (!itemId) return null;
+
+  const fmtData = (iso) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const fmtHora = (iso) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const toggleSel = (id) =>
+    setSelecionados((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
+
+  const todosMarcados = !!dados?.length && selecionados.length === dados.length;
+  const toggleTodos = () =>
+    setSelecionados(todosMarcados ? [] : (dados || []).map((d) => d.id));
+
+  const removerSelecionados = async () => {
+    setRemovendo(true);
+    try {
+      // Remoção server-side (SERVICE_KEY, ignora RLS); trata as FKs no servidor
+      const removidos = await removerNoServidor("historico", selecionados);
+      setRemovendo(false);
+      if (!removidos) { showToast?.("Nada foi removido — registros não encontrados.", "error"); return; }
+      showToast?.(`✓ ${removidos} registro(s) removido(s) do histórico.`, "ok");
+      setConfirmando(false);
+      setSelecionados([]);
+      setReloadKey((k) => k + 1);   // recarrega o histórico
+      onChange?.();                 // atualiza a tabela principal (preço/última coleta)
+    } catch (e) {
+      setRemovendo(false);
+      showToast?.("Erro ao remover registros: " + e.message, "error");
+    }
+  };
 
   const precos = (dados || []).filter((d) => d.preco).map((d) => d.preco);
   const minPreco = precos.length ? Math.min(...precos) : 0;
@@ -227,23 +337,55 @@ function HistoricoModal({ itemId, nome, onClose }) {
           <button className="btn-close" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body">
+          {confirmando && (
+            <div className="hist-confirm">
+              <div className="hc-txt">
+                Remover <strong>{selecionados.length} registro(s)</strong> selecionado(s) do histórico?
+                <br />Esta ação não pode ser desfeita.
+              </div>
+              <div className="hc-actions">
+                <button className="hc-cancel" disabled={removendo} onClick={() => setConfirmando(false)}>Cancelar</button>
+                <button className="hc-ok" disabled={removendo} onClick={removerSelecionados}>
+                  {removendo ? "Removendo…" : "Remover"}
+                </button>
+              </div>
+            </div>
+          )}
+
           {!dados ? (
             <div className="loading"><div className="spinner" /></div>
           ) : dados.length === 0 ? (
             <div className="empty">Sem histórico disponível.</div>
           ) : (
             <>
+              <div className="hist-toolbar">
+                <button className="hist-sel-all" onClick={toggleTodos}>
+                  <span className={`hist-check${todosMarcados ? " on" : ""}`}>{todosMarcados ? "✓" : ""}</span>
+                  {todosMarcados ? "Desmarcar todos" : "Selecionar todos"}
+                </button>
+                {selecionados.length > 0 && (
+                  <div className="hist-bulk">
+                    <span className="hist-sel-count">{selecionados.length} selecionado(s)</span>
+                    <button className="hist-bulk-remove" onClick={() => setConfirmando(true)}>
+                      ✕ Remover selecionados
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginBottom: "1.25rem", letterSpacing: ".15em" }}>
                 ★ MENOR PREÇO: <span className="green">R$ {minPreco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
               </div>
               <div className="chart-wrap">
-                {dados.map((d, i) => {
+                {dados.map((d) => {
                   const pct = d.preco ? ((d.preco - minPreco) / amplitude) * 70 + 10 : 0;
                   const isMin = d.preco === minPreco;
+                  const isSel = selecionados.includes(d.id);
                   return (
-                    <div key={i} className="chart-row">
+                    <div key={d.id} className={`chart-row${isSel ? " sel" : ""}`}>
                       <div className="chart-date dim">
-                        {new Date(d.coletado_em).toLocaleDateString("pt-BR")}
+                        <div>{fmtData(d.coletado_em)}</div>
+                        <div className="chart-hora">{fmtHora(d.coletado_em)}</div>
                       </div>
                       <div className="bar-track">
                         <div className={`bar-fill${isMin ? " min-price" : ""}`} style={{ width: `${pct}%` }} />
@@ -251,12 +393,60 @@ function HistoricoModal({ itemId, nome, onClose }) {
                       <div className={`chart-price${isMin ? " min-price" : ""}`}>
                         {d.preco ? `R$ ${Number(d.preco).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "esgotado"}
                       </div>
+                      <button
+                        className={`hist-check${isSel ? " on" : ""}`}
+                        title="Selecionar registro"
+                        onClick={() => toggleSel(d.id)}
+                      >{isSel ? "✓" : ""}</button>
                     </div>
                   );
                 })}
               </div>
             </>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente Modal de Opções (menu de ações do produto) ──────
+function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
+  if (!item) return null;
+  const monitorando = item.monitorando !== false;
+  const metaSub = item.preco_meta
+    ? `Meta atual: R$ ${Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+    : "Definir preço-alvo";
+
+  return (
+    <div className="opcoes-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="opcoes-box">
+        <div className="opcoes-header">
+          <div>
+            <div className="opcoes-eyebrow">Ações do produto</div>
+            <div className="opcoes-nome">{item.nome_na_loja}</div>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="opcoes-list">
+          <button className="opcao-btn meta" onClick={() => onMeta(item)}>
+            <span className="op-ic">◎</span>
+            <span className="op-tx"><span className="op-tt">Editar meta</span><span className="op-sub">{metaSub}</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className="opcao-btn coletar" onClick={() => onColetar(item)}>
+            <span className="op-ic">⚡</span>
+            <span className="op-tx"><span className="op-tt">Coletar agora</span><span className="op-sub">Dispara coleta de todos os produtos</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className={`opcao-btn ${monitorando ? "toggle-on" : "toggle-off"}`} onClick={() => onToggle(item)}>
+            <span className="op-ic">{monitorando ? "⏸" : "▶"}</span>
+            <span className="op-tx">
+              <span className="op-tt">{monitorando ? "Desativar monitoramento" : "Ativar monitoramento"}</span>
+              <span className="op-sub">{monitorando ? "Pausa as coletas (mantém histórico)" : "Volta a coletar nas próximas execuções"}</span>
+            </span>
+            <span className="op-arr">→</span>
+          </button>
         </div>
       </div>
     </div>
@@ -341,7 +531,22 @@ function MetaModal({ item, onClose, onSave }) {
 }
 
 // ── Dashboard principal ────────────────────────────────────────
-const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO"];
+const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
+
+// Rótulos amigáveis para as siglas de categoria salvas em produtos.categoria
+const CAT_LABEL = {
+  all:     "Todos",
+  PSU:     "Fonte",
+  MOBO:    "Placa Mãe",
+  STORAGE: "Armazenamento",
+};
+
+const LOJAS_FILTER = [
+  { key: "all",       label: "Todas Lojas" },
+  { key: "kabum",     label: "KaBuM"       },
+  { key: "terabyte",  label: "Terabyte"    },
+  { key: "pichau",    label: "Pichau"      },
+];
 
 export default function Dashboard({ showToast }) {
   const [dados,        setDados]        = useState([]);
@@ -351,10 +556,12 @@ export default function Dashboard({ showToast }) {
   const [termoBusca,   setTermoBusca]   = useState("");
   const [sortCampo,    setSortCampo]    = useState("nome");
   const [sortDir,      setSortDir]      = useState("asc");
+  const [filtroLoja, setFiltroLoja] = useState("all");
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
   const [metaItem,     setMetaItem]     = useState(null);
+  const [opcoesItem,   setOpcoesItem]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
   const [statsAlertas, setStatsAlertas] = useState("—");
 
@@ -428,6 +635,10 @@ export default function Dashboard({ showToast }) {
         (x.categoria || "").toLowerCase().includes(q)
       );
     }
+    if (filtroLoja !== "all") {
+      const q = filtroLoja.toLowerCase();
+      d = d.filter(x => (x.loja || "").toLowerCase().includes(q));
+    }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
@@ -447,13 +658,14 @@ export default function Dashboard({ showToast }) {
   };
 
   const removerProduto = async (itemId, nome) => {
-    const sb = await getSupabase();
-    await sb.from("alertas").delete().eq("item_id", itemId);
-    await sb.from("historico_precos").delete().eq("item_id", itemId);
-    const { error } = await sb.from("itens").delete().eq("id", itemId);
-    if (error) { showToast("Erro ao remover: " + error.message, "error"); return; }
-    showToast(`✓ "${nome}" removido.`, "ok");
-    carregarPrecos();
+    try {
+      const removidos = await removerNoServidor("produto", [itemId]);
+      if (!removidos) { showToast("Nada foi removido — produto não encontrado.", "error"); return; }
+      showToast(`✓ "${nome}" removido.`, "ok");
+      carregarPrecos();
+    } catch (e) {
+      showToast("Erro ao remover: " + e.message, "error");
+    }
   };
 
   const toggleMonitoramento = async (itemId, nome, ativoAtual) => {
@@ -503,6 +715,43 @@ export default function Dashboard({ showToast }) {
   const confirmar = (titulo, corpo, icone, cb, isDanger = true) =>
     setConfirm({ titulo, corpo, icone, isDanger, cb });
 
+  // ── Ações disparadas pelo menu de Opções ────────────────────
+  const opcMeta = (item) => { setOpcoesItem(null); setMetaItem(item); };
+
+  const opcColetar = () => {
+    setOpcoesItem(null);
+    confirmar(
+      "COLETAR AGORA",
+      "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
+      "⚡", iniciarColeta, false,
+    );
+  };
+
+  const opcToggle = (item) => {
+    const monitorando = item.monitorando !== false;
+    setOpcoesItem(null);
+    confirmar(
+      monitorando ? "DESATIVAR MONITORAMENTO" : "ATIVAR MONITORAMENTO",
+      monitorando
+        ? `Pausar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto não será mais coletado, mas seu histórico é mantido.`
+        : `Reativar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto voltará a ser coletado nas próximas execuções.`,
+      monitorando ? "⏸" : "▶",
+      () => toggleMonitoramento(item.item_id, item.nome_na_loja, monitorando),
+      monitorando,
+    );
+  };
+
+  const opcRemover = (item) => {
+    setOpcoesItem(null);
+    confirmar(
+      "REMOVER PRODUTO",
+      `Remover permanentemente:<br><br><strong>${item.nome_na_loja}</strong><br><br><span style="color:var(--red);font-size:var(--fs-sm)">✕ Histórico de preços<br>✕ Alertas associados<br>✕ Todas as configurações</span><br><br>Esta ação não pode ser desfeita.`,
+      "⚠",
+      () => removerProduto(item.item_id, item.nome_na_loja),
+      true,
+    );
+  };
+
   return (
     <>
       <style>{css}</style>
@@ -515,8 +764,16 @@ export default function Dashboard({ showToast }) {
       <HistoricoModal
         itemId={historicoItem?.id} nome={historicoItem?.nome}
         onClose={() => setHistoricoItem(null)}
+        showToast={showToast} onChange={carregarPrecos}
       />
       <MetaModal item={metaItem} onClose={() => setMetaItem(null)} onSave={salvarMeta} />
+      <OpcoesModal
+        item={opcoesItem}
+        onClose={() => setOpcoesItem(null)}
+        onMeta={opcMeta}
+        onColetar={opcColetar}
+        onToggle={opcToggle}
+      />
 
       {/* STATS */}
       <div className="stats-bar">
@@ -562,6 +819,7 @@ export default function Dashboard({ showToast }) {
           </div>
 
           <div className="toolbar">
+            {/* Linha 1: Busca e Ação */}
             <div className="toolbar-row">
               <div className="search-wrap">
                 <span className="search-icon">⌕</span>
@@ -581,15 +839,36 @@ export default function Dashboard({ showToast }) {
               </button>
             </div>
 
+            {/* Linha 2: Filtros de categoria + contagem de resultados */}
             <div className="toolbar-row">
               <div className="filters">
                 {FILTROS_CAT.map((f) => (
                   <button key={f} className={`filter-btn${filtro === f ? " active" : ""}`} onClick={() => setFiltro(f)}>
-                    {f === "all" ? "Todos" : f === "PSU" ? "Fonte" : f === "MOBO" ? "Placa Mãe" : f}
+                    {CAT_LABEL[f] || f}
                   </button>
                 ))}
               </div>
-              <div className="sort-controls">
+              <div className="result-count">
+                {dadosFiltrados.length === dados.length
+                  ? `${dados.length} produto(s)`
+                  : `${dadosFiltrados.length} de ${dados.length}`}
+              </div>
+            </div>
+
+            {/* Linha 3: filtros por loja (esquerda) + ordenação NOME/PREÇO (direita) */}
+            <div className="toolbar-row">
+              <div className="filters">
+                {LOJAS_FILTER.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    className={`filter-btn filter-btn-loja${filtroLoja === key ? " active" : ""}`}
+                    onClick={() => setFiltroLoja(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="sort-controls sort-controls-right">
                 {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
                   <button key={campo} className={`sort-btn${sortCampo === campo ? " active" : ""}`} onClick={() => toggleSort(campo)}>
                     <span>{label}</span>
@@ -598,11 +877,6 @@ export default function Dashboard({ showToast }) {
                     </span>
                   </button>
                 ))}
-              </div>
-              <div className="result-count">
-                {dadosFiltrados.length === dados.length
-                  ? `${dados.length} produto(s)`
-                  : `${dadosFiltrados.length} de ${dados.length}`}
               </div>
             </div>
           </div>
@@ -630,6 +904,13 @@ export default function Dashboard({ showToast }) {
               </div>
             ) : (
               <table>
+                <colgroup>
+                  <col className="col-produto" />
+                  <col className="col-loja" />
+                  <col className="col-preco" />
+                  <col className="col-status" />
+                  <col className="col-acoes" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Produto</th><th>Loja</th><th>Preço atual</th><th>Status</th><th>Ações</th>
@@ -657,7 +938,22 @@ export default function Dashboard({ showToast }) {
                           {precoFmt
                             ? <>
                                 <div className="price-current">{precoFmt}</div>
-                                {item.preco_meta && <div className="price-meta">meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>}
+                                {item.preco_meta && (
+                                  <div className="price-meta">
+                                    meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                                {item.coletado_em && (
+                                  <div className="price-timestamp">
+                                    {new Date(item.coletado_em).toLocaleString("pt-BR", {
+                                      day:    "2-digit",
+                                      month:  "2-digit",
+                                      year:   "numeric",
+                                      hour:   "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                )}
                               </>
                             : <div className="price-unavailable">indisponível</div>}
                         </td>
@@ -667,30 +963,10 @@ export default function Dashboard({ showToast }) {
                             <button className="action-btn hist" onClick={() => setHistoricoItem({ id: item.item_id, nome: item.nome_na_loja })}>
                               <span className="ab-icon">◈</span><span className="ab-label">Histórico</span>
                             </button>
-                            <button className="action-btn meta" onClick={() => setMetaItem(item)}>
-                              <span className="ab-icon">◎</span><span className="ab-label">Editar Meta</span>
+                            <button className="action-btn opcoes-trigger" onClick={() => setOpcoesItem(item)}>
+                              <span className="ab-icon">⋯</span><span className="ab-label">Opções</span>
                             </button>
-                            <button className={`action-btn ${monitorando ? "toggle-on" : "toggle-off"}`}
-                              onClick={() => confirmar(
-                                monitorando ? "DESATIVAR MONITORAMENTO" : "ATIVAR MONITORAMENTO",
-                                monitorando
-                                  ? `Pausar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto não será mais coletado, mas seu histórico é mantido.`
-                                  : `Reativar o monitoramento de preços para:<br><br><strong>${item.nome_na_loja}</strong><br><br>O produto voltará a ser coletado nas próximas execuções.`,
-                                monitorando ? "⏸" : "▶",
-                                () => toggleMonitoramento(item.item_id, item.nome_na_loja, monitorando),
-                                monitorando,
-                              )}>
-                              <span className="ab-icon">{monitorando ? "⏸" : "▶"}</span>
-                              <span className="ab-label">{monitorando ? "DESATIVAR" : "ATIVAR"}</span>
-                            </button>
-                            <button className="action-btn remove"
-                              onClick={() => confirmar(
-                                "REMOVER PRODUTO",
-                                `Remover permanentemente:<br><br><strong>${item.nome_na_loja}</strong><br><br><span style="color:var(--red);font-size:var(--fs-sm)">✕ Histórico de preços<br>✕ Alertas associados<br>✕ Todas as configurações</span><br><br>Esta ação não pode ser desfeita.`,
-                                "⚠",
-                                () => removerProduto(item.item_id, item.nome_na_loja),
-                                true,
-                              )}>
+                            <button className="action-btn remove" onClick={() => opcRemover(item)}>
                               <span className="ab-icon">✕</span><span className="ab-label">Remover</span>
                             </button>
                           </div>
