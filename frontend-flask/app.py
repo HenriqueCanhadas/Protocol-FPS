@@ -6,9 +6,12 @@ SEGURANÇA:
   - /api/config  → retorna APENAS as variáveis públicas do Supabase.
   - /api/trigger-coleta → dispara o workflow do GitHub Actions.
     O GITHUB_TOKEN permanece exclusivamente no servidor; nunca vai ao browser.
+  - /api/remover → remove produtos/coletas usando a SUPABASE_SERVICE_KEY.
+    A SERVICE_KEY ignora RLS e NUNCA vai ao browser (só o servidor a usa).
 
 Variáveis lidas do .env (raiz do projeto):
-  SUPABASE_URL, SUPABASE_ANON_KEY   → usadas pelo frontend
+  SUPABASE_URL, SUPABASE_ANON_KEY    → usadas pelo frontend
+  SUPABASE_SERVICE_KEY               → usada SOMENTE por /api/remover (server-side)
   GITHUB_TOKEN, GITHUB_OWNER,
   GITHUB_REPO, GITHUB_WORKFLOW       → usadas SOMENTE por /api/trigger-coleta
 """
@@ -37,10 +40,34 @@ _PUBLIC_CONFIG = {
 }
 
 # ── Variáveis privadas (somente no servidor) ───────────────────
+_SUPABASE_URL         = os.getenv("SUPABASE_URL",         "")
+_SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 _GITHUB_TOKEN    = os.getenv("GITHUB_TOKEN",    "")
 _GITHUB_OWNER    = os.getenv("GITHUB_OWNER",    "")
 _GITHUB_REPO     = os.getenv("GITHUB_REPO",     "")
 _GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "coletar.yml")
+
+
+def _supabase_delete(table, column, ids):
+    """
+    DELETE server-side via PostgREST usando a SERVICE_KEY (ignora RLS).
+    Retorna a quantidade de linhas efetivamente removidas.
+    """
+    valores = ",".join('"' + str(i).replace('"', "") + '"' for i in ids)
+    url = f"{_SUPABASE_URL}/rest/v1/{table}?{column}=in.({valores})"
+    req = urllib.request.Request(
+        url,
+        headers={
+            "apikey":        _SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+            "Prefer":        "return=representation",  # devolve as linhas removidas
+            "Content-Type":  "application/json",
+        },
+        method="DELETE",
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        data = json.loads(resp.read().decode() or "[]")
+        return len(data)
 
 
 # ── API ────────────────────────────────────────────────────────
@@ -104,6 +131,46 @@ def api_trigger_coleta():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/api/remover", methods=["POST"])
+def api_remover():
+    """
+    Remove produtos ('produto') ou registros de histórico ('historico')
+    usando a SERVICE_KEY (ignora RLS). Limpa as FKs antes de apagar o alvo.
+
+    Body JSON: { "tipo": "produto" | "historico", "ids": [...] }
+    """
+    if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
+        return jsonify({
+            "error": "SUPABASE_URL / SUPABASE_SERVICE_KEY não configuradas no .env"
+        }), 500
+
+    payload = request.get_json(silent=True) or {}
+    tipo = payload.get("tipo")
+    ids  = payload.get("ids") or []
+
+    if tipo not in ("produto", "historico"):
+        return jsonify({"error": "tipo inválido (use 'produto' ou 'historico')"}), 400
+    if not isinstance(ids, list) or not ids:
+        return jsonify({"error": "nenhum id informado"}), 400
+
+    try:
+        if tipo == "historico":
+            # FK: remove alertas que referenciam estes registros de histórico
+            _supabase_delete("alertas", "historico_id", ids)
+            removidos = _supabase_delete("historico_precos", "id", ids)
+        else:  # produto
+            _supabase_delete("alertas", "item_id", ids)
+            _supabase_delete("historico_precos", "item_id", ids)
+            removidos = _supabase_delete("itens", "id", ids)
+        return jsonify({"ok": True, "removed": removidos}), 200
+
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        return jsonify({"error": detail}), exc.code
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 # ── SPA catch-all ──────────────────────────────────────────────
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
@@ -134,6 +201,7 @@ if __name__ == "__main__":
     print(f"\n  ── Supabase (público) ──────────────────────────")
     print(f"  SUPABASE_URL  : {'✓ OK' if _PUBLIC_CONFIG['SUPABASE_URL']      else '✗ AUSENTE'}")
     print(f"  ANON_KEY      : {'✓ OK' if _PUBLIC_CONFIG['SUPABASE_ANON_KEY'] else '✗ AUSENTE'}")
+    print(f"  SERVICE_KEY   : {'✓ OK' if _SUPABASE_SERVICE_KEY              else '✗ AUSENTE'}")
     print(f"\n  ── GitHub Actions (servidor) ────────────────────")
     print(f"  GITHUB_TOKEN  : {'✓ OK' if _GITHUB_TOKEN else '✗ AUSENTE'}")
     print(f"  GITHUB_OWNER  : {_GITHUB_OWNER  or '✗ AUSENTE'}")
