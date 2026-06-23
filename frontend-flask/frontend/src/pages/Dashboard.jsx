@@ -82,8 +82,10 @@ const css = `
 }
 .filter-btn:hover { border-color:var(--green-dim); color:var(--text); }
 .filter-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.filter-btn-loja.active { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08); }
 
 .sort-controls { display:flex; gap:.4rem; flex-wrap:wrap; }
+.sort-controls-right { margin-left:auto; }
 .sort-btn {
   display:flex; align-items:center; gap:.4rem;
   background:var(--bg2); border:1px solid var(--border2);
@@ -103,7 +105,13 @@ const css = `
 
 /* tabela */
 .price-table-wrap { overflow-x:auto; border:1px solid var(--border2); }
-table { width:100%; border-collapse:collapse; font-size:var(--fs-base); }
+table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:760px; }
+/* Larguras fixas das colunas (proporção do padrão "Todos / Todas Lojas") */
+.col-produto { width:41.8%; }
+.col-loja    { width:15.55%; }
+.col-preco   { width:16.2%; }
+.col-status  { width:9.43%; }
+.col-acoes   { width:17.02%; }
 thead { background:var(--bg3); }
 th { text-align:left; padding:.85rem 1.1rem; font-size:var(--fs-xs); letter-spacing:.25em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border2); white-space:nowrap; }
 tbody tr { border-bottom:1px solid var(--border); transition:background .15s; }
@@ -523,7 +531,22 @@ function MetaModal({ item, onClose, onSave }) {
 }
 
 // ── Dashboard principal ────────────────────────────────────────
-const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO"];
+const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
+
+// Rótulos amigáveis para as siglas de categoria salvas em produtos.categoria
+const CAT_LABEL = {
+  all:     "Todos",
+  PSU:     "Fonte",
+  MOBO:    "Placa Mãe",
+  STORAGE: "Armazenamento",
+};
+
+const LOJAS_FILTER = [
+  { key: "all",       label: "Todas Lojas" },
+  { key: "kabum",     label: "KaBuM"       },
+  { key: "terabyte",  label: "Terabyte"    },
+  { key: "pichau",    label: "Pichau"      },
+];
 
 export default function Dashboard({ showToast }) {
   const [dados,        setDados]        = useState([]);
@@ -533,6 +556,7 @@ export default function Dashboard({ showToast }) {
   const [termoBusca,   setTermoBusca]   = useState("");
   const [sortCampo,    setSortCampo]    = useState("nome");
   const [sortDir,      setSortDir]      = useState("asc");
+  const [filtroLoja, setFiltroLoja] = useState("all");
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
@@ -610,6 +634,10 @@ export default function Dashboard({ showToast }) {
         (x.loja || "").toLowerCase().includes(q) ||
         (x.categoria || "").toLowerCase().includes(q)
       );
+    }
+    if (filtroLoja !== "all") {
+      const q = filtroLoja.toLowerCase();
+      d = d.filter(x => (x.loja || "").toLowerCase().includes(q));
     }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
@@ -791,6 +819,7 @@ export default function Dashboard({ showToast }) {
           </div>
 
           <div className="toolbar">
+            {/* Linha 1: Busca e Ação */}
             <div className="toolbar-row">
               <div className="search-wrap">
                 <span className="search-icon">⌕</span>
@@ -810,15 +839,36 @@ export default function Dashboard({ showToast }) {
               </button>
             </div>
 
+            {/* Linha 2: Filtros de categoria + contagem de resultados */}
             <div className="toolbar-row">
               <div className="filters">
                 {FILTROS_CAT.map((f) => (
                   <button key={f} className={`filter-btn${filtro === f ? " active" : ""}`} onClick={() => setFiltro(f)}>
-                    {f === "all" ? "Todos" : f === "PSU" ? "Fonte" : f === "MOBO" ? "Placa Mãe" : f}
+                    {CAT_LABEL[f] || f}
                   </button>
                 ))}
               </div>
-              <div className="sort-controls">
+              <div className="result-count">
+                {dadosFiltrados.length === dados.length
+                  ? `${dados.length} produto(s)`
+                  : `${dadosFiltrados.length} de ${dados.length}`}
+              </div>
+            </div>
+
+            {/* Linha 3: filtros por loja (esquerda) + ordenação NOME/PREÇO (direita) */}
+            <div className="toolbar-row">
+              <div className="filters">
+                {LOJAS_FILTER.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    className={`filter-btn filter-btn-loja${filtroLoja === key ? " active" : ""}`}
+                    onClick={() => setFiltroLoja(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="sort-controls sort-controls-right">
                 {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
                   <button key={campo} className={`sort-btn${sortCampo === campo ? " active" : ""}`} onClick={() => toggleSort(campo)}>
                     <span>{label}</span>
@@ -827,11 +877,6 @@ export default function Dashboard({ showToast }) {
                     </span>
                   </button>
                 ))}
-              </div>
-              <div className="result-count">
-                {dadosFiltrados.length === dados.length
-                  ? `${dados.length} produto(s)`
-                  : `${dadosFiltrados.length} de ${dados.length}`}
               </div>
             </div>
           </div>
@@ -859,6 +904,13 @@ export default function Dashboard({ showToast }) {
               </div>
             ) : (
               <table>
+                <colgroup>
+                  <col className="col-produto" />
+                  <col className="col-loja" />
+                  <col className="col-preco" />
+                  <col className="col-status" />
+                  <col className="col-acoes" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>Produto</th><th>Loja</th><th>Preço atual</th><th>Status</th><th>Ações</th>
