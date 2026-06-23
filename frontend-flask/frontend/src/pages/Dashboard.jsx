@@ -117,7 +117,8 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .prod-cat  { font-size:var(--fs-xs); color:var(--text-dim); margin-top:.2rem; letter-spacing:.1em; text-transform:uppercase; }
 .loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.45rem; letter-spacing:.03em; color:var(--green); }
-.price-meta    { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-meta      { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-timestamp { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.2rem; letter-spacing:.04em; opacity:.75; }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
 .status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
 .status-badge.ok    { color:var(--green); border-color:var(--green-dim); }
@@ -146,7 +147,7 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 /* modal histórico */
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:200; animation:fadeIn .2s ease; }
 .modal { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); width:min(720px,96vw); max-height:88vh; overflow-y:auto; display:flex; flex-direction:column; }
-.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; border-bottom:1px solid var(--border2); position:sticky; top:0; background:var(--bg2); }
+.modal-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.5rem; border-bottom:1px solid var(--border2); position:sticky; top:0; background:var(--bg2); z-index:1; }
 .modal-title { font-size:var(--fs-sm); letter-spacing:.3em; text-transform:uppercase; color:var(--green); }
 .btn-close { background:none; border:none; color:var(--text-dim); font-size:1.4rem; cursor:pointer; line-height:1; transition:color .15s; padding:.2rem .4rem; }
 .btn-close:hover { color:var(--red); }
@@ -885,7 +886,22 @@ export default function Dashboard({ showToast }) {
                           {precoFmt
                             ? <>
                                 <div className="price-current">{precoFmt}</div>
-                                {item.preco_meta && <div className="price-meta">meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</div>}
+                                {item.preco_meta && (
+                                  <div className="price-meta">
+                                    meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                                {item.coletado_em && (
+                                  <div className="price-timestamp">
+                                    {new Date(item.coletado_em).toLocaleString("pt-BR", {
+                                      day:    "2-digit",
+                                      month:  "2-digit",
+                                      year:   "numeric",
+                                      hour:   "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                  </div>
+                                )}
                               </>
                             : <div className="price-unavailable">indisponível</div>}
                         </td>
