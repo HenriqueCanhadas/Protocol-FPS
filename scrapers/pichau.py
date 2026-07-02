@@ -30,8 +30,10 @@ logger = logging.getLogger(__name__)
 # Sleep após carregamento — maior no CI (Cloudflare challenge leva até 5s)
 _SLEEP_POS_LOAD = 5.0 if IS_CI else 1.5
 
-# Retry no CI quando challenge é detectada
-_MAX_TENTATIVAS = 2 if IS_CI else 1
+# Retry no CI quando challenge/bloqueio é detectado
+# (a Pichau devolve página falsa de "manutenção" para IPs de datacenter;
+#  às vezes libera após alguns segundos — vale tentar mais vezes no CI)
+_MAX_TENTATIVAS = 3 if IS_CI else 1
 
 # Seletor de disponibilidade
 SELETOR_ESGOTADO = ", ".join([
@@ -85,8 +87,13 @@ class PichauScraper(ScraperBase):
 
         for tentativa in range(1, _MAX_TENTATIVAS + 1):
             if tentativa > 1:
-                logger.info("[pichau] Tentativa %d/%d para %s", tentativa, _MAX_TENTATIVAS, url)
-                time.sleep(3.0)  # delay entre tentativas
+                # Delay crescente: 10s, 20s... dá tempo do rate-limit/bloqueio expirar
+                espera = 10.0 * (tentativa - 1)
+                logger.info(
+                    "[pichau] Tentativa %d/%d para %s (aguardando %.0fs)",
+                    tentativa, _MAX_TENTATIVAS, url, espera,
+                )
+                time.sleep(espera)
 
             try:
                 with _STEALTH.use_sync(sync_playwright()) as pw:
