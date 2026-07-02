@@ -168,6 +168,33 @@ logger = logging.getLogger("main")
 
 
 # ══════════════════════════════════════════════════════════════════════
+# SELEÇÃO DE ITENS
+# ══════════════════════════════════════════════════════════════════════
+
+def _selecionar_itens(sb) -> list:
+    """
+    Decide QUAIS itens coletar.
+
+    - Se a env var ITEM_ID estiver definida (coleta PONTUAL, disparada pelo
+      botão "Coletar Agora" de um produto), coleta apenas aquele item — mesmo
+      que o monitoramento esteja pausado, pois é um pedido manual explícito.
+    - Caso contrário (cron diário ou botão global), coleta COMPLETA: todos os
+      itens com monitorando = true.
+    """
+    item_id_alvo = os.environ.get("ITEM_ID", "").strip()
+
+    query = sb.table("itens").select("id, url, nome_na_loja, preco_meta, lojas(nome)")
+    if item_id_alvo:
+        logger.info("Modo PONTUAL — coletando apenas item_id=%s", item_id_alvo)
+        query = query.eq("id", item_id_alvo)
+    else:
+        logger.info("Modo COMPLETO — coletando todos os itens monitorados")
+        query = query.eq("monitorando", True)
+
+    return query.execute().data
+
+
+# ══════════════════════════════════════════════════════════════════════
 # MAIN
 # ══════════════════════════════════════════════════════════════════════
 
@@ -186,13 +213,7 @@ def main() -> None:
 
     sb = get_supabase()
 
-    resp = (
-        sb.table("itens")
-        .select("id, url, nome_na_loja, preco_meta, lojas(nome)")
-        .eq("monitorando", True)
-        .execute()
-    )
-    itens = resp.data
+    itens = _selecionar_itens(sb)
     logger.info("Itens a monitorar: %d", len(itens))
     print()
 

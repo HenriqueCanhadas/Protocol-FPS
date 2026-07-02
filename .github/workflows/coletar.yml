@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 12 * * *"   # 09:00 horário de Brasília (UTC-3) = 12:00 UTC
   workflow_dispatch:        # permite rodar manualmente pelo GitHub
+    inputs:
+      item_id:
+        description: "ID do item para coleta pontual (vazio = coleta todos os monitorados)"
+        required: false
+        default: ""
 
 jobs:
   coletar:
@@ -41,4 +46,6 @@ jobs:
           # GITHUB_ACTIONS já é setado automaticamente pelo runner
           # mas deixamos explícito para garantir que os scrapers detectem o CI
           GITHUB_ACTIONS:        "true"
+          # ID do item para coleta pontual (vazio no cron/dispatch global = coleta todos)
+          ITEM_ID:               ${{ github.event.inputs.item_id }}
         run: python main.py

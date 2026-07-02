@@ -21,12 +21,21 @@ The entry point run by CI. It is *not* imported by the frontend; they communicat
 through the Supabase database and the GitHub `workflow_dispatch` API.
 
 **2. The frontend (`frontend-flask/`)**
-A React (Vite) SPA. Flask (`app.py`) only serves it in local dev and proxies two API
+A React (Vite) SPA. Flask (`app.py`) only serves it in local dev and provides the API
 routes; **Flask is not used in production**. In production the SPA is deployed to Vercel,
-talks directly to Supabase via `VITE_*` env vars, and triggers collection through the
-Vercel serverless function `frontend/api/trigger-coleta.js`. `app.py` and
-`trigger-coleta.js` are deliberate duplicates of the same two endpoints (`/api/config`,
-`/api/trigger-coleta`) — one for dev (Flask), one for prod (Vercel). Keep them in sync.
+talks directly to Supabase via `VITE_*` env vars, and reaches the server-only routes
+through Vercel serverless functions under `frontend-flask/frontend/api/`.
+
+Three server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
+dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them in sync:**
+- `/api/config` — returns only the public `SUPABASE_URL` + `SUPABASE_ANON_KEY`
+  (Flask only; in prod Vite inlines these at build time).
+- `/api/trigger-coleta` (Vercel: `api/trigger-coleta.js`) — fires the GitHub
+  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side.
+- `/api/remover` (Vercel: `api/remover.js`) — deletes a product or a history row using
+  `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
+  references first: `alertas` → then `historico_precos`/`itens`, since there are no
+  cascade rules in the DB.
 
 ## Collector flow (`main.py`)
 

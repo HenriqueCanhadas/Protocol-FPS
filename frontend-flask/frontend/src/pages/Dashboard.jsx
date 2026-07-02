@@ -437,7 +437,7 @@ function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
           </button>
           <button className="opcao-btn coletar" onClick={() => onColetar(item)}>
             <span className="op-ic">⚡</span>
-            <span className="op-tx"><span className="op-tt">Coletar agora</span><span className="op-sub">Dispara coleta de todos os produtos</span></span>
+            <span className="op-tx"><span className="op-tt">Coletar agora</span><span className="op-sub">Coleta somente este produto</span></span>
             <span className="op-arr">→</span>
           </button>
           <button className={`opcao-btn ${monitorando ? "toggle-on" : "toggle-off"}`} onClick={() => onToggle(item)}>
@@ -685,19 +685,25 @@ export default function Dashboard({ showToast }) {
     carregarPrecos();
   };
 
-  const iniciarColeta = async () => {
+  const iniciarColeta = async (itemId = null, nomeProduto = null) => {
     setColetando(true);
+    const escopo = nomeProduto ? `"${nomeProduto}"` : "todos os produtos";
     setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
 
     try {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
-      const resp = await fetch("/api/trigger-coleta", { method: "POST" });
+      // Sem itemId → coleta completa; com itemId → coleta pontual (só o produto)
+      const resp = await fetch("/api/trigger-coleta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itemId ? { item_id: itemId } : {}),
+      });
       const data = await resp.json();
 
       if (resp.ok && data.ok) {
         setProgresso({ visible: true, txt: "Workflow disparado com sucesso!", pct: 100 });
-        showToast("⚡ Coleta iniciada no GitHub Actions!", "ok");
+        showToast(`⚡ Coleta iniciada (${escopo}) no GitHub Actions!`, "ok");
       } else {
         throw new Error(data.error || `Erro ${resp.status}`);
       }
@@ -718,12 +724,14 @@ export default function Dashboard({ showToast }) {
   // ── Ações disparadas pelo menu de Opções ────────────────────
   const opcMeta = (item) => { setOpcoesItem(null); setMetaItem(item); };
 
-  const opcColetar = () => {
+  const opcColetar = (item) => {
     setOpcoesItem(null);
     confirmar(
       "COLETAR AGORA",
-      "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
-      "⚡", iniciarColeta, false,
+      `Disparar uma coleta imediata de preço <strong>apenas para este produto</strong>:<br><br><strong>${item.nome_na_loja}</strong><br><br>O processo roda no GitHub Actions e pode levar alguns minutos.`,
+      "⚡",
+      () => iniciarColeta(item.item_id, item.nome_na_loja),
+      false,
     );
   };
 
@@ -832,7 +840,7 @@ export default function Dashboard({ showToast }) {
                 )}
               </div>
               <button className="btn-coletar" disabled={coletando} onClick={() =>
-                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços.<br><br>O processo pode levar alguns minutos.", "⚡", iniciarColeta, false)
+                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.", "⚡", () => iniciarColeta(), false)
               }>
                 <span>⚡</span>
                 <span>{coletando ? "DISPARANDO..." : "COLETAR AGORA"}</span>

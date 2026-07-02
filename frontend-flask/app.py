@@ -97,7 +97,15 @@ def api_trigger_coleta():
         f"https://api.github.com/repos/{_GITHUB_OWNER}/{_GITHUB_REPO}"
         f"/actions/workflows/{_GITHUB_WORKFLOW}/dispatches"
     )
-    body = json.dumps({"ref": "main"}).encode()
+
+    # item_id opcional no corpo → coleta pontual (só aquele produto).
+    # Sem item_id → coleta completa (todos os monitorados).
+    payload = request.get_json(silent=True) or {}
+    item_id = payload.get("item_id")
+    dispatch = {"ref": "main"}
+    if item_id:
+        dispatch["inputs"] = {"item_id": str(item_id)}
+    body = json.dumps(dispatch).encode()
 
     req = urllib.request.Request(
         api_url,
