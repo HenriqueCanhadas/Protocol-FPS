@@ -68,7 +68,7 @@ Foco: deixar a coleta em CI confiável e o horário correto antes de mexer em fe
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S1 · Ajustar GitHub Actions p/ Pichau e Terabyte (todo:47) | Rodar `workflow_dispatch` 3×; comparar preço/estoque local × CI para Pichau e Terabyte | 🟡 Pending | **Terabyte estabilizada: 3/3 runs no CI = local** (runs 64/65/66: R$ 7.799,99 ✅). Kabum idem 3/3 (R$ 2.499,99 ✅). **Pichau: bloqueio por IP de datacenter confirmado 3/3** — serve página falsa "Site em Manutenção - Pru Pru" a IPs GitHub/Azure; fix aplicado detecta o bloqueio e faz 3 retries (10s/20s) com log honesto ("Challenge/Bloqueio Pichau" em vez de falso "esgotado"), mas o desbloqueio exige proxy BR ou runner self-hosted (decisão pendente) |
+| S1 · Ajustar GitHub Actions p/ Pichau e Terabyte (todo:47) | Rodar `workflow_dispatch` 3×; comparar preço/estoque local × CI para Pichau e Terabyte | ✅ Done | **Terabyte estabilizada: 3/3 runs no CI = local** (runs 64/65/66: R$ 7.799,99 ✅). Kabum idem 3/3 (R$ 2.499,99 ✅). **Pichau: bloqueio por IP de datacenter confirmado 3/3** — página falsa "Site em Manutenção - Pru Pru" a IPs GitHub/Azure; fix detecta o bloqueio, faz 3 retries (10s/20s) e loga honestamente ("Challenge/Bloqueio Pichau" em vez de falso "esgotado"). **Decisão 01/07/2026: limitação aceita** — Pichau coleta só local; alternativas futuras: runner self-hosted ou proxy residencial BR |
 | S1 · Resolver aviso de deprecação Node.js 20 no Actions (todo:75) | Ver o log do Actions sem o aviso de Node 20 | ✅ Done | `checkout@v7` + `setup-python@v6` (Node 24 nativo); flag `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` removida. Validado nos runs 64 e 65: **0 annotations** de deprecação |
 | S1 · Ajustar fuso horário UTC-3 (Brasília) back/front/banco (todo:67) | Coletar um item e conferir o mesmo horário local em back, front e Supabase | ✅ Done | Banco correto (timestamptz UTC `+00:00`); Telegram já usava UTC-3 fixo; front agora força `America/Sao_Paulo` via `utils/datas.js` (teste: 14:22 UTC → 11:22 BRT). "Alertas hoje" conta o dia civil de Brasília |
 
@@ -135,13 +135,13 @@ Foco: documentar o banco e repensar a métrica de alertas.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 23 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,67,75 |
-| 🟡 Pending | 5 | 43,45,47,49,51 |
+| ✅ Done | 24 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,47,67,75 |
+| 🟡 Pending | 4 | 43,45,49,51 |
 | ⬜ Todo | 7 | 53,55,57,59,61,63,65,69 |
 
-> Atualização 01/07/2026 (Sprint 1): todo:67 e todo:75 concluídos e validados em CI;
-> todo:47 parcialmente resolvido — Terabyte/Kabum estáveis, Pichau bloqueada por IP
-> de datacenter (ver tabela da Sprint 1 e opções de mitigação).
+> **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:67, todo:75 e
+> todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
+> apenas localmente por decisão registrada (bloqueio de IP de datacenter aceito).
 
 ---
 
