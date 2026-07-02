@@ -3,8 +3,9 @@
  * Página principal: stats, tabela de preços, alertas, botão coletar.
  */
 import { useState, useEffect, useCallback } from "react";
-import { getSupabase } from "../services/supabase";
-import ConfirmModal from "../components/ConfirmModal";
+import { getSupabase } from "@/services/supabase";
+import ConfirmModal from "@/components/ConfirmModal";
+import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
 
 /**
  * Remove produtos/coletas via endpoint server-side (/api/remover),
@@ -296,8 +297,8 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
 
   if (!itemId) return null;
 
-  const fmtData = (iso) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const fmtHora = (iso) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit" });
+  const fmtHora = (iso) => horaBRT(iso, { hour: "2-digit", minute: "2-digit" });
 
   const toggleSel = (id) =>
     setSelecionados((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
@@ -436,7 +437,7 @@ function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
           </button>
           <button className="opcao-btn coletar" onClick={() => onColetar(item)}>
             <span className="op-ic">⚡</span>
-            <span className="op-tx"><span className="op-tt">Coletar agora</span><span className="op-sub">Dispara coleta de todos os produtos</span></span>
+            <span className="op-tx"><span className="op-tt">Coletar agora</span><span className="op-sub">Coleta somente este produto</span></span>
             <span className="op-arr">→</span>
           </button>
           <button className={`opcao-btn ${monitorando ? "toggle-on" : "toggle-off"}`} onClick={() => onToggle(item)}>
@@ -602,11 +603,10 @@ export default function Dashboard({ showToast }) {
 
   const carregarAlertas = useCallback(async () => {
     const sb   = await getSupabase();
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     const { data } = await sb
       .from("alertas")
       .select("id, tipo, preco_gatilho, preco_anterior, criado_em, itens(nome_na_loja, url, lojas(nome))")
-      .gte("criado_em", hoje.toISOString())
+      .gte("criado_em", inicioDoDiaBRT())
       .order("criado_em", { ascending: false })
       .limit(20);
     setAlertas(data || []);
@@ -685,19 +685,25 @@ export default function Dashboard({ showToast }) {
     carregarPrecos();
   };
 
-  const iniciarColeta = async () => {
+  const iniciarColeta = async (itemId = null, nomeProduto = null) => {
     setColetando(true);
+    const escopo = nomeProduto ? `"${nomeProduto}"` : "todos os produtos";
     setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
 
     try {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
-      const resp = await fetch("/api/trigger-coleta", { method: "POST" });
+      // Sem itemId → coleta completa; com itemId → coleta pontual (só o produto)
+      const resp = await fetch("/api/trigger-coleta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(itemId ? { item_id: itemId } : {}),
+      });
       const data = await resp.json();
 
       if (resp.ok && data.ok) {
         setProgresso({ visible: true, txt: "Workflow disparado com sucesso!", pct: 100 });
-        showToast("⚡ Coleta iniciada no GitHub Actions!", "ok");
+        showToast(`⚡ Coleta iniciada (${escopo}) no GitHub Actions!`, "ok");
       } else {
         throw new Error(data.error || `Erro ${resp.status}`);
       }
@@ -718,12 +724,14 @@ export default function Dashboard({ showToast }) {
   // ── Ações disparadas pelo menu de Opções ────────────────────
   const opcMeta = (item) => { setOpcoesItem(null); setMetaItem(item); };
 
-  const opcColetar = () => {
+  const opcColetar = (item) => {
     setOpcoesItem(null);
     confirmar(
       "COLETAR AGORA",
-      "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
-      "⚡", iniciarColeta, false,
+      `Disparar uma coleta imediata de preço <strong>apenas para este produto</strong>:<br><br><strong>${item.nome_na_loja}</strong><br><br>O processo roda no GitHub Actions e pode levar alguns minutos.`,
+      "⚡",
+      () => iniciarColeta(item.item_id, item.nome_na_loja),
+      false,
     );
   };
 
@@ -799,10 +807,10 @@ export default function Dashboard({ showToast }) {
           {ultColeta ? (
             <>
               <div style={{ fontFamily: "var(--display)", fontSize: "1.85rem", letterSpacing: ".03em", color: "var(--green)", lineHeight: 1 }}>
-                {new Date(ultColeta.coletado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                {horaBRT(ultColeta.coletado_em, { hour: "2-digit", minute: "2-digit" })}
               </div>
               <div className="stat-sub">
-                {new Date(ultColeta.coletado_em).toLocaleDateString("pt-BR")}
+                {dataBRT(ultColeta.coletado_em)}
               </div>
             </>
           ) : <div className="stat-value">—</div>}
@@ -832,7 +840,7 @@ export default function Dashboard({ showToast }) {
                 )}
               </div>
               <button className="btn-coletar" disabled={coletando} onClick={() =>
-                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços.<br><br>O processo pode levar alguns minutos.", "⚡", iniciarColeta, false)
+                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.", "⚡", () => iniciarColeta(), false)
               }>
                 <span>⚡</span>
                 <span>{coletando ? "DISPARANDO..." : "COLETAR AGORA"}</span>
@@ -945,7 +953,7 @@ export default function Dashboard({ showToast }) {
                                 )}
                                 {item.coletado_em && (
                                   <div className="price-timestamp">
-                                    {new Date(item.coletado_em).toLocaleString("pt-BR", {
+                                    {dataHoraBRT(item.coletado_em, {
                                       day:    "2-digit",
                                       month:  "2-digit",
                                       year:   "numeric",
@@ -992,7 +1000,7 @@ export default function Dashboard({ showToast }) {
             <div className="alertas-list">
               {alertas.map((a) => {
                 const preco = Number(a.preco_gatilho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                const dt    = new Date(a.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                const dt    = dataHoraBRT(a.criado_em, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
                 return (
                   <div key={a.id} className={`alerta-item tipo-${a.tipo}`}>
                     <span className={`alerta-tipo ${a.tipo}`}>{a.tipo === "abaixo_meta" ? "↓ META" : "↓ QUEDA"}</span>

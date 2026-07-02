@@ -33,6 +33,16 @@ export default async function handler(req, res) {
 
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
 
+  // item_id opcional no corpo → coleta pontual (só aquele produto).
+  // Sem item_id → coleta completa (todos os monitorados).
+  let reqBody = req.body;
+  if (typeof reqBody === "string") {
+    try { reqBody = JSON.parse(reqBody); } catch { reqBody = {}; }
+  }
+  const itemId = reqBody?.item_id;
+  const dispatch = { ref: "main" };
+  if (itemId) dispatch.inputs = { item_id: String(itemId) };
+
   try {
     const resp = await fetch(apiUrl, {
       method: "POST",
@@ -42,7 +52,7 @@ export default async function handler(req, res) {
         "X-GitHub-Api-Version": "2022-11-28",
         "Content-Type":         "application/json",
       },
-      body: JSON.stringify({ ref: "main" }),
+      body: JSON.stringify(dispatch),
     });
 
     if (resp.status === 204) {

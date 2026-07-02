@@ -5,17 +5,17 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import { useAuth }  from "./hooks/useAuth";
-import { useToast } from "./hooks/useToast";
+import { useAuth }  from "@/hooks/useAuth";
+import { useToast } from "@/hooks/useToast";
 
-import LoginScreen from "./components/LoginScreen";
-import NavDrawer   from "./components/NavDrawer";
-import AppHeader   from "./components/AppHeader";
-import Toast       from "./components/Toast";
+import LoginScreen from "@/components/LoginScreen";
+import NavDrawer   from "@/components/NavDrawer";
+import AppHeader   from "@/components/AppHeader";
+import Toast       from "@/components/Toast";
 
-import Dashboard   from "./pages/Dashboard";
-import NovoProduto from "./pages/NovoProduto";
-import Conta       from "./pages/Conta";
+import Dashboard   from "@/pages/Dashboard";
+import NovoProduto from "@/pages/NovoProduto";
+import Conta       from "@/pages/Conta";
 
 export default function App() {
   const { user, loading, signIn, signOut, updatePassword } = useAuth();

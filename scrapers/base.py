@@ -228,6 +228,9 @@ class ScraperBase(ABC):
             "just a moment", "attention required", "access denied",
             "security check", "checking your", "please wait",
             "403 forbidden", "forbidden", "blocked", "bot check",
+            # Pichau serve página falsa de manutenção para IPs de datacenter
+            # (título real observado no CI: 'Site em Manutenção - Pru Pru')
+            "manutenção", "manutencao", "pru pru",
         ]
         challenge_body_signals = [
             "cf-browser-verification", "cf_captcha_kind", "__cf_chl",
