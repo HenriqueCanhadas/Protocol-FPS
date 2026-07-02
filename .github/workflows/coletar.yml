@@ -5,20 +5,18 @@ on:
     - cron: "0 12 * * *"   # 09:00 horário de Brasília (UTC-3) = 12:00 UTC
   workflow_dispatch:        # permite rodar manualmente pelo GitHub
 
-env:
-  # Força Node.js 24 nas GitHub Actions (obrigatório a partir de 16/06/2026)
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   coletar:
     runs-on: ubuntu-latest
 
     steps:
+      # checkout@v7 e setup-python@v6 já rodam em Node.js 24 nativamente —
+      # dispensa a flag FORCE_JAVASCRIPT_ACTIONS_TO_NODE24 usada com as versões antigas
       - name: Checkout do repositório
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Configura Python 3.11
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
