@@ -3,6 +3,7 @@
  * Página de conta do usuário: info de sessão, troca de senha, encerrar sessões.
  */
 import { Link } from "react-router-dom";
+import { dataHoraBRT } from "../utils/datas";
 
 const css = `
 .conta-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
@@ -56,7 +57,7 @@ export default function Conta({ user, updatePassword, signOut, showToast }) {
   };
 
   const lastLogin = user?.last_sign_in_at
-    ? new Date(user.last_sign_in_at).toLocaleString("pt-BR")
+    ? dataHoraBRT(user.last_sign_in_at)
     : "—";
 
   return (

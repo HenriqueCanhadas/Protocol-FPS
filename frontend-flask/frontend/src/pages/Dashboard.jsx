@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "../services/supabase";
 import ConfirmModal from "../components/ConfirmModal";
+import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "../utils/datas";
 
 /**
  * Remove produtos/coletas via endpoint server-side (/api/remover),
@@ -296,8 +297,8 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
 
   if (!itemId) return null;
 
-  const fmtData = (iso) => new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const fmtHora = (iso) => new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit" });
+  const fmtHora = (iso) => horaBRT(iso, { hour: "2-digit", minute: "2-digit" });
 
   const toggleSel = (id) =>
     setSelecionados((sel) => sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]);
@@ -602,11 +603,10 @@ export default function Dashboard({ showToast }) {
 
   const carregarAlertas = useCallback(async () => {
     const sb   = await getSupabase();
-    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     const { data } = await sb
       .from("alertas")
       .select("id, tipo, preco_gatilho, preco_anterior, criado_em, itens(nome_na_loja, url, lojas(nome))")
-      .gte("criado_em", hoje.toISOString())
+      .gte("criado_em", inicioDoDiaBRT())
       .order("criado_em", { ascending: false })
       .limit(20);
     setAlertas(data || []);
@@ -799,10 +799,10 @@ export default function Dashboard({ showToast }) {
           {ultColeta ? (
             <>
               <div style={{ fontFamily: "var(--display)", fontSize: "1.85rem", letterSpacing: ".03em", color: "var(--green)", lineHeight: 1 }}>
-                {new Date(ultColeta.coletado_em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                {horaBRT(ultColeta.coletado_em, { hour: "2-digit", minute: "2-digit" })}
               </div>
               <div className="stat-sub">
-                {new Date(ultColeta.coletado_em).toLocaleDateString("pt-BR")}
+                {dataBRT(ultColeta.coletado_em)}
               </div>
             </>
           ) : <div className="stat-value">—</div>}
@@ -945,7 +945,7 @@ export default function Dashboard({ showToast }) {
                                 )}
                                 {item.coletado_em && (
                                   <div className="price-timestamp">
-                                    {new Date(item.coletado_em).toLocaleString("pt-BR", {
+                                    {dataHoraBRT(item.coletado_em, {
                                       day:    "2-digit",
                                       month:  "2-digit",
                                       year:   "numeric",
@@ -992,7 +992,7 @@ export default function Dashboard({ showToast }) {
             <div className="alertas-list">
               {alertas.map((a) => {
                 const preco = Number(a.preco_gatilho).toLocaleString("pt-BR", { minimumFractionDigits: 2 });
-                const dt    = new Date(a.criado_em).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                const dt    = dataHoraBRT(a.criado_em, { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
                 return (
                   <div key={a.id} className={`alerta-item tipo-${a.tipo}`}>
                     <span className={`alerta-tipo ${a.tipo}`}>{a.tipo === "abaixo_meta" ? "↓ META" : "↓ QUEDA"}</span>
