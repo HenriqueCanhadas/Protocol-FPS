@@ -175,6 +175,12 @@ def api_remover():
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_spa(path):
+    # Paridade com o Vercel: em produção o rewrite exclui /api/ ("/((?!api/).*)").
+    # Rotas /api/* não atendidas pelos handlers acima NÃO devem cair no SPA — o
+    # correto é 404 JSON (como o Vercel faria), e não servir o index.html.
+    if path.startswith("api/"):
+        return jsonify({"error": "Endpoint de API não encontrado"}), 404
+
     dist = Path(app.static_folder)
     target = dist / path
     if path and target.exists():

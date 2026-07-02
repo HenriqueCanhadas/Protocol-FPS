@@ -3,9 +3,9 @@
  * Página principal: stats, tabela de preços, alertas, botão coletar.
  */
 import { useState, useEffect, useCallback } from "react";
-import { getSupabase } from "../services/supabase";
-import ConfirmModal from "../components/ConfirmModal";
-import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "../utils/datas";
+import { getSupabase } from "@/services/supabase";
+import ConfirmModal from "@/components/ConfirmModal";
+import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
 
 /**
  * Remove produtos/coletas via endpoint server-side (/api/remover),

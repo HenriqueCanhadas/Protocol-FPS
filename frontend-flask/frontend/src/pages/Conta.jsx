@@ -3,7 +3,7 @@
  * Página de conta do usuário: info de sessão, troca de senha, encerrar sessões.
  */
 import { Link } from "react-router-dom";
-import { dataHoraBRT } from "../utils/datas";
+import { dataHoraBRT } from "@/utils/datas";
 
 const css = `
 .conta-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }

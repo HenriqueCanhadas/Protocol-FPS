@@ -3,7 +3,7 @@
  * Gerencia estado de autenticação via Supabase Auth.
  */
 import { useState, useEffect } from "react";
-import { getSupabase } from "../services/supabase";
+import { getSupabase } from "@/services/supabase";
 
 export function useAuth() {
   const [user, setUser]       = useState(null);

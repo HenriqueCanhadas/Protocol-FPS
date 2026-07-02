@@ -1,7 +1,7 @@
 # PROTOCOL FPS — Planejamento de Sprints
 
 > Relatório gerado a partir do arquivo `todo` (raiz do repositório).
-> Data de geração: **01/07/2026**. Início do planejamento: **02/07/2026**.
+> Data de geração: **02/07/2026**. Início do planejamento: **02/07/2026**.
 >
 > **Legenda de status**
 > - ✅ **Done** — concluído (item `OK-` no `todo`)
@@ -21,14 +21,15 @@
 | Sprint | Tema | Período | Dias | Itens |
 |--------|------|---------|------|-------|
 | Sprint 0 | Baseline concluído (histórico) | até 01/07/2026 | — | 21 ✅ |
-| Sprint 1 | Estabilização de Infra & CI | 02/07 – 04/07 | 3 | 3 |
-| Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 |
+| Sprint 1 | Estabilização de Infra & CI | 02/07 – 04/07 | 3 | 3 ✅ |
+| Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 ✅ |
 | Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 |
 | Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 |
 | Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 |
 | Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 2 |
 
-**Total planejado (Sprints 1–6):** 19 dias úteis · 15 tarefas pendentes/a fazer.
+**Total planejado (Sprints 1–6):** 19 dias úteis · 10 tarefas pendentes/a fazer
+(5 já concluídas nas Sprints 1–2).
 
 ---
 
@@ -80,8 +81,8 @@ Foco: organizar a estrutura de pastas e alinhar as rotas ao Flask + React.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S2 · Melhorar estrutura de pastas do front (Flask + React) (todo:43) | Build (`npm run build`) e dev (Flask + Vite) continuam funcionando após reorganização | 🟡 Pending | Estrutura atual: `frontend-flask/` (Flask) + `frontend-flask/frontend/` (React/Vite). Esperado: endereçamento via Flask + arquitetura React organizada |
-| S2 · Usar Flask para as rotas do front-end (todo:45) | Navegar pelas rotas servidas pelo Flask em dev sem quebrar o proxy `/api/*` | 🟡 Pending | Hoje o Flask serve o SPA e faz proxy de 2 rotas. Esperado: roteamento consistente dev (Flask) × prod (Vercel), mantendo `app.py` e `trigger-coleta.js` em sincronia |
+| S2 · Melhorar estrutura de pastas do front (Flask + React) (todo:43) | Build (`npm run build`) e dev (Flask + Vite) continuam funcionando após reorganização | ✅ Done | Estrutura React já seguia o padrão `components/hooks/pages/services/utils/styles`. Adicionado **alias `@/` → `src/`** no `vite.config.js` + `jsconfig.json` (suporte no editor) e **todos os imports internos padronizados** para caminho absoluto `@/`. Build validado em **02/07/2026: 87 módulos, 0 erros**. Rename do aninhamento `frontend-flask/frontend/` NÃO feito por ser disruptivo (afeta `vercel.json`, `static_folder` do `app.py`, CI e docs) — deixado como decisão futura |
+| S2 · Usar Flask para as rotas do front-end (todo:45) | Navegar pelas rotas servidas em dev sem quebrar o proxy `/api/*`; comportamento igual ao do Vercel em prod | ✅ Done | **Decisão 02/07/2026:** manter **SPA + React Router**. O Flask só roda em dev e o Vercel em prod — torná-lo "dono das rotas" seria regressão. Objetivo reinterpretado como **paridade dev × prod**: o catch-all do Flask (`serve_spa`) agora devolve **404 JSON** para `/api/*` inexistente, espelhando o rewrite do Vercel `/((?!api/).*)` (antes servia `index.html` para qualquer rota). `app.py` e as Vercel Functions seguem em sincronia |
 
 ---
 
@@ -135,13 +136,20 @@ Foco: documentar o banco e repensar a métrica de alertas.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 24 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,47,67,75 |
-| 🟡 Pending | 4 | 43,45,49,51 |
-| ⬜ Todo | 7 | 53,55,57,59,61,63,65,69 |
+| ✅ Done | 26 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,67,75 |
+| 🟡 Pending | 2 | 49,51 |
+| ⬜ Todo | 8 | 53,55,57,59,61,63,65,69 |
 
 > **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:67, todo:75 e
 > todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
 > apenas localmente por decisão registrada (bloqueio de IP de datacenter aceito).
+>
+> **Sprint 2 concluída em 02/07/2026** (antes do prazo de 07–09/07): todo:43 e todo:45.
+> Estrutura React organizada com alias `@/` (build de 87 módulos OK) e **decisão de
+> arquitetura registrada** — mantém-se SPA + React Router (Flask só em dev, Vercel em
+> prod); a Sprint entregou **paridade de roteamento dev × prod** (Flask agora devolve
+> 404 JSON em `/api/*` inexistente, como o rewrite do Vercel). O rename do aninhamento
+> `frontend-flask/frontend/` foi conscientemente adiado por ser disruptivo.
 
 ---
 
@@ -156,7 +164,7 @@ este relatório sincronizado com o `todo`.
 | `sprint-planner` ✅ | Base | Ler o `todo`, classificar por status (`OK-`/`Pending-`/`-`) e regenerar este `sprints.md` (tabela `SPRINT | TEST | STATUS | RESULTS` + Skills Futuras) | Alta (feita) |
 | `ci-diagnostics` | S1 | Diagnosticar diferença local × CI dos scrapers (Pichau/Terabyte): dump de página, detecção de challenge, timeouts e flags do Chromium | Alta |
 | `scraper-nova-loja` | S1/S4 | Andaime para nova loja: subclasse de `ScraperBase`, `_aguardar_preco`/`extrair_dados` e registro no dict `SCRAPERS` do `main.py` | Média |
-| `frontend-refactor` | S2 | Guiar reorganização de pastas do front mantendo build Vite, proxy `/api/*` e paridade `app.py` × `trigger-coleta.js` | Média |
+| `frontend-refactor` | S2 | Guiar reorganização de pastas do front mantendo build Vite, alias `@/`, proxy `/api/*` e paridade `app.py` × Vercel Functions | Média |
 | `timezone-audit` | S1/S3 | Auditar e normalizar timestamps para America/Sao_Paulo (UTC-3) em back, front e banco | Alta |
 | `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | Média |
 | `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | Alta (impacto grande) |

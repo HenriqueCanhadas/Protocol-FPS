@@ -4,8 +4,8 @@
  */
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getSupabase } from "../services/supabase";
-import ConfirmModal from "../components/ConfirmModal";
+import { getSupabase } from "@/services/supabase";
+import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
 .np-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }

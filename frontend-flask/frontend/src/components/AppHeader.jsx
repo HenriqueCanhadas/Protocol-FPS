@@ -3,7 +3,7 @@
  */
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { horaBRT } from "../utils/datas";
+import { horaBRT } from "@/utils/datas";
 
 export default function AppHeader({ onMenuClick, menuOpen }) {
   const [time, setTime] = useState("");
