@@ -179,16 +179,21 @@ def api_remover():
         return jsonify({"error": str(exc)}), 500
 
 
+# ── API: rota inexistente ──────────────────────────────────────
+# Paridade com o Vercel (o rewrite de produção exclui /api/ via "/((?!api/).*)").
+# Precisa ser rota própria: com static_url_path="" o Flask registra
+# "/<path:filename>" (static), que capturaria "/api/..." antes do serve_spa e
+# devolveria 404 HTML. Como "/api/<...>" é mais específica, ela vence e responde
+# 404 JSON — o mesmo comportamento do Vercel para uma rota de API inexistente.
+@app.route("/api/<path:_sub>", methods=["GET", "POST", "PUT", "DELETE", "PATCH"])
+def api_not_found(_sub):
+    return jsonify({"error": "Endpoint de API não encontrado"}), 404
+
+
 # ── SPA catch-all ──────────────────────────────────────────────
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 def serve_spa(path):
-    # Paridade com o Vercel: em produção o rewrite exclui /api/ ("/((?!api/).*)").
-    # Rotas /api/* não atendidas pelos handlers acima NÃO devem cair no SPA — o
-    # correto é 404 JSON (como o Vercel faria), e não servir o index.html.
-    if path.startswith("api/"):
-        return jsonify({"error": "Endpoint de API não encontrado"}), 404
-
     dist = Path(app.static_folder)
     target = dist / path
     if path and target.exists():
@@ -201,6 +206,23 @@ def serve_spa(path):
         "<p>Execute <code>cd frontend && npm install && npm run build</code></p>",
         404,
     )
+
+
+# ── Fallback SPA (deep-links) ──────────────────────────────────
+# Com static_url_path="" a rota estática "/<path:filename>" captura rotas como
+# "/conta" antes do serve_spa e devolveria 404. Este handler garante a paridade
+# com o Vercel (rewrite "/((?!api/).*)"): rota de API inexistente → 404 JSON;
+# rota "de página" (sem extensão) → serve o index.html para o React Router assumir;
+# arquivo realmente ausente (ex.: /assets/x.js) → mantém 404.
+@app.errorhandler(404)
+def _spa_fallback(err):
+    if request.path.startswith("/api/"):
+        return jsonify({"error": "Endpoint de API não encontrado"}), 404
+    ultimo = request.path.rsplit("/", 1)[-1]
+    index = Path(app.static_folder) / "index.html"
+    if "." not in ultimo and index.exists():
+        return send_file(str(index))
+    return err
 
 
 # ── Dev helper ─────────────────────────────────────────────────
