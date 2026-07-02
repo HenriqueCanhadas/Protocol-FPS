@@ -1,0 +1,162 @@
+# PROTOCOL FPS — Planejamento de Sprints
+
+> Relatório gerado a partir do arquivo `todo` (raiz do repositório).
+> Data de geração: **01/07/2026**. Início do planejamento: **02/07/2026**.
+>
+> **Legenda de status**
+> - ✅ **Done** — concluído (item `OK-` no `todo`)
+> - 🟡 **Pending** — iniciado mas não finalizado (item `Pending-` no `todo`)
+> - ⬜ **Todo** — a fazer / ainda não iniciado (item `-` no `todo`)
+>
+> **Colunas da tabela**
+> - **SPRINT** — sprint + tarefa (com a referência da linha no `todo`)
+> - **TEST** — critério de aceite / como validar
+> - **STATUS** — ✅ / 🟡 / ⬜
+> - **RESULTS** — resultado atual ou resultado esperado ao concluir
+
+---
+
+## Visão geral do cronograma
+
+| Sprint | Tema | Período | Dias | Itens |
+|--------|------|---------|------|-------|
+| Sprint 0 | Baseline concluído (histórico) | até 01/07/2026 | — | 21 ✅ |
+| Sprint 1 | Estabilização de Infra & CI | 02/07 – 04/07 | 3 | 3 |
+| Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 |
+| Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 |
+| Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 |
+| Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 |
+| Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 2 |
+
+**Total planejado (Sprints 1–6):** 19 dias úteis · 15 tarefas pendentes/a fazer.
+
+---
+
+## Sprint 0 — Baseline concluído (histórico)
+
+Itens já entregues (`OK-` no `todo`). Servem de base para os próximos sprints.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S0 · Remover produto e tudo atrelado no banco (todo:1) | Remover um produto e confirmar que histórico/alertas somem no Supabase | ✅ Done | Exclusão em cascata funcionando |
+| S0 · Melhorar visualização das páginas + cor das letras (todo:3) | Abrir cada página e conferir legibilidade/contraste | ✅ Done | Fontes maiores e cores ajustadas |
+| S0 · Menu hambúrguer no lugar da navegação no topo (todo:5) | Abrir em tela pequena e alternar seções | ✅ Done | Menu hambúrguer ativo |
+| S0 · Nome completo em "Menor preço hoje" (todo:7) | Verificar card sem truncar o nome | ✅ Done | Nome exibido por completo |
+| S0 · Desativar monitoramento → status OFF vermelho (todo:9) | Desativar item e ver badge "OFF" vermelho | ✅ Done | Badge OFF implementado |
+| S0 · Desativar monitoramento de produto X (todo:11) | Alternar `monitorando` por item | ✅ Done | Toggle por produto |
+| S0 · Data + hora na "Última coleta" (todo:13) | Ver ex.: `03/06/2026 22:12` | ✅ Done | Data + hora exibidas |
+| S0 · Alterar a meta de valor (todo:15) | Editar meta e persistir no banco | ✅ Done | Edição de meta OK |
+| S0 · Campo de busca por produto/loja (todo:17) | Buscar por nome e por loja | ✅ Done | Busca funcional |
+| S0 · Ordenar tabela por nome/valor (todo:19) | Ordenar asc/desc por nome e preço | ✅ Done | Ordenação funcional |
+| S0 · Nome clicável no Monitor de Preços (todo:21) | Clicar e ser redirecionado ao produto | ✅ Done | Links ativos |
+| S0 · Botão de disparo de coleta manual (todo:23) | Apertar botão e disparar coleta | ✅ Done | Gatilho `workflow_dispatch` |
+| S0 · Hospedagem gratuita (todo:25) | Acessar URL pública | ✅ Done | Deploy no Vercel |
+| S0 · requirements.txt back + CI (todo:27) | CI instala deps e roda `main.py` | ✅ Done | Back configurado (front não precisa) |
+| S0 · Easter egg (todo:29) | Acionar easter egg | ✅ Done | Implementado |
+| S0 · Formatação de email/telegram (todo:31) | Disparar alerta e conferir mensagem | ✅ Done | Foco no retorno do Telegram |
+| S0 · Menu de opções na coluna Ações (todo:33) | Ver "Editar Meta", "Desativar", "Coletar Agora" | ✅ Done | Menu de ações |
+| S0 · Formatar seção Ações (histórico/remover/ativar) (todo:35) | Conferir layout das ações | ✅ Done | Layout ajustado |
+| S0 · Remover monitoramento específico front+banco (todo:37) | Remover leitura específica (ex.: dia 3, 19h) | ✅ Done | Remoção pontual |
+| S0 · Remover múltiplos monitoramentos específicos (todo:39) | Selecionar vários e remover | ✅ Done | Seleção múltipla validada |
+| S0 · Corrigir sobreposição no histórico (todo:41) | Rolar modal e ver linha verde sem cobrir o título | ✅ Done | Z-index/sticky corrigido |
+
+---
+
+## Sprint 1 — Estabilização de Infra & CI (02/07 – 04/07)
+
+Foco: deixar a coleta em CI confiável e o horário correto antes de mexer em features.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S1 · Ajustar GitHub Actions p/ Pichau e Terabyte (todo:47) | Rodar `workflow_dispatch` 3×; comparar preço/estoque local × CI para Pichau e Terabyte | 🟡 Pending | Local roda 100%; CI apresenta inconsistência (anti-bot/timeout no container). Esperado: coleta estável nas 3 lojas |
+| S1 · Resolver aviso de deprecação Node.js 20 no Actions (todo:75) | Ver o log do Actions sem o aviso de Node 20 | 🟡 Pending | Já existe workaround `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24=true`. Esperado: atualizar `actions/checkout` e `actions/setup-python` p/ versões com Node 24 e remover a flag temporária |
+| S1 · Ajustar fuso horário UTC-3 (Brasília) back/front/banco (todo:67) | Coletar um item e conferir o mesmo horário local em back, front e Supabase | ⬜ Todo | Esperado: todos os timestamps normalizados para America/Sao_Paulo (UTC-3), sem defasagem |
+
+---
+
+## Sprint 2 — Refatoração do Frontend (07/07 – 09/07)
+
+Foco: organizar a estrutura de pastas e alinhar as rotas ao Flask + React.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S2 · Melhorar estrutura de pastas do front (Flask + React) (todo:43) | Build (`npm run build`) e dev (Flask + Vite) continuam funcionando após reorganização | 🟡 Pending | Estrutura atual: `frontend-flask/` (Flask) + `frontend-flask/frontend/` (React/Vite). Esperado: endereçamento via Flask + arquitetura React organizada |
+| S2 · Usar Flask para as rotas do front-end (todo:45) | Navegar pelas rotas servidas pelo Flask em dev sem quebrar o proxy `/api/*` | 🟡 Pending | Hoje o Flask serve o SPA e faz proxy de 2 rotas. Esperado: roteamento consistente dev (Flask) × prod (Vercel), mantendo `app.py` e `trigger-coleta.js` em sincronia |
+
+---
+
+## Sprint 3 — Enriquecimento de dados na UI (10/07 – 12/07)
+
+Foco: dar mais contexto aos preços e permitir monitorar armazenamento.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S3 · Data e hora em "Preço Atual" (todo:49) | Ver a data/hora de referência do valor exibido em "Preço Atual" | 🟡 Pending | Esperado: exibir quando aquele valor foi coletado (validar se vira uma coluna dedicada de data de coleta/meta) |
+| S3 · Campo "Armazenamento" (HD/SSD/NVMe) (todo:51) | Cadastrar novo produto com armazenamento e ver no dashboard | 🟡 Pending | Já existe no dashboard; falta ajustar no banco e no fluxo de novo produto |
+| S3 · "Coletar Agora" apenas para o produto selecionado (todo:53) | Acionar "Coletar Agora" em um item e confirmar que só ele foi coletado | ⬜ Todo | Esperado: coleta pontual por produto na seção de Ações |
+
+---
+
+## Sprint 4 — Coleta segmentada & filtros (14/07 – 16/07)
+
+Foco: filtrar e coletar por categoria/loja em vez de sempre tudo.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S4 · Coletar por categoria (GPU/CPU/RAM/…) (todo:55) | Disparar coleta apenas de GPUs e confirmar que só elas foram coletadas | ⬜ Todo | Esperado: seleção de categoria no disparo de coleta |
+| S4 · Filtros por loja e por produto de loja (todo:57) | Filtrar a lista por loja e por produto dentro de uma loja | ⬜ Todo | Esperado: filtros combináveis na UI |
+| S4 · Coleta por loja/produto/categoria específica (todo:59) | Escolher escopo (loja OU produto OU categoria) e coletar só ele | ⬜ Todo | Esperado: parâmetro de escopo no `main.py` / gatilho |
+
+---
+
+## Sprint 5 — Multiusuário & Admin (17/07 – 21/07)
+
+Foco: isolar monitoramentos por usuário e criar papel de administrador. **Requer refatoração do banco.**
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S5 · Monitoramentos separados por usuário (todo:63) | Usuário A vê só itens A; usuário B só itens B | ⬜ Todo | Esperado: refatorar banco com `user_id`; isolamento de dados por usuário |
+| S5 · Usuário Admin vê todos os produtos por usuário (todo:65) | Logar como admin e ver os itens de todos, agrupados por usuário | ⬜ Todo | Esperado: papel admin + visão consolidada por usuário |
+
+---
+
+## Sprint 6 — Documentação & refino (22/07 – 23/07)
+
+Foco: documentar o banco e repensar a métrica de alertas.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S6 · Documentação do banco (estrutura e referências) (todo:69) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
+| S6 · Repensar métrica "Alertas hoje" (todo:61) | Validar novo cálculo/exibição de "Alertas hoje" | ⬜ Todo | Ainda em definição; esperado: novo modelo de métrica |
+
+---
+
+## Resumo por status
+
+| Status | Qtde | Itens (linha no `todo`) |
+|--------|------|--------------------------|
+| ✅ Done | 21 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41 |
+| 🟡 Pending | 6 | 43,45,47,49,51,75 |
+| ⬜ Todo | 9 | 53,55,57,59,61,63,65,67,69 |
+
+---
+
+## Skills Futuras (para futura alteração)
+
+Skills sugeridas com base nos sprints acima — a serem criadas/refinadas em `.claude/skills/`
+conforme o projeto evolui. A skill de planejamento (`sprint-planner`) **já foi criada** e mantém
+este relatório sincronizado com o `todo`.
+
+| Skill | Origem (Sprint) | Objetivo | Prioridade |
+|-------|-----------------|----------|------------|
+| `sprint-planner` ✅ | Base | Ler o `todo`, classificar por status (`OK-`/`Pending-`/`-`) e regenerar este `sprints.md` (tabela `SPRINT | TEST | STATUS | RESULTS` + Skills Futuras) | Alta (feita) |
+| `ci-diagnostics` | S1 | Diagnosticar diferença local × CI dos scrapers (Pichau/Terabyte): dump de página, detecção de challenge, timeouts e flags do Chromium | Alta |
+| `scraper-nova-loja` | S1/S4 | Andaime para nova loja: subclasse de `ScraperBase`, `_aguardar_preco`/`extrair_dados` e registro no dict `SCRAPERS` do `main.py` | Média |
+| `frontend-refactor` | S2 | Guiar reorganização de pastas do front mantendo build Vite, proxy `/api/*` e paridade `app.py` × `trigger-coleta.js` | Média |
+| `timezone-audit` | S1/S3 | Auditar e normalizar timestamps para America/Sao_Paulo (UTC-3) em back, front e banco | Alta |
+| `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | Média |
+| `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | Alta (impacto grande) |
+| `db-docs` | S6 | Gerar/atualizar `project/banco.md` (tabelas, relacionamentos, RPC `verificar_alertas`) | Média |
+
+> **Como evoluir:** ao concluir uma tarefa, marque o item correspondente no `todo` com o prefixo
+> `OK-` (ou `Pending-` se ficar parcial) e rode a skill `sprint-planner` para regenerar este arquivo.
