@@ -78,7 +78,9 @@ const LOJAS_DETECTADAS = {
   "terabyteshop.com.br": "terabyteshop",
   "pichau.com.br":      "pichau",
 };
-const CATEGORIAS = ["GPU", "CPU", "RAM", "PSU", "MOBO", "SSD", "COOLER"];
+// Deve refletir as categorias existentes na tabela `produtos` do Supabase
+// (o cadastro faz lookup por categoria; valor sem linha correspondente falha ao salvar).
+const CATEGORIAS = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
 const LOJAS_LABEL = { kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau" };
 
 function detectarLoja(url) {
@@ -247,7 +249,7 @@ export default function NovoProduto({ showToast }) {
                     {CATEGORIAS.map((c) => (
                       <div key={c} className={`cat-chip${categoria === c ? " selected" : ""}`}
                         onClick={() => { setCategoria(c); setErros((e) => ({ ...e, categoria: false })); }}>
-                        {c === "PSU" ? "Fonte" : c === "MOBO" ? "Placa Mãe" : c}
+                        {c === "PSU" ? "Fonte" : c === "MOBO" ? "Placa Mãe" : c === "STORAGE" ? "Armazenamento" : c}
                       </div>
                     ))}
                   </div>

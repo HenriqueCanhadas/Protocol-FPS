@@ -23,13 +23,13 @@
 | Sprint 0 | Baseline concluído (histórico) | até 01/07/2026 | — | 21 ✅ |
 | Sprint 1 | Estabilização de Infra & CI | 02/07 – 04/07 | 3 | 3 ✅ |
 | Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 ✅ |
-| Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 2 ✅ · 1 🟡 |
+| Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 ✅ |
 | Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 |
 | Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 |
 | Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 2 |
 
-**Total planejado (Sprints 1–6):** 19 dias úteis · 8 tarefas pendentes/a fazer
-(7 concluídas nas Sprints 1–3; todo:51 segue 🟡 Pending).
+**Total planejado (Sprints 1–6):** 19 dias úteis · 7 tarefas a fazer
+(8 concluídas nas Sprints 1–3; nenhuma pendente).
 
 ---
 
@@ -93,7 +93,7 @@ Foco: dar mais contexto aos preços e permitir monitorar armazenamento.
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
 | S3 · Data e hora em "Preço Atual" (todo:49) | Ver a data/hora de referência do valor exibido em "Preço Atual" | ✅ Done | **Validado 02/07/2026:** `Dashboard.jsx` renderiza `price-timestamp` com `dataHoraBRT(item.coletado_em)` (dd/mm/aaaa hh:mm, horário de Brasília) por produto na coluna "Preço atual" |
-| S3 · Campo "Armazenamento" (HD/SSD/NVMe) (todo:51) | Cadastrar novo produto com armazenamento e ver no dashboard | 🟡 Pending | **Validação 02/07/2026 achou inconsistência:** o Dashboard filtra por categoria `STORAGE` (label "Armazenamento"), mas `NovoProduto.jsx` só oferece `SSD` — um produto cadastrado como SSD não casa com o filtro STORAGE. Falta **unificar a taxonomia** (cadastro × dashboard × banco) e contemplar HD/NVMe |
+| S3 · Campo "Armazenamento" (HD/SSD/NVMe) (todo:51) | Cadastrar novo produto com armazenamento e ver no dashboard | ✅ Done | **Corrigido 02/07/2026.** A validação revelou que o banco só tinha 5 categorias (sem STORAGE) e o form oferecia `SSD`/`COOLER` inexistentes — o cadastro **falhava**. Ações: inserida `produtos.categoria=STORAGE` (nome "Armazenamento"); `NovoProduto.jsx` alinhado a `[GPU,CPU,RAM,PSU,MOBO,STORAGE]` (removidos SSD/COOLER quebrados) com rótulo "Armazenamento"; filtro STORAGE do Dashboard agora tem categoria real. Uma categoria única cobre HD/SSD/NVMe (separá-las em 3 = passo futuro). Testado: as 6 categorias resolvem para `produto_id` + build 87 módulos |
 | S3 · "Coletar Agora" apenas para o produto selecionado (todo:53) | Acionar "Coletar Agora" em um item e confirmar que só ele foi coletado | ✅ Done | **Implementado ponta a ponta (02/07/2026):** `workflow_dispatch` aceita input `item_id` → env `ITEM_ID`; `main.py._selecionar_itens` faz coleta **PONTUAL** (`eq id`) ou **COMPLETA**; endpoints Flask e Vercel repassam `item_id` no dispatch; menu "Opções › Coletar agora" coleta só o produto. **Testes:** scoping read-only real (pontual=1 / completo=4 / strip), ambos os endpoints com GitHub mockado (com/sem item_id + body string), build 87 módulos, `py_compile`, `node --check`. Falta só o dispatch real via UI para E2E completo |
 
 ---
@@ -136,8 +136,8 @@ Foco: documentar o banco e repensar a métrica de alertas.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 28 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,53,67,75 |
-| 🟡 Pending | 1 | 51 |
+| ✅ Done | 29 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,67,75 |
+| 🟡 Pending | 0 | — |
 | ⬜ Todo | 7 | 55,57,59,61,63,65,69 |
 
 > **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:67, todo:75 e
@@ -151,11 +151,12 @@ Foco: documentar o banco e repensar a métrica de alertas.
 > 404 JSON em `/api/*` inexistente, como o rewrite do Vercel). O rename do aninhamento
 > `frontend-flask/frontend/` foi conscientemente adiado por ser disruptivo.
 >
-> **Sprint 3 parcial em 02/07/2026:** todo:49 (data/hora em "Preço Atual") **validado** e
-> todo:53 (Coletar Agora por produto) **implementado + testado ponta a ponta** (workflow
-> `item_id` → `main.py` scoping → endpoints Flask/Vercel → menu de Opções). O todo:51
-> (Armazenamento) permanece 🟡 — a validação revelou **inconsistência de taxonomia** entre
-> o cadastro (`SSD`) e o filtro do dashboard (`STORAGE`), ainda a ser unificada.
+> **Sprint 3 concluída em 02/07/2026** (antes do prazo de 10–12/07): todo:49 (data/hora em
+> "Preço Atual") **validado**; todo:53 (Coletar Agora por produto) **implementado + testado
+> ponta a ponta** (workflow `item_id` → `main.py` scoping → endpoints Flask/Vercel → menu de
+> Opções); todo:51 (Armazenamento) **corrigido** — a validação revelou taxonomia inconsistente
+> (banco sem STORAGE; form oferecia SSD/COOLER inexistentes que faziam o cadastro falhar),
+> resolvida inserindo a categoria STORAGE no banco e alinhando o `NovoProduto.jsx`.
 
 ---
 
