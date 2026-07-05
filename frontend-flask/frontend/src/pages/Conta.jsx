@@ -36,7 +36,7 @@ const css = `
 
 import { useState } from "react";
 
-export default function Conta({ user, updatePassword, signOut, showToast }) {
+export default function Conta({ user, perfil, updatePassword, signOut, showToast }) {
   const [novaSenha, setNovaSenha] = useState("");
   const [confSenha, setConfSenha] = useState("");
   const [erroSenha, setErroSenha] = useState("");
@@ -86,6 +86,15 @@ export default function Conta({ user, updatePassword, signOut, showToast }) {
               <div className="info-row">
                 <div className="info-key">Status</div>
                 <div className="info-value"><span className="badge-active">ATIVO</span></div>
+              </div>
+              <div className="info-row">
+                <div className="info-key">Papel</div>
+                <div className="info-value">
+                  <span className="badge-active" style={(perfil?.nivel ?? 1) >= 2
+                    ? { borderColor: "var(--amber)", color: "var(--amber)" } : undefined}>
+                    {(perfil?.nivel ?? 1) >= 2 ? "ADMIN" : "NORMAL"}
+                  </span>
+                </div>
               </div>
               <div className="info-row">
                 <div className="info-key">Último acesso</div>

@@ -13,9 +13,16 @@ import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
  * Flask atende em dev; Vercel Function em produção.
  */
 async function removerNoServidor(tipo, ids) {
+  // Envia o access_token do usuário: o servidor valida a sessão e autoriza
+  // apenas itens do próprio usuário (ou qualquer item, se admin).
+  const sb = await getSupabase();
+  const { data: { session } } = await sb.auth.getSession();
   const resp = await fetch("/api/remover", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({ tipo, ids }),
   });
   const data = await resp.json().catch(() => ({}));
@@ -84,6 +91,22 @@ const css = `
 .filter-btn:hover { border-color:var(--green-dim); color:var(--text); }
 .filter-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .filter-btn-loja.active { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08); }
+
+/* visão de admin: filtro por usuário (dono dos itens) */
+.user-filter-tag { display:flex; align-items:center; font-size:var(--fs-xs); letter-spacing:.25em; color:var(--text-dim); text-transform:uppercase; padding:.5rem .35rem .5rem 0; }
+.filter-btn-user.active { border-color:#37c8ff; color:#37c8ff; background:rgba(55,200,255,.08); }
+.prod-dono { margin-left:.75rem; color:#37c8ff; opacity:.85; letter-spacing:.06em; }
+.prod-dono-voce { color:var(--green); }
+
+/* filtro "produto de loja" (aparece quando uma loja está selecionada) */
+.produto-select {
+  background:var(--bg2); border:1px solid rgba(255,184,0,.35);
+  color:var(--amber); font-family:var(--mono); font-size:var(--fs-sm);
+  letter-spacing:.08em; padding:.5rem .8rem; cursor:pointer;
+  max-width:340px; outline:none; transition:border-color .15s,box-shadow .15s;
+}
+.produto-select:hover,.produto-select:focus { border-color:var(--amber); box-shadow:0 0 0 1px rgba(255,184,0,.25); }
+.produto-select option { background:var(--bg2); color:var(--text); }
 
 .sort-controls { display:flex; gap:.4rem; flex-wrap:wrap; }
 .sort-controls-right { margin-left:auto; }
@@ -542,14 +565,15 @@ const CAT_LABEL = {
   STORAGE: "Armazenamento",
 };
 
+// `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
 const LOJAS_FILTER = [
-  { key: "all",       label: "Todas Lojas" },
-  { key: "kabum",     label: "KaBuM"       },
-  { key: "terabyte",  label: "Terabyte"    },
-  { key: "pichau",    label: "Pichau"      },
+  { key: "all",       label: "Todas Lojas", slug: null           },
+  { key: "kabum",     label: "KaBuM",       slug: "kabum"        },
+  { key: "terabyte",  label: "Terabyte",    slug: "terabyteshop" },
+  { key: "pichau",    label: "Pichau",      slug: "pichau"       },
 ];
 
-export default function Dashboard({ showToast }) {
+export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [dados,        setDados]        = useState([]);
   const [alertas,      setAlertas]      = useState([]);
   const [filtro,       setFiltro]       = useState("all");
@@ -557,22 +581,32 @@ export default function Dashboard({ showToast }) {
   const [termoBusca,   setTermoBusca]   = useState("");
   const [sortCampo,    setSortCampo]    = useState("nome");
   const [sortDir,      setSortDir]      = useState("asc");
-  const [filtroLoja, setFiltroLoja] = useState("all");
+  const [filtroLoja,    setFiltroLoja]    = useState("all");
+  const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
+  const [filtroUsuario, setFiltroUsuario] = useState("all"); // admin: dono dos itens
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
   const [metaItem,     setMetaItem]     = useState(null);
   const [opcoesItem,   setOpcoesItem]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
-  const [statsAlertas, setStatsAlertas] = useState("—");
 
   // Carrega dados
   const carregarPrecos = useCallback(async () => {
     const sb = await getSupabase();
-    const { data: itens, error } = await sb
+    // Inclui o dono (usuarios via FK itens.user_id) para a visão de admin.
+    let { data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
+      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome)")
       .order("nome_na_loja", { ascending: true });
+
+    if (error) {
+      // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
+      ({ data: itens, error } = await sb
+        .from("itens")
+        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
+        .order("nome_na_loja", { ascending: true }));
+    }
 
     if (error) { showToast("Erro ao carregar dados", "error"); return; }
     if (!itens?.length) { setDados([]); return; }
@@ -597,6 +631,10 @@ export default function Dashboard({ showToast }) {
         monitorando: item.monitorando, preco_meta: item.preco_meta,
         preco: ult.preco ?? null, disponivel: ult.disponivel ?? false,
         coletado_em: ult.coletado_em ?? null,
+        // Dono do item (visão de admin; usuário normal só recebe os seus via RLS)
+        dono_id:    item.user_id || null,
+        dono_email: item.usuarios?.email || null,
+        dono_nome:  item.usuarios?.nome  || null,
       };
     }));
   }, [showToast]);
@@ -610,7 +648,6 @@ export default function Dashboard({ showToast }) {
       .order("criado_em", { ascending: false })
       .limit(20);
     setAlertas(data || []);
-    setStatsAlertas(data?.length ?? 0);
   }, []);
 
   useEffect(() => {
@@ -623,10 +660,19 @@ export default function Dashboard({ showToast }) {
   const disponiveis = ativos.filter((d) => d.disponivel && d.preco);
   const menor       = disponiveis.length ? disponiveis.reduce((a, b) => a.preco < b.preco ? a : b) : null;
   const ultColeta   = [...dados].filter((d) => d.coletado_em).sort((a, b) => new Date(b.coletado_em) - new Date(a.coletado_em))[0];
+  // "Abaixo da meta" (todo:65, decisão 05/07/2026): oportunidades AGORA —
+  // itens ativos cujo preço atual está abaixo do preço-meta definido.
+  // Substitui o antigo "Alertas hoje" (quase sempre 0 com 1 coleta/dia,
+  // zerava à meia-noite e contava em dobro abaixo_meta + queda_preco).
+  const comMeta    = ativos.filter((d) => d.preco_meta);
+  const abaixoMeta = comMeta.filter((d) => d.preco && d.preco < d.preco_meta);
 
   // Filtro + busca + sort
   const dadosFiltrados = (() => {
     let d = filtro === "all" ? [...dados] : dados.filter((x) => x.categoria === filtro);
+    if (isAdmin && filtroUsuario !== "all") {
+      d = d.filter((x) => x.dono_id === filtroUsuario);
+    }
     if (termoBusca.trim()) {
       const q = termoBusca.toLowerCase();
       d = d.filter((x) =>
@@ -639,6 +685,9 @@ export default function Dashboard({ showToast }) {
       const q = filtroLoja.toLowerCase();
       d = d.filter(x => (x.loja || "").toLowerCase().includes(q));
     }
+    if (filtroProduto !== "all") {
+      d = d.filter(x => x.item_id === filtroProduto);
+    }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
@@ -650,6 +699,47 @@ export default function Dashboard({ showToast }) {
     });
     return d;
   })();
+
+  // ── Escopo de coleta (Sprint 4: coleta segmentada) ───────────
+  // Produtos da loja selecionada (para o filtro "produto de loja")
+  const produtosDaLoja = filtroLoja === "all" ? [] :
+    dados
+      .filter((x) => (x.loja || "").toLowerCase().includes(filtroLoja))
+      .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
+
+  const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
+  const escopado  = filtro !== "all" || filtroLoja !== "all";
+
+  // Admin: donos distintos dos itens carregados (usuário normal só recebe os seus)
+  const donos = isAdmin
+    ? [...new Map(dados.filter((x) => x.dono_id).map((x) =>
+        [x.dono_id, { id: x.dono_id, rotulo: x.dono_nome || x.dono_email || x.dono_id.slice(0, 8) }]
+      )).values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"))
+    : [];
+  const rotuloDono = (item) =>
+    item.dono_id === user?.id ? "você" : (item.dono_nome || item.dono_email || "—");
+
+  // Ao trocar de loja, o filtro de produto (que pertence à loja) é limpo
+  const selecionarLoja = (key) => { setFiltroLoja(key); setFiltroProduto("all"); };
+
+  /**
+   * Resolve o escopo da coleta a partir dos filtros ativos na toolbar:
+   *   produto selecionado → pontual (item_id)
+   *   categoria/loja      → segmentada (inputs combináveis)
+   *   sem filtros         → completa
+   */
+  const escopoColeta = () => {
+    if (filtroLoja !== "all" && filtroProduto !== "all") {
+      const prod = dados.find((x) => x.item_id === filtroProduto);
+      return { item_id: filtroProduto, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
+    }
+    const esc    = {};
+    const partes = [];
+    if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
+    if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
+    esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
+    return esc;
+  };
 
   // Ações
   const toggleSort = (campo) => {
@@ -685,25 +775,34 @@ export default function Dashboard({ showToast }) {
     carregarPrecos();
   };
 
-  const iniciarColeta = async (itemId = null, nomeProduto = null) => {
+  const iniciarColeta = async (escopo = {}) => {
     setColetando(true);
-    const escopo = nomeProduto ? `"${nomeProduto}"` : "todos os produtos";
+    const descricao = escopo.descricao || "todos os produtos";
     setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
 
     try {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
-      // Sem itemId → coleta completa; com itemId → coleta pontual (só o produto)
+      // Corpo do dispatch (mesma semântica do main.py):
+      //   item_id → pontual; categoria/loja → segmentada; vazio → completa
+      const body = {};
+      if (escopo.item_id) {
+        body.item_id = escopo.item_id;
+      } else {
+        if (escopo.categoria) body.categoria = escopo.categoria;
+        if (escopo.loja)      body.loja      = escopo.loja;
+      }
+
       const resp = await fetch("/api/trigger-coleta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemId ? { item_id: itemId } : {}),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
 
       if (resp.ok && data.ok) {
         setProgresso({ visible: true, txt: "Workflow disparado com sucesso!", pct: 100 });
-        showToast(`⚡ Coleta iniciada (${escopo}) no GitHub Actions!`, "ok");
+        showToast(`⚡ Coleta iniciada (${descricao}) no GitHub Actions!`, "ok");
       } else {
         throw new Error(data.error || `Erro ${resp.status}`);
       }
@@ -730,7 +829,7 @@ export default function Dashboard({ showToast }) {
       "COLETAR AGORA",
       `Disparar uma coleta imediata de preço <strong>apenas para este produto</strong>:<br><br><strong>${item.nome_na_loja}</strong><br><br>O processo roda no GitHub Actions e pode levar alguns minutos.`,
       "⚡",
-      () => iniciarColeta(item.item_id, item.nome_na_loja),
+      () => iniciarColeta({ item_id: item.item_id, descricao: `"${item.nome_na_loja}"` }),
       false,
     );
   };
@@ -791,9 +890,13 @@ export default function Dashboard({ showToast }) {
           <div className="stat-sub">produtos ativos</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Alertas hoje</div>
-          <div className="stat-value amber">{statsAlertas}</div>
-          <div className="stat-sub">disparos</div>
+          <div className="stat-label">Abaixo da meta</div>
+          <div className="stat-value amber">{abaixoMeta.length}</div>
+          <div className="stat-sub">
+            {comMeta.length
+              ? `de ${comMeta.length} com meta definida`
+              : "nenhum item com meta"}
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Menor preço hoje</div>
@@ -839,13 +942,48 @@ export default function Dashboard({ showToast }) {
                   <button className="btn-search-clear" onClick={() => setTermoBusca("")}>✕</button>
                 )}
               </div>
-              <button className="btn-coletar" disabled={coletando} onClick={() =>
-                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.", "⚡", () => iniciarColeta(), false)
-              }>
+              <button className="btn-coletar" disabled={coletando} onClick={() => {
+                const esc = escopoColeta();
+                const segmentada = esc.item_id || esc.categoria || esc.loja;
+                confirmar(
+                  "COLETAR AGORA",
+                  segmentada
+                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>Somente os itens desse escopo serão coletados. O processo pode levar alguns minutos.`
+                    : "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
+                  "⚡",
+                  () => iniciarColeta(esc),
+                  false,
+                );
+              }}>
                 <span>⚡</span>
-                <span>{coletando ? "DISPARANDO..." : "COLETAR AGORA"}</span>
+                <span>{coletando ? "DISPARANDO..." : escopado ? "COLETAR FILTRADOS" : "COLETAR AGORA"}</span>
               </button>
             </div>
+
+            {/* Linha admin: filtro por usuário (visão consolidada por dono) */}
+            {isAdmin && donos.length > 0 && (
+              <div className="toolbar-row">
+                <div className="filters">
+                  <span className="user-filter-tag">◈ USUÁRIOS</span>
+                  <button
+                    className={`filter-btn filter-btn-user${filtroUsuario === "all" ? " active" : ""}`}
+                    onClick={() => setFiltroUsuario("all")}
+                  >
+                    Todos ({dados.length})
+                  </button>
+                  {donos.map((d) => (
+                    <button
+                      key={d.id}
+                      className={`filter-btn filter-btn-user${filtroUsuario === d.id ? " active" : ""}`}
+                      onClick={() => setFiltroUsuario(d.id)}
+                      title={d.id}
+                    >
+                      {d.id === user?.id ? "Você" : d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Linha 2: Filtros de categoria + contagem de resultados */}
             <div className="toolbar-row">
@@ -870,11 +1008,26 @@ export default function Dashboard({ showToast }) {
                   <button
                     key={key}
                     className={`filter-btn filter-btn-loja${filtroLoja === key ? " active" : ""}`}
-                    onClick={() => setFiltroLoja(key)}
+                    onClick={() => selecionarLoja(key)}
                   >
                     {label}
                   </button>
                 ))}
+                {filtroLoja !== "all" && (
+                  <select
+                    className="produto-select"
+                    value={filtroProduto}
+                    onChange={(e) => setFiltroProduto(e.target.value)}
+                    title={`Filtrar por um produto da ${lojaAtiva?.label}`}
+                  >
+                    <option value="all">Todos os produtos · {lojaAtiva?.label}</option>
+                    {produtosDaLoja.map((p) => (
+                      <option key={p.item_id} value={p.item_id}>
+                        {p.nome_na_loja}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="sort-controls sort-controls-right">
                 {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
@@ -939,7 +1092,14 @@ export default function Dashboard({ showToast }) {
                               ? <a className="prod-nome-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.nome_na_loja}</a>
                               : item.nome_na_loja}
                           </div>
-                          <div className="prod-cat">{item.categoria}</div>
+                          <div className="prod-cat">
+                            {item.categoria}
+                            {isAdmin && item.dono_id && (
+                              <span className={`prod-dono${item.dono_id === user?.id ? " prod-dono-voce" : ""}`}>
+                                ◈ {rotuloDono(item)}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td><span className="loja-badge">{item.loja}</span></td>
                         <td>

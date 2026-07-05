@@ -26,20 +26,47 @@ routes; **Flask is not used in production**. In production the SPA is deployed t
 talks directly to Supabase via `VITE_*` env vars, and reaches the server-only routes
 through Vercel serverless functions under `frontend-flask/frontend/api/`.
 
-Three server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
+**SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
+Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
+`BrowserRouter` with three pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`, `Conta` `/conta`)
+plus redirects for legacy HTML routes. The Supabase client (`services/supabase.js`) is a lazy
+singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/config` from Flask.
+Imports use the `@/` alias (→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` —
+update both if you change it).
+
+Four server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
 dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them in sync:**
 - `/api/config` — returns only the public `SUPABASE_URL` + `SUPABASE_ANON_KEY`
   (Flask only; in prod Vite inlines these at build time).
 - `/api/trigger-coleta` (Vercel: `api/trigger-coleta.js`) — fires the GitHub
-  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side.
+  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side. An optional `item_id` in the POST
+  body is forwarded as the workflow input to trigger a pointwise (single-product) run.
 - `/api/remover` (Vercel: `api/remover.js`) — deletes a product or a history row using
   `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
   cascade rules in the DB.
+- `/api/usuarios` (Vercel: `api/usuarios.js`) — admin-only user management via the
+  Supabase admin API (`acao: "criar"` with email/senha/nivel, `acao: "trocar_senha"`).
+  Requires a session token whose profile has `nivel >= 2`; the signup trigger creates
+  profiles at nivel 1 and the endpoint promotes to 2 when creating an admin.
+
+**Route parity gotcha (Flask, `app.py`):** Vercel's prod rewrite is `/((?!api/).*)` → SPA.
+Because Flask is mounted with `static_url_path=""`, its catch-all static route would otherwise
+swallow `/api/...` (404 HTML) and page deep-links like `/conta` (404 instead of SPA). `app.py`
+compensates with an explicit `/api/<path>` route (→ 404 JSON) and a 404 errorhandler that serves
+`index.html` for extension-less paths. Preserve this behavior when touching Flask routing —
+it exists to mirror the Vercel rewrite in dev.
 
 ## Collector flow (`main.py`)
 
-1. Query Supabase `itens` where `monitorando = true`.
+**Two collection modes** (`_selecionar_itens`): if the `ITEM_ID` env var is set, it collects
+*only* that one item even if `monitorando = false` (a **pointwise** run, fired by a per-product
+"Coletar Agora" button); otherwise it does a **full** run over every item with
+`monitorando = true` (the daily cron / global button). The value flows
+frontend → `/api/trigger-coleta` (`item_id` in the POST body) → `workflow_dispatch` input
+`item_id` (`.github/workflows/coletar.yml`) → the `ITEM_ID` env var read here.
+
+1. Query Supabase `itens` where `monitorando = true` (or `id = ITEM_ID` in pointwise mode).
 2. For each item, pick a scraper from the `SCRAPERS` dict keyed by the store name
    (`lojas.nome` lowercased + spaces stripped — e.g. `"terabyteshop"`).
 3. `Scraper().coletar(url)` returns a `DadosProduto` dataclass `(nome, preco, disponivel, url)`.
@@ -49,8 +76,19 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
 
 Alert types handled in `_montar_mensagem`: `abaixo_meta` (below target) and price-drop.
 
-The Supabase tables (`itens`, `lojas`, `historico_precos`, `alertas`) and the
-`verificar_alertas` RPC live in Supabase, not in this repo — there are no migrations here.
+The Supabase tables (`itens`, `lojas`, `produtos`, `historico_precos`, `alertas`,
+`usuarios`) and the `verificar_alertas` RPC live in Supabase. Schema changes are
+recorded as SQL files under `project/migrations/` (run manually in the Supabase SQL
+Editor — the service key can't execute DDL).
+
+**Multiuser model (Sprint 5):** `usuarios.nivel` (1 = normal, 2 = admin) mirrors
+`auth.users` via a signup trigger; `itens.user_id` (default `auth.uid()`) marks the
+owner. RLS lets a user see/manage only their own `itens`/`historico_precos`/`alertas`;
+`is_admin()` (SECURITY DEFINER) grants admins full visibility. The collector uses the
+SERVICE_KEY and bypasses RLS entirely. `/api/remover` requires the session's
+`Authorization: Bearer` token and returns 401 (no session) / 403 (not the owner and
+not admin). Frontend: `useAuth` exposes `perfil`/`isAdmin`; the Dashboard shows an
+admin-only per-user filter row and owner tags.
 
 ## Scraper architecture (`scrapers/`)
 
@@ -108,7 +146,10 @@ The `.env` lives at the **repo root** (the collector loads it there; `app.py` lo
 - Email (Gmail SMTP): `EMAIL_REMETENTE`, `EMAIL_SENHA_APP`, `EMAIL_DESTINATARIO`.
 - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - GitHub dispatch (frontend "run now" button): `GITHUB_TOKEN` (PAT with `actions:write`),
-  `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_WORKFLOW`.
+  `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_WORKFLOW`, and optional `GITHUB_BRANCH` —
+  the `workflow_dispatch` target ref (default `main`). Set it to a feature branch to
+  test new workflow inputs before merging; GitHub 422s a dispatch whose inputs the
+  target branch's workflow doesn't define.
 
 **Security rule that matters**: anything prefixed `VITE_` is inlined into the public JS
 bundle. The `GITHUB_TOKEN` must **never** carry a `VITE_` prefix — it is read only
@@ -118,4 +159,11 @@ as GitHub Actions Secrets in `.github/workflows/coletar.yml`.
 ## CI
 
 `.github/workflows/coletar.yml` runs the collector daily at 12:00 UTC (09:00 BRT) and on
-manual `workflow_dispatch`. Python 3.11, installs Playwright Chromium, runs `python main.py`.
+manual `workflow_dispatch` (with an optional `item_id` input for pointwise runs).
+Python 3.11, installs Playwright Chromium, runs `python main.py`.
+
+## Project planning
+
+The `todo` file at the repo root is the source of truth for planned work (statuses:
+`OK-` done, `Pending-` started, `-` to do). The `sprint-planner` skill reads it and
+(re)generates the sprint report at `project/sprints.md`. Edit `todo`, not `sprints.md`.

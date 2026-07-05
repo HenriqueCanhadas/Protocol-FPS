@@ -93,7 +93,7 @@ function detectarLoja(url) {
   return null;
 }
 
-export default function NovoProduto({ showToast }) {
+export default function NovoProduto({ showToast, user }) {
   const [lojasDB,   setLojasDB]   = useState({});
   const [produtosDB,setProdutosDB] = useState({});
   const [fila,      setFila]       = useState([]);
@@ -174,6 +174,9 @@ export default function NovoProduto({ showToast }) {
         url: item.url, nome_na_loja: item.nome_na_loja,
         loja_id: lojaId, produto_id: prodId,
         preco_meta: item.preco_meta, monitorando: item.monitorando,
+        // Dono do item (RLS multiusuário). O banco tem default auth.uid(),
+        // mas gravamos explícito para deixar a intenção clara.
+        ...(user?.id ? { user_id: user.id } : {}),
       });
       if (error) errosSalvar.push(`${item.nome_na_loja}: ${error.message}`);
       else salvos++;

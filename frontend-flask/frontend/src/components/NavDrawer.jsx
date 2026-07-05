@@ -8,12 +8,18 @@ const ITEMS = [
   { href: "/novo-produto", icon: "＋", label: "Novo Produto" },
 ];
 
+// Visível apenas para admins (usuarios.nivel >= 2)
+const ITEMS_ADMIN = [
+  { href: "/novo-usuario", icon: "◈", label: "Novo Usuário" },
+];
+
 const ITEMS_CONTA = [
   { href: "/conta", icon: "◉", label: "Minha Conta" },
 ];
 
-export default function NavDrawer({ open, onClose, user, onLogout }) {
+export default function NavDrawer({ open, onClose, user, isAdmin = false, onLogout }) {
   const { pathname } = useLocation();
+  const items = isAdmin ? [...ITEMS, ...ITEMS_ADMIN] : ITEMS;
 
   return (
     <>
@@ -27,7 +33,7 @@ export default function NavDrawer({ open, onClose, user, onLogout }) {
         </div>
 
         <nav className="nav-drawer-items">
-          {ITEMS.map(({ href, icon, label }) => (
+          {items.map(({ href, icon, label }) => (
             <Link
               key={href}
               to={href}
