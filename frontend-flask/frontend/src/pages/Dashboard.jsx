@@ -13,9 +13,16 @@ import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
  * Flask atende em dev; Vercel Function em produção.
  */
 async function removerNoServidor(tipo, ids) {
+  // Envia o access_token do usuário: o servidor valida a sessão e autoriza
+  // apenas itens do próprio usuário (ou qualquer item, se admin).
+  const sb = await getSupabase();
+  const { data: { session } } = await sb.auth.getSession();
   const resp = await fetch("/api/remover", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
     body: JSON.stringify({ tipo, ids }),
   });
   const data = await resp.json().catch(() => ({}));
@@ -84,6 +91,12 @@ const css = `
 .filter-btn:hover { border-color:var(--green-dim); color:var(--text); }
 .filter-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .filter-btn-loja.active { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08); }
+
+/* visão de admin: filtro por usuário (dono dos itens) */
+.user-filter-tag { display:flex; align-items:center; font-size:var(--fs-xs); letter-spacing:.25em; color:var(--text-dim); text-transform:uppercase; padding:.5rem .35rem .5rem 0; }
+.filter-btn-user.active { border-color:#37c8ff; color:#37c8ff; background:rgba(55,200,255,.08); }
+.prod-dono { margin-left:.75rem; color:#37c8ff; opacity:.85; letter-spacing:.06em; }
+.prod-dono-voce { color:var(--green); }
 
 /* filtro "produto de loja" (aparece quando uma loja está selecionada) */
 .produto-select {
@@ -560,7 +573,7 @@ const LOJAS_FILTER = [
   { key: "pichau",    label: "Pichau",      slug: "pichau"       },
 ];
 
-export default function Dashboard({ showToast }) {
+export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [dados,        setDados]        = useState([]);
   const [alertas,      setAlertas]      = useState([]);
   const [filtro,       setFiltro]       = useState("all");
@@ -570,6 +583,7 @@ export default function Dashboard({ showToast }) {
   const [sortDir,      setSortDir]      = useState("asc");
   const [filtroLoja,    setFiltroLoja]    = useState("all");
   const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
+  const [filtroUsuario, setFiltroUsuario] = useState("all"); // admin: dono dos itens
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
@@ -581,10 +595,19 @@ export default function Dashboard({ showToast }) {
   // Carrega dados
   const carregarPrecos = useCallback(async () => {
     const sb = await getSupabase();
-    const { data: itens, error } = await sb
+    // Inclui o dono (usuarios via FK itens.user_id) para a visão de admin.
+    let { data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
+      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome)")
       .order("nome_na_loja", { ascending: true });
+
+    if (error) {
+      // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
+      ({ data: itens, error } = await sb
+        .from("itens")
+        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
+        .order("nome_na_loja", { ascending: true }));
+    }
 
     if (error) { showToast("Erro ao carregar dados", "error"); return; }
     if (!itens?.length) { setDados([]); return; }
@@ -609,6 +632,10 @@ export default function Dashboard({ showToast }) {
         monitorando: item.monitorando, preco_meta: item.preco_meta,
         preco: ult.preco ?? null, disponivel: ult.disponivel ?? false,
         coletado_em: ult.coletado_em ?? null,
+        // Dono do item (visão de admin; usuário normal só recebe os seus via RLS)
+        dono_id:    item.user_id || null,
+        dono_email: item.usuarios?.email || null,
+        dono_nome:  item.usuarios?.nome  || null,
       };
     }));
   }, [showToast]);
@@ -639,6 +666,9 @@ export default function Dashboard({ showToast }) {
   // Filtro + busca + sort
   const dadosFiltrados = (() => {
     let d = filtro === "all" ? [...dados] : dados.filter((x) => x.categoria === filtro);
+    if (isAdmin && filtroUsuario !== "all") {
+      d = d.filter((x) => x.dono_id === filtroUsuario);
+    }
     if (termoBusca.trim()) {
       const q = termoBusca.toLowerCase();
       d = d.filter((x) =>
@@ -675,6 +705,15 @@ export default function Dashboard({ showToast }) {
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
   const escopado  = filtro !== "all" || filtroLoja !== "all";
+
+  // Admin: donos distintos dos itens carregados (usuário normal só recebe os seus)
+  const donos = isAdmin
+    ? [...new Map(dados.filter((x) => x.dono_id).map((x) =>
+        [x.dono_id, { id: x.dono_id, rotulo: x.dono_nome || x.dono_email || x.dono_id.slice(0, 8) }]
+      )).values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"))
+    : [];
+  const rotuloDono = (item) =>
+    item.dono_id === user?.id ? "você" : (item.dono_nome || item.dono_email || "—");
 
   // Ao trocar de loja, o filtro de produto (que pertence à loja) é limpo
   const selecionarLoja = (key) => { setFiltroLoja(key); setFiltroProduto("all"); };
@@ -913,6 +952,31 @@ export default function Dashboard({ showToast }) {
               </button>
             </div>
 
+            {/* Linha admin: filtro por usuário (visão consolidada por dono) */}
+            {isAdmin && donos.length > 0 && (
+              <div className="toolbar-row">
+                <div className="filters">
+                  <span className="user-filter-tag">◈ USUÁRIOS</span>
+                  <button
+                    className={`filter-btn filter-btn-user${filtroUsuario === "all" ? " active" : ""}`}
+                    onClick={() => setFiltroUsuario("all")}
+                  >
+                    Todos ({dados.length})
+                  </button>
+                  {donos.map((d) => (
+                    <button
+                      key={d.id}
+                      className={`filter-btn filter-btn-user${filtroUsuario === d.id ? " active" : ""}`}
+                      onClick={() => setFiltroUsuario(d.id)}
+                      title={d.id}
+                    >
+                      {d.id === user?.id ? "Você" : d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Linha 2: Filtros de categoria + contagem de resultados */}
             <div className="toolbar-row">
               <div className="filters">
@@ -1020,7 +1084,14 @@ export default function Dashboard({ showToast }) {
                               ? <a className="prod-nome-link" href={item.url} target="_blank" rel="noopener noreferrer">{item.nome_na_loja}</a>
                               : item.nome_na_loja}
                           </div>
-                          <div className="prod-cat">{item.categoria}</div>
+                          <div className="prod-cat">
+                            {item.categoria}
+                            {isAdmin && item.dono_id && (
+                              <span className={`prod-dono${item.dono_id === user?.id ? " prod-dono-voce" : ""}`}>
+                                ◈ {rotuloDono(item)}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td><span className="loja-badge">{item.loja}</span></td>
                         <td>

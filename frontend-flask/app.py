@@ -52,6 +52,74 @@ _GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "coletar.yml")
 _GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH",   "main")
 
 
+def _supabase_get(path):
+    """GET server-side via PostgREST com a SERVICE_KEY (ignora RLS)."""
+    req = urllib.request.Request(
+        f"{_SUPABASE_URL}/rest/v1/{path}",
+        headers={
+            "apikey":        _SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        return json.loads(resp.read().decode() or "[]")
+
+
+def _usuario_do_token(access_token):
+    """
+    Valida o access_token do Supabase e retorna (user_id, is_admin).
+    Levanta PermissionError se o token for inválido/expirado.
+    Pré-migração (tabela usuarios inexistente) → modo legado: todo
+    autenticado é tratado como admin (modelo compartilhado antigo).
+    """
+    req = urllib.request.Request(
+        f"{_SUPABASE_URL}/auth/v1/user",
+        headers={
+            "apikey":        _SUPABASE_SERVICE_KEY,
+            "Authorization": f"Bearer {access_token}",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            uid = json.loads(resp.read().decode()).get("id")
+    except urllib.error.HTTPError:
+        raise PermissionError("Sessão inválida ou expirada — faça login novamente.")
+    if not uid:
+        raise PermissionError("Sessão inválida ou expirada — faça login novamente.")
+
+    try:
+        perfil = _supabase_get(f"usuarios?id=eq.{uid}&select=nivel")
+        nivel = perfil[0]["nivel"] if perfil else 1
+        return uid, nivel >= 2
+    except urllib.error.HTTPError:
+        # Tabela usuarios ainda não existe (migração multiusuário pendente)
+        return uid, True
+
+
+def _autorizar_remocao(uid, is_admin, tipo, ids):
+    """
+    Garante que todos os ids pertencem ao usuário (admin remove qualquer um).
+    Levanta PermissionError se algum item for de outro dono.
+    Pré-migração (itens sem user_id) → permite (modelo compartilhado antigo).
+    """
+    if is_admin:
+        return
+    valores = ",".join('"' + str(i).replace('"', "") + '"' for i in ids)
+    try:
+        if tipo == "historico":
+            linhas = _supabase_get(
+                f"historico_precos?id=in.({valores})&select=id,itens(user_id)")
+            donos = {(l.get("itens") or {}).get("user_id") for l in linhas}
+        else:
+            linhas = _supabase_get(f"itens?id=in.({valores})&select=id,user_id")
+            donos = {l.get("user_id") for l in linhas}
+    except urllib.error.HTTPError:
+        return  # coluna user_id ainda não existe (migração pendente)
+    if donos - {uid}:
+        raise PermissionError(
+            "Permissão negada: só é possível remover itens do próprio usuário.")
+
+
 def _supabase_delete(table, column, ids):
     """
     DELETE server-side via PostgREST usando a SERVICE_KEY (ignora RLS).
@@ -178,6 +246,20 @@ def api_remover():
         return jsonify({"error": "tipo inválido (use 'produto' ou 'historico')"}), 400
     if not isinstance(ids, list) or not ids:
         return jsonify({"error": "nenhum id informado"}), 400
+
+    # ── Autorização: dono do item ou admin (usuarios.nivel >= 2) ──
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+    if not token:
+        return jsonify({"error": "Não autenticado — faça login para remover."}), 401
+    try:
+        uid, is_admin = _usuario_do_token(token)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 401
+    try:
+        _autorizar_remocao(uid, is_admin, tipo, ids)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 403
 
     try:
         if tipo == "historico":

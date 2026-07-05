@@ -18,7 +18,7 @@ import NovoProduto from "@/pages/NovoProduto";
 import Conta       from "@/pages/Conta";
 
 export default function App() {
-  const { user, loading, signIn, signOut, updatePassword } = useAuth();
+  const { user, perfil, isAdmin, loading, signIn, signOut, updatePassword } = useAuth();
   const { toast, showToast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -58,11 +58,12 @@ export default function App() {
         />
 
         <Routes>
-          <Route path="/"             element={<Dashboard   showToast={showToast} />} />
-          <Route path="/novo-produto" element={<NovoProduto showToast={showToast} />} />
+          <Route path="/"             element={<Dashboard   showToast={showToast} isAdmin={isAdmin} user={user} />} />
+          <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} />} />
           <Route path="/conta"        element={
             <Conta
               user={user}
+              perfil={perfil}
               updatePassword={updatePassword}
               signOut={signOut}
               showToast={showToast}

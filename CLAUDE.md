@@ -72,8 +72,19 @@ frontend → `/api/trigger-coleta` (`item_id` in the POST body) → `workflow_di
 
 Alert types handled in `_montar_mensagem`: `abaixo_meta` (below target) and price-drop.
 
-The Supabase tables (`itens`, `lojas`, `historico_precos`, `alertas`) and the
-`verificar_alertas` RPC live in Supabase, not in this repo — there are no migrations here.
+The Supabase tables (`itens`, `lojas`, `produtos`, `historico_precos`, `alertas`,
+`usuarios`) and the `verificar_alertas` RPC live in Supabase. Schema changes are
+recorded as SQL files under `project/migrations/` (run manually in the Supabase SQL
+Editor — the service key can't execute DDL).
+
+**Multiuser model (Sprint 5):** `usuarios.nivel` (1 = normal, 2 = admin) mirrors
+`auth.users` via a signup trigger; `itens.user_id` (default `auth.uid()`) marks the
+owner. RLS lets a user see/manage only their own `itens`/`historico_precos`/`alertas`;
+`is_admin()` (SECURITY DEFINER) grants admins full visibility. The collector uses the
+SERVICE_KEY and bypasses RLS entirely. `/api/remover` requires the session's
+`Authorization: Bearer` token and returns 401 (no session) / 403 (not the owner and
+not admin). Frontend: `useAuth` exposes `perfil`/`isAdmin`; the Dashboard shows an
+admin-only per-user filter row and owner tags.
 
 ## Scraper architecture (`scrapers/`)
 
