@@ -27,9 +27,10 @@
 | Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 ✅ |
 | Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 ✅ |
 | Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 3 |
+| Sprint 7 | Gestão de usuários (admin) | 24/07 – 25/07 | 2 | 2 ✅ |
 
-**Total planejado (Sprints 1–6):** 19 dias úteis · 3 tarefas a fazer
-(13 concluídas nas Sprints 1–5; nenhuma pendente).
+**Total planejado (Sprints 1–7):** 21 dias úteis · 3 tarefas a fazer
+(15 concluídas nas Sprints 1–5 e 7; nenhuma pendente).
 
 ---
 
@@ -129,9 +130,21 @@ Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S6 · Documentação do banco (estrutura e referências) (todo:71) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
+| S6 · Documentação do banco (estrutura e referências) (todo:75) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas`, `usuarios` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
 | S6 · Repensar métrica "Alertas hoje" (todo:65) | Validar novo cálculo/exibição de "Alertas hoje" | ⬜ Todo | Ainda em definição; esperado: novo modelo de métrica |
-| S6 · Atualizar README.md do projeto (todo:73) | Ler o README no GitHub e entender o projeto sem abrir o código | ⬜ Todo | Esperado: README explicando o projeto — **somente ao final de todas as sprints**, com o projeto concluído (condição registrada no `todo`) |
+| S6 · Atualizar README.md do projeto (todo:77) | Ler o README no GitHub e entender o projeto sem abrir o código | ⬜ Todo | Esperado: README explicando o projeto — **somente ao final de todas as sprints**, com o projeto concluído (condição registrada no `todo`) |
+
+---
+
+## Sprint 7 — Gestão de usuários (admin) (24/07 – 25/07)
+
+Foco: admin cria usuários (com papel) e troca senhas pela UI, sem tocar no painel do
+Supabase. Executada em 05/07/2026, na sequência da Sprint 5 (usa a mesma base de RLS/perfis).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S7 · Menu "Novo Usuário" (admin) com email/senha/papel (todo:71) | Logar como admin e criar um usuário normal e um admin pela UI; não-admin não vê o item nem acessa a rota | ✅ Done | **Implementado (05/07/2026):** NavDrawer exibe **"Novo Usuário"** apenas para `isAdmin`; rota `/novo-usuario` redireciona não-admin. Form com email + senha + confirmação + **papel** (chips "Usuário padrão" / "Admin" com aviso de escopo). Novo endpoint **`/api/usuarios`** (4º par Flask × Vercel) usa a **admin API** do Supabase (SERVICE_KEY só no servidor), autorizado por token de sessão + `nivel >= 2` (401 sem sessão / 403 não-admin); trigger cria o perfil nivel 1 e o endpoint promove a 2 quando papel=admin. **Testes:** 16/16 (Flask) + 17/17 (Vercel) mockados; **E2E real 18/18** — admin de teste criou usuário normal (que logou com a senha definida) e admin (perfil nivel 2); usuário normal → 403, sem token → 401; cleanup completo |
+| S7 · Admin altera a senha de qualquer usuário (todo:73) | Admin define nova senha para outro usuário; a antiga para de funcionar e a nova loga | ✅ Done | **Implementado (05/07/2026):** card **"Alterar senha de usuário"** em `/novo-usuario` com select dos usuários (admin lê todos via RLS `usuarios_select`) + nova senha com confirmação; `acao=trocar_senha` chama `PUT /auth/v1/admin/users/{id}`. **E2E real:** senha antiga **deixou de funcionar** e a nova logou; usuário normal tentando trocar senha alheia → 403 |
 
 ---
 
@@ -139,9 +152,9 @@ Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 34 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,67,69 |
+| ✅ Done | 36 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,67,69,71,73 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 3 | 65,71,73 |
+| ⬜ Todo | 3 | 65,75,77 |
 
 > **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:55, todo:57 e
 > todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
@@ -182,6 +195,13 @@ Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 > papel na página Conta. **Validação em dupla camada:** 9/9 casos mockados por endpoint
 > e **E2E real 27/27** com usuários de teste criados/removidos via admin API (isolamento
 > A×B, visão admin consolidada, autorização e coletor intactos).
+>
+> **Sprint 7 concluída em 05/07/2026** (adicionada e executada no mesmo dia, na sequência
+> da Sprint 5): todo:71 e todo:73. Menu **"Novo Usuário"** (só admin) com criação de
+> usuário por email/senha/**papel** (normal/admin) e **troca de senha de qualquer
+> usuário**, via novo endpoint `/api/usuarios` (4º par Flask × Vercel, admin API do
+> Supabase server-side). **Validação:** 16/16 + 17/17 mockados e **E2E real 18/18**
+> (criação normal+admin, login com a senha definida, troca de senha efetiva, 401/403).
 
 ---
 
