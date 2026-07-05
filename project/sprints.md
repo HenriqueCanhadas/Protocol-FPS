@@ -1,7 +1,7 @@
 # PROTOCOL FPS — Planejamento de Sprints
 
 > Relatório gerado a partir do arquivo `todo` (raiz do repositório).
-> Data de geração: **02/07/2026**. Início do planejamento: **02/07/2026**.
+> Data de geração: **05/07/2026**. Início do planejamento: **02/07/2026**.
 >
 > **Legenda de status**
 > - ✅ **Done** — concluído (item `OK-` no `todo`)
@@ -24,12 +24,12 @@
 | Sprint 1 | Estabilização de Infra & CI | 02/07 – 04/07 | 3 | 3 ✅ |
 | Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 ✅ |
 | Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 ✅ |
-| Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 |
+| Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 ✅ |
 | Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 |
-| Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 2 |
+| Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 3 |
 
-**Total planejado (Sprints 1–6):** 19 dias úteis · 7 tarefas a fazer
-(8 concluídas nas Sprints 1–3; nenhuma pendente).
+**Total planejado (Sprints 1–6):** 19 dias úteis · 5 tarefas a fazer
+(11 concluídas nas Sprints 1–4; nenhuma pendente).
 
 ---
 
@@ -70,8 +70,8 @@ Foco: deixar a coleta em CI confiável e o horário correto antes de mexer em fe
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
 | S1 · Ajustar GitHub Actions p/ Pichau e Terabyte (todo:47) | Rodar `workflow_dispatch` 3×; comparar preço/estoque local × CI para Pichau e Terabyte | ✅ Done | **Terabyte estabilizada: 3/3 runs no CI = local** (runs 64/65/66: R$ 7.799,99 ✅). Kabum idem 3/3 (R$ 2.499,99 ✅). **Pichau: bloqueio por IP de datacenter confirmado 3/3** — página falsa "Site em Manutenção - Pru Pru" a IPs GitHub/Azure; fix detecta o bloqueio, faz 3 retries (10s/20s) e loga honestamente ("Challenge/Bloqueio Pichau" em vez de falso "esgotado"). **Decisão 01/07/2026: limitação aceita** — Pichau coleta só local; alternativas futuras: runner self-hosted ou proxy residencial BR |
-| S1 · Resolver aviso de deprecação Node.js 20 no Actions (todo:75) | Ver o log do Actions sem o aviso de Node 20 | ✅ Done | `checkout@v7` + `setup-python@v6` (Node 24 nativo); flag `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` removida. Validado nos runs 64 e 65: **0 annotations** de deprecação |
-| S1 · Ajustar fuso horário UTC-3 (Brasília) back/front/banco (todo:67) | Coletar um item e conferir o mesmo horário local em back, front e Supabase | ✅ Done | Banco correto (timestamptz UTC `+00:00`); Telegram já usava UTC-3 fixo; front agora força `America/Sao_Paulo` via `utils/datas.js` (teste: 14:22 UTC → 11:22 BRT). "Alertas hoje" conta o dia civil de Brasília |
+| S1 · Resolver aviso de deprecação Node.js 20 no Actions (todo:57) | Ver o log do Actions sem o aviso de Node 20 | ✅ Done | `checkout@v7` + `setup-python@v6` (Node 24 nativo); flag `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24` removida. Validado nos runs 64 e 65: **0 annotations** de deprecação |
+| S1 · Ajustar fuso horário UTC-3 (Brasília) back/front/banco (todo:55) | Coletar um item e conferir o mesmo horário local em back, front e Supabase | ✅ Done | Banco correto (timestamptz UTC `+00:00`); Telegram já usava UTC-3 fixo; front agora força `America/Sao_Paulo` via `utils/datas.js` (teste: 14:22 UTC → 11:22 BRT). "Alertas hoje" conta o dia civil de Brasília |
 
 ---
 
@@ -104,9 +104,9 @@ Foco: filtrar e coletar por categoria/loja em vez de sempre tudo.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S4 · Coletar por categoria (GPU/CPU/RAM/…) (todo:55) | Disparar coleta apenas de GPUs e confirmar que só elas foram coletadas | ⬜ Todo | Esperado: seleção de categoria no disparo de coleta |
-| S4 · Filtros por loja e por produto de loja (todo:57) | Filtrar a lista por loja e por produto dentro de uma loja | ⬜ Todo | Esperado: filtros combináveis na UI |
-| S4 · Coleta por loja/produto/categoria específica (todo:59) | Escolher escopo (loja OU produto OU categoria) e coletar só ele | ⬜ Todo | Esperado: parâmetro de escopo no `main.py` / gatilho |
+| S4 · Coletar por categoria (GPU/CPU/RAM/…) (todo:59) | Disparar coleta apenas de GPUs e confirmar que só elas foram coletadas | ✅ Done | **Implementado ponta a ponta (05/07/2026):** `main.py._selecionar_itens` ganhou modo **SEGMENTADO** via envs `CATEGORIA`/`LOJA` (combináveis; `ITEM_ID` mantém precedência); `workflow_dispatch` aceita inputs `categoria` e `loja` → envs; endpoints Flask e Vercel repassam no dispatch (paridade validada com GitHub mockado: 8/8 e 9/9 casos, payloads idênticos). **Scoping validado no banco real (read-only, 7/7 cenários):** completo=4, categoria, loja, combinado, normalização minúscula/espaços, precedência do pontual, categoria inexistente=0. **E2E ao vivo (05/07/2026):** run [#82](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28750800235) com `categoria=GPU`, conclusão `success` — log "Modo SEGMENTADO categoria=GPU", **3 itens** (só GPUs; CPU Kabum nem aparece); Terabyte +1 registro (R$ 7.799,99); 2 Pichau bloqueadas pelo challenge conhecido do CI; **CPU Kabum intocada no banco** |
+| S4 · Filtros por loja e por produto de loja (todo:61) | Filtrar a lista por loja e por produto dentro de uma loja | ✅ Done | Filtro por loja já existia (chips âmbar). **Adicionado filtro por PRODUTO DE LOJA (05/07/2026):** ao selecionar uma loja, aparece um `select` listando somente os produtos dela; escolher um restringe a tabela àquele produto. **Combinável** com categoria e busca (todos compõem em `dadosFiltrados`); trocar de loja limpa o filtro de produto. Build 87 módulos, 0 erros |
+| S4 · Coleta por loja/produto/categoria específica (todo:63) | Escolher escopo (loja OU produto OU categoria) e coletar só ele | ✅ Done | **Botão COLETAR AGORA respeita os filtros ativos (05/07/2026)** e vira **COLETAR FILTRADOS** quando há escopo: produto selecionado → coleta **pontual** (`item_id`); categoria/loja → coleta **segmentada** (combináveis, ex.: GPUs da Kabum); sem filtros → **completa**. A confirmação descreve o escopo exato antes do disparo. **E2E ao vivo (05/07/2026):** run [#83](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28750995029) com `loja=kabum`, conclusão `success` — log "Modo SEGMENTADO loja=kabum", **1 item**; CPU Kabum +1 registro (R$ 3.699,99); **GPUs intocadas no banco** |
 
 ---
 
@@ -116,19 +116,20 @@ Foco: isolar monitoramentos por usuário e criar papel de administrador. **Reque
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S5 · Monitoramentos separados por usuário (todo:63) | Usuário A vê só itens A; usuário B só itens B | ⬜ Todo | Esperado: refatorar banco com `user_id`; isolamento de dados por usuário |
-| S5 · Usuário Admin vê todos os produtos por usuário (todo:65) | Logar como admin e ver os itens de todos, agrupados por usuário | ⬜ Todo | Esperado: papel admin + visão consolidada por usuário |
+| S5 · Monitoramentos separados por usuário (todo:67) | Usuário A vê só itens A; usuário B só itens B | ⬜ Todo | Esperado: refatorar banco com `user_id`; isolamento de dados por usuário |
+| S5 · Usuário Admin vê todos os produtos por usuário (todo:69) | Logar como admin e ver os itens de todos, agrupados por usuário | ⬜ Todo | Esperado: papel admin + visão consolidada por usuário |
 
 ---
 
 ## Sprint 6 — Documentação & refino (22/07 – 23/07)
 
-Foco: documentar o banco e repensar a métrica de alertas.
+Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S6 · Documentação do banco (estrutura e referências) (todo:69) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
-| S6 · Repensar métrica "Alertas hoje" (todo:61) | Validar novo cálculo/exibição de "Alertas hoje" | ⬜ Todo | Ainda em definição; esperado: novo modelo de métrica |
+| S6 · Documentação do banco (estrutura e referências) (todo:71) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
+| S6 · Repensar métrica "Alertas hoje" (todo:65) | Validar novo cálculo/exibição de "Alertas hoje" | ⬜ Todo | Ainda em definição; esperado: novo modelo de métrica |
+| S6 · Atualizar README.md do projeto (todo:73) | Ler o README no GitHub e entender o projeto sem abrir o código | ⬜ Todo | Esperado: README explicando o projeto — **somente ao final de todas as sprints**, com o projeto concluído (condição registrada no `todo`) |
 
 ---
 
@@ -136,11 +137,11 @@ Foco: documentar o banco e repensar a métrica de alertas.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 29 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,67,75 |
+| ✅ Done | 32 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 7 | 55,57,59,61,63,65,69 |
+| ⬜ Todo | 5 | 65,67,69,71,73 |
 
-> **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:67, todo:75 e
+> **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:55, todo:57 e
 > todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
 > apenas localmente por decisão registrada (bloqueio de IP de datacenter aceito).
 >
@@ -157,6 +158,18 @@ Foco: documentar o banco e repensar a métrica de alertas.
 > Opções); todo:51 (Armazenamento) **corrigido** — a validação revelou taxonomia inconsistente
 > (banco sem STORAGE; form oferecia SSD/COOLER inexistentes que faziam o cadastro falhar),
 > resolvida inserindo a categoria STORAGE no banco e alinhando o `NovoProduto.jsx`.
+>
+> **Sprint 4 concluída em 05/07/2026** (antes do prazo de 14–16/07): todo:59, todo:61 e
+> todo:63. Coleta **segmentada por categoria e/ou loja** ponta a ponta (envs
+> `CATEGORIA`/`LOJA` no `main.py` → inputs no `workflow_dispatch` → endpoints Flask/Vercel
+> em paridade → UI), filtro por **produto de loja** no Dashboard e botão **COLETAR
+> FILTRADOS** que traduz os filtros ativos em escopo de coleta. **Validação em dupla
+> camada:** local (7/7 cenários de scoping no banco real, 8/8 Flask + 9/9 Vercel com
+> GitHub mockado, YAML validado, build 87 módulos) e **E2E ao vivo** (runs
+> [#82](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28750800235)
+> `categoria=GPU` e [#83](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28750995029)
+> `loja=kabum`, ambos `success` — em cada um, **somente o escopo ganhou registros** em
+> `historico_precos`, verificado por snapshot antes/depois).
 
 ---
 
@@ -173,7 +186,7 @@ este relatório sincronizado com o `todo`.
 | `scraper-nova-loja` | S1/S4 | Andaime para nova loja: subclasse de `ScraperBase`, `_aguardar_preco`/`extrair_dados` e registro no dict `SCRAPERS` do `main.py` | Média |
 | `frontend-refactor` | S2 | Guiar reorganização de pastas do front mantendo build Vite, alias `@/`, proxy `/api/*` e paridade `app.py` × Vercel Functions | Média |
 | `timezone-audit` | S1/S3 | Auditar e normalizar timestamps para America/Sao_Paulo (UTC-3) em back, front e banco | Alta |
-| `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | Média |
+| `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | — (entregue na Sprint 4 sem necessidade de skill) |
 | `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | Alta (impacto grande) |
 | `db-docs` | S6 | Gerar/atualizar `project/banco.md` (tabelas, relacionamentos, RPC `verificar_alertas`) | Média |
 
