@@ -98,13 +98,23 @@ def api_trigger_coleta():
         f"/actions/workflows/{_GITHUB_WORKFLOW}/dispatches"
     )
 
-    # item_id opcional no corpo → coleta pontual (só aquele produto).
-    # Sem item_id → coleta completa (todos os monitorados).
-    payload = request.get_json(silent=True) or {}
-    item_id = payload.get("item_id")
-    dispatch = {"ref": "main"}
+    # Escopo opcional no corpo (mesma semântica do main.py):
+    #   item_id          → coleta pontual (só aquele produto; tem precedência)
+    #   categoria / loja → coleta segmentada (combináveis: ex. GPUs da Kabum)
+    #   nada             → coleta completa (todos os monitorados)
+    payload   = request.get_json(silent=True) or {}
+    item_id   = payload.get("item_id")
+    categoria = payload.get("categoria")
+    loja      = payload.get("loja")
+    dispatch  = {"ref": "main"}
+    inputs = {}
     if item_id:
-        dispatch["inputs"] = {"item_id": str(item_id)}
+        inputs["item_id"] = str(item_id)
+    else:
+        if categoria: inputs["categoria"] = str(categoria)
+        if loja:      inputs["loja"]      = str(loja)
+    if inputs:
+        dispatch["inputs"] = inputs
     body = json.dumps(dispatch).encode()
 
     req = urllib.request.Request(

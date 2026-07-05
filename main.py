@@ -171,27 +171,60 @@ logger = logging.getLogger("main")
 # SELEÇÃO DE ITENS
 # ══════════════════════════════════════════════════════════════════════
 
+def _slug_loja(nome: str) -> str:
+    """Normaliza o nome da loja para o slug usado no dict SCRAPERS
+    (minúsculas, sem espaços — ex.: 'Terabyte Shop' → 'terabyteshop')."""
+    return (nome or "").lower().replace(" ", "")
+
+
 def _selecionar_itens(sb) -> list:
     """
-    Decide QUAIS itens coletar.
+    Decide QUAIS itens coletar, por ordem de precedência:
 
-    - Se a env var ITEM_ID estiver definida (coleta PONTUAL, disparada pelo
-      botão "Coletar Agora" de um produto), coleta apenas aquele item — mesmo
-      que o monitoramento esteja pausado, pois é um pedido manual explícito.
-    - Caso contrário (cron diário ou botão global), coleta COMPLETA: todos os
-      itens com monitorando = true.
+    1. ITEM_ID definido (coleta PONTUAL, botão "Coletar Agora" de um produto):
+       coleta apenas aquele item — mesmo com monitoramento pausado, pois é
+       um pedido manual explícito. Ignora CATEGORIA/LOJA.
+    2. CATEGORIA e/ou LOJA definidas (coleta SEGMENTADA): coleta os itens
+       monitorados daquela categoria (ex.: GPU) e/ou loja (ex.: kabum).
+       As duas são combináveis — ex.: só as GPUs da Kabum.
+    3. Nenhuma env definida (cron diário ou botão global): coleta COMPLETA,
+       todos os itens com monitorando = true.
     """
     item_id_alvo = os.environ.get("ITEM_ID", "").strip()
+    categoria    = os.environ.get("CATEGORIA", "").strip().upper()
+    loja         = _slug_loja(os.environ.get("LOJA", "").strip())
 
-    query = sb.table("itens").select("id, url, nome_na_loja, preco_meta, lojas(nome)")
+    query = sb.table("itens").select(
+        "id, url, nome_na_loja, preco_meta, lojas(nome), produtos(categoria)"
+    )
     if item_id_alvo:
         logger.info("Modo PONTUAL — coletando apenas item_id=%s", item_id_alvo)
         query = query.eq("id", item_id_alvo)
+    elif categoria or loja:
+        escopo = " + ".join(filter(None, (
+            f"categoria={categoria}" if categoria else "",
+            f"loja={loja}" if loja else "",
+        )))
+        logger.info("Modo SEGMENTADO — coletando itens monitorados de %s", escopo)
+        query = query.eq("monitorando", True)
     else:
         logger.info("Modo COMPLETO — coletando todos os itens monitorados")
         query = query.eq("monitorando", True)
 
-    return query.execute().data
+    itens = query.execute().data
+
+    # Filtro do escopo segmentado em Python: evita depender do hint !inner
+    # do PostgREST e permite normalizar o nome da loja do mesmo jeito que
+    # o dict SCRAPERS (poucos itens — custo desprezível).
+    if not item_id_alvo:
+        if categoria:
+            itens = [i for i in itens
+                     if (i.get("produtos") or {}).get("categoria", "").upper() == categoria]
+        if loja:
+            itens = [i for i in itens
+                     if _slug_loja((i.get("lojas") or {}).get("nome")) == loja]
+
+    return itens
 
 
 # ══════════════════════════════════════════════════════════════════════

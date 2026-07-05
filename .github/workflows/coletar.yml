@@ -9,6 +9,14 @@ on:
         description: "ID do item para coleta pontual (vazio = coleta todos os monitorados)"
         required: false
         default: ""
+      categoria:
+        description: "Categoria para coleta segmentada — GPU/CPU/RAM/PSU/MOBO/STORAGE (vazio = todas)"
+        required: false
+        default: ""
+      loja:
+        description: "Loja para coleta segmentada — kabum/terabyteshop/pichau (vazio = todas)"
+        required: false
+        default: ""
 
 jobs:
   coletar:
@@ -46,6 +54,11 @@ jobs:
           # GITHUB_ACTIONS já é setado automaticamente pelo runner
           # mas deixamos explícito para garantir que os scrapers detectem o CI
           GITHUB_ACTIONS:        "true"
-          # ID do item para coleta pontual (vazio no cron/dispatch global = coleta todos)
+          # Escopo da coleta (vazios no cron/dispatch global = coleta todos):
+          #   ITEM_ID   → coleta pontual de um produto (tem precedência)
+          #   CATEGORIA → coleta segmentada por categoria (GPU/CPU/...)
+          #   LOJA      → coleta segmentada por loja (kabum/terabyteshop/pichau)
           ITEM_ID:               ${{ github.event.inputs.item_id }}
+          CATEGORIA:             ${{ github.event.inputs.categoria }}
+          LOJA:                  ${{ github.event.inputs.loja }}
         run: python main.py

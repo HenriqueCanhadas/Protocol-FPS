@@ -85,6 +85,16 @@ const css = `
 .filter-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .filter-btn-loja.active { border-color: var(--amber); color: var(--amber); background: rgba(255,184,0,.08); }
 
+/* filtro "produto de loja" (aparece quando uma loja está selecionada) */
+.produto-select {
+  background:var(--bg2); border:1px solid rgba(255,184,0,.35);
+  color:var(--amber); font-family:var(--mono); font-size:var(--fs-sm);
+  letter-spacing:.08em; padding:.5rem .8rem; cursor:pointer;
+  max-width:340px; outline:none; transition:border-color .15s,box-shadow .15s;
+}
+.produto-select:hover,.produto-select:focus { border-color:var(--amber); box-shadow:0 0 0 1px rgba(255,184,0,.25); }
+.produto-select option { background:var(--bg2); color:var(--text); }
+
 .sort-controls { display:flex; gap:.4rem; flex-wrap:wrap; }
 .sort-controls-right { margin-left:auto; }
 .sort-btn {
@@ -542,11 +552,12 @@ const CAT_LABEL = {
   STORAGE: "Armazenamento",
 };
 
+// `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
 const LOJAS_FILTER = [
-  { key: "all",       label: "Todas Lojas" },
-  { key: "kabum",     label: "KaBuM"       },
-  { key: "terabyte",  label: "Terabyte"    },
-  { key: "pichau",    label: "Pichau"      },
+  { key: "all",       label: "Todas Lojas", slug: null           },
+  { key: "kabum",     label: "KaBuM",       slug: "kabum"        },
+  { key: "terabyte",  label: "Terabyte",    slug: "terabyteshop" },
+  { key: "pichau",    label: "Pichau",      slug: "pichau"       },
 ];
 
 export default function Dashboard({ showToast }) {
@@ -557,7 +568,8 @@ export default function Dashboard({ showToast }) {
   const [termoBusca,   setTermoBusca]   = useState("");
   const [sortCampo,    setSortCampo]    = useState("nome");
   const [sortDir,      setSortDir]      = useState("asc");
-  const [filtroLoja, setFiltroLoja] = useState("all");
+  const [filtroLoja,    setFiltroLoja]    = useState("all");
+  const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
@@ -639,6 +651,9 @@ export default function Dashboard({ showToast }) {
       const q = filtroLoja.toLowerCase();
       d = d.filter(x => (x.loja || "").toLowerCase().includes(q));
     }
+    if (filtroProduto !== "all") {
+      d = d.filter(x => x.item_id === filtroProduto);
+    }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
@@ -650,6 +665,38 @@ export default function Dashboard({ showToast }) {
     });
     return d;
   })();
+
+  // ── Escopo de coleta (Sprint 4: coleta segmentada) ───────────
+  // Produtos da loja selecionada (para o filtro "produto de loja")
+  const produtosDaLoja = filtroLoja === "all" ? [] :
+    dados
+      .filter((x) => (x.loja || "").toLowerCase().includes(filtroLoja))
+      .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
+
+  const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
+  const escopado  = filtro !== "all" || filtroLoja !== "all";
+
+  // Ao trocar de loja, o filtro de produto (que pertence à loja) é limpo
+  const selecionarLoja = (key) => { setFiltroLoja(key); setFiltroProduto("all"); };
+
+  /**
+   * Resolve o escopo da coleta a partir dos filtros ativos na toolbar:
+   *   produto selecionado → pontual (item_id)
+   *   categoria/loja      → segmentada (inputs combináveis)
+   *   sem filtros         → completa
+   */
+  const escopoColeta = () => {
+    if (filtroLoja !== "all" && filtroProduto !== "all") {
+      const prod = dados.find((x) => x.item_id === filtroProduto);
+      return { item_id: filtroProduto, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
+    }
+    const esc    = {};
+    const partes = [];
+    if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
+    if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
+    esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
+    return esc;
+  };
 
   // Ações
   const toggleSort = (campo) => {
@@ -685,25 +732,34 @@ export default function Dashboard({ showToast }) {
     carregarPrecos();
   };
 
-  const iniciarColeta = async (itemId = null, nomeProduto = null) => {
+  const iniciarColeta = async (escopo = {}) => {
     setColetando(true);
-    const escopo = nomeProduto ? `"${nomeProduto}"` : "todos os produtos";
+    const descricao = escopo.descricao || "todos os produtos";
     setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
 
     try {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
-      // Sem itemId → coleta completa; com itemId → coleta pontual (só o produto)
+      // Corpo do dispatch (mesma semântica do main.py):
+      //   item_id → pontual; categoria/loja → segmentada; vazio → completa
+      const body = {};
+      if (escopo.item_id) {
+        body.item_id = escopo.item_id;
+      } else {
+        if (escopo.categoria) body.categoria = escopo.categoria;
+        if (escopo.loja)      body.loja      = escopo.loja;
+      }
+
       const resp = await fetch("/api/trigger-coleta", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(itemId ? { item_id: itemId } : {}),
+        body: JSON.stringify(body),
       });
       const data = await resp.json();
 
       if (resp.ok && data.ok) {
         setProgresso({ visible: true, txt: "Workflow disparado com sucesso!", pct: 100 });
-        showToast(`⚡ Coleta iniciada (${escopo}) no GitHub Actions!`, "ok");
+        showToast(`⚡ Coleta iniciada (${descricao}) no GitHub Actions!`, "ok");
       } else {
         throw new Error(data.error || `Erro ${resp.status}`);
       }
@@ -730,7 +786,7 @@ export default function Dashboard({ showToast }) {
       "COLETAR AGORA",
       `Disparar uma coleta imediata de preço <strong>apenas para este produto</strong>:<br><br><strong>${item.nome_na_loja}</strong><br><br>O processo roda no GitHub Actions e pode levar alguns minutos.`,
       "⚡",
-      () => iniciarColeta(item.item_id, item.nome_na_loja),
+      () => iniciarColeta({ item_id: item.item_id, descricao: `"${item.nome_na_loja}"` }),
       false,
     );
   };
@@ -839,11 +895,21 @@ export default function Dashboard({ showToast }) {
                   <button className="btn-search-clear" onClick={() => setTermoBusca("")}>✕</button>
                 )}
               </div>
-              <button className="btn-coletar" disabled={coletando} onClick={() =>
-                confirmar("COLETAR AGORA", "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.", "⚡", () => iniciarColeta(), false)
-              }>
+              <button className="btn-coletar" disabled={coletando} onClick={() => {
+                const esc = escopoColeta();
+                const segmentada = esc.item_id || esc.categoria || esc.loja;
+                confirmar(
+                  "COLETAR AGORA",
+                  segmentada
+                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>Somente os itens desse escopo serão coletados. O processo pode levar alguns minutos.`
+                    : "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
+                  "⚡",
+                  () => iniciarColeta(esc),
+                  false,
+                );
+              }}>
                 <span>⚡</span>
-                <span>{coletando ? "DISPARANDO..." : "COLETAR AGORA"}</span>
+                <span>{coletando ? "DISPARANDO..." : escopado ? "COLETAR FILTRADOS" : "COLETAR AGORA"}</span>
               </button>
             </div>
 
@@ -870,11 +936,26 @@ export default function Dashboard({ showToast }) {
                   <button
                     key={key}
                     className={`filter-btn filter-btn-loja${filtroLoja === key ? " active" : ""}`}
-                    onClick={() => setFiltroLoja(key)}
+                    onClick={() => selecionarLoja(key)}
                   >
                     {label}
                   </button>
                 ))}
+                {filtroLoja !== "all" && (
+                  <select
+                    className="produto-select"
+                    value={filtroProduto}
+                    onChange={(e) => setFiltroProduto(e.target.value)}
+                    title={`Filtrar por um produto da ${lojaAtiva?.label}`}
+                  >
+                    <option value="all">Todos os produtos · {lojaAtiva?.label}</option>
+                    {produtosDaLoja.map((p) => (
+                      <option key={p.item_id} value={p.item_id}>
+                        {p.nome_na_loja}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="sort-controls sort-controls-right">
                 {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
