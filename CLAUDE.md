@@ -34,7 +34,7 @@ singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/confi
 Imports use the `@/` alias (→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` —
 update both if you change it).
 
-Three server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
+Four server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
 dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them in sync:**
 - `/api/config` — returns only the public `SUPABASE_URL` + `SUPABASE_ANON_KEY`
   (Flask only; in prod Vite inlines these at build time).
@@ -45,6 +45,10 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
   `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
   cascade rules in the DB.
+- `/api/usuarios` (Vercel: `api/usuarios.js`) — admin-only user management via the
+  Supabase admin API (`acao: "criar"` with email/senha/nivel, `acao: "trocar_senha"`).
+  Requires a session token whose profile has `nivel >= 2`; the signup trigger creates
+  profiles at nivel 1 and the endpoint promotes to 2 when creating an admin.
 
 **Route parity gotcha (Flask, `app.py`):** Vercel's prod rewrite is `/((?!api/).*)` → SPA.
 Because Flask is mounted with `static_url_path=""`, its catch-all static route would otherwise

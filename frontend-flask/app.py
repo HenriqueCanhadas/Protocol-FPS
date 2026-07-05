@@ -279,6 +279,102 @@ def api_remover():
         return jsonify({"error": str(exc)}), 500
 
 
+@app.route("/api/usuarios", methods=["POST"])
+def api_usuarios():
+    """
+    Gestão de usuários — SOMENTE ADMIN (usuarios.nivel >= 2).
+    Usa a admin API do Supabase (SERVICE_KEY, só no servidor).
+
+    Body JSON:
+      { "acao": "criar",        "email": ..., "senha": ..., "nivel": 1|2 }
+      { "acao": "trocar_senha", "user_id": ..., "senha": ... }
+    """
+    if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
+        return jsonify({"error": "SUPABASE_URL / SUPABASE_SERVICE_KEY não configuradas no .env"}), 500
+
+    # ── Autorização: exige sessão de ADMIN (sem modo legado aqui) ──
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header[7:] if auth_header.startswith("Bearer ") else ""
+    if not token:
+        return jsonify({"error": "Não autenticado — faça login para gerenciar usuários."}), 401
+    try:
+        _, is_admin = _usuario_do_token(token)
+    except PermissionError as exc:
+        return jsonify({"error": str(exc)}), 401
+    if not is_admin:
+        return jsonify({"error": "Permissão negada: apenas administradores gerenciam usuários."}), 403
+
+    payload = request.get_json(silent=True) or {}
+    acao  = payload.get("acao")
+    senha = payload.get("senha") or ""
+
+    if acao not in ("criar", "trocar_senha"):
+        return jsonify({"error": "acao inválida (use 'criar' ou 'trocar_senha')"}), 400
+    if len(senha) < 8:
+        return jsonify({"error": "A senha deve ter pelo menos 8 caracteres."}), 400
+
+    def _admin_api(path, data, method="POST"):
+        req = urllib.request.Request(
+            f"{_SUPABASE_URL}/auth/v1{path}",
+            data=json.dumps(data).encode(),
+            headers={
+                "apikey":        _SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+                "Content-Type":  "application/json",
+            },
+            method=method,
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode() or "{}")
+
+    try:
+        if acao == "criar":
+            email = (payload.get("email") or "").strip().lower()
+            nivel = int(payload.get("nivel") or 1)
+            if "@" not in email or "." not in email:
+                return jsonify({"error": "Email inválido."}), 400
+            if nivel not in (1, 2):
+                return jsonify({"error": "nivel inválido (1=normal, 2=admin)."}), 400
+
+            novo = _admin_api("/admin/users", {
+                "email": email, "password": senha, "email_confirm": True,
+            })
+            uid = novo.get("id")
+            if not uid:
+                return jsonify({"error": "Supabase não retornou o id do usuário."}), 502
+
+            # O trigger cria o perfil com nivel 1; promove se for admin
+            if nivel == 2:
+                req = urllib.request.Request(
+                    f"{_SUPABASE_URL}/rest/v1/usuarios?id=eq.{uid}",
+                    data=json.dumps({"nivel": 2}).encode(),
+                    headers={
+                        "apikey":        _SUPABASE_SERVICE_KEY,
+                        "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+                        "Content-Type":  "application/json",
+                    },
+                    method="PATCH",
+                )
+                urllib.request.urlopen(req, timeout=15).close()
+
+            return jsonify({"ok": True, "user_id": uid, "nivel": nivel}), 200
+
+        # trocar_senha
+        user_id = (payload.get("user_id") or "").strip()
+        if not user_id:
+            return jsonify({"error": "user_id não informado."}), 400
+        _admin_api(f"/admin/users/{user_id}", {"password": senha}, method="PUT")
+        return jsonify({"ok": True}), 200
+
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode(errors="replace")
+        if exc.code == 422 and acao == "criar":
+            detail = "Já existe um usuário com esse email (422)."
+        return jsonify({"error": detail}), exc.code
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
 # ── API: rota inexistente ──────────────────────────────────────
 # Paridade com o Vercel (o rewrite de produção exclui /api/ via "/((?!api/).*)").
 # Precisa ser rota própria: com static_url_path="" o Flask registra
