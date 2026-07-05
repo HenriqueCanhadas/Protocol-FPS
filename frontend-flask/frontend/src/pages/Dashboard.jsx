@@ -590,7 +590,6 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [metaItem,     setMetaItem]     = useState(null);
   const [opcoesItem,   setOpcoesItem]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
-  const [statsAlertas, setStatsAlertas] = useState("—");
 
   // Carrega dados
   const carregarPrecos = useCallback(async () => {
@@ -649,7 +648,6 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       .order("criado_em", { ascending: false })
       .limit(20);
     setAlertas(data || []);
-    setStatsAlertas(data?.length ?? 0);
   }, []);
 
   useEffect(() => {
@@ -662,6 +660,12 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const disponiveis = ativos.filter((d) => d.disponivel && d.preco);
   const menor       = disponiveis.length ? disponiveis.reduce((a, b) => a.preco < b.preco ? a : b) : null;
   const ultColeta   = [...dados].filter((d) => d.coletado_em).sort((a, b) => new Date(b.coletado_em) - new Date(a.coletado_em))[0];
+  // "Abaixo da meta" (todo:65, decisão 05/07/2026): oportunidades AGORA —
+  // itens ativos cujo preço atual está abaixo do preço-meta definido.
+  // Substitui o antigo "Alertas hoje" (quase sempre 0 com 1 coleta/dia,
+  // zerava à meia-noite e contava em dobro abaixo_meta + queda_preco).
+  const comMeta    = ativos.filter((d) => d.preco_meta);
+  const abaixoMeta = comMeta.filter((d) => d.preco && d.preco < d.preco_meta);
 
   // Filtro + busca + sort
   const dadosFiltrados = (() => {
@@ -886,9 +890,13 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
           <div className="stat-sub">produtos ativos</div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">Alertas hoje</div>
-          <div className="stat-value amber">{statsAlertas}</div>
-          <div className="stat-sub">disparos</div>
+          <div className="stat-label">Abaixo da meta</div>
+          <div className="stat-value amber">{abaixoMeta.length}</div>
+          <div className="stat-sub">
+            {comMeta.length
+              ? `de ${comMeta.length} com meta definida`
+              : "nenhum item com meta"}
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Menor preço hoje</div>
