@@ -26,20 +26,43 @@ routes; **Flask is not used in production**. In production the SPA is deployed t
 talks directly to Supabase via `VITE_*` env vars, and reaches the server-only routes
 through Vercel serverless functions under `frontend-flask/frontend/api/`.
 
+**SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
+Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
+`BrowserRouter` with three pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`, `Conta` `/conta`)
+plus redirects for legacy HTML routes. The Supabase client (`services/supabase.js`) is a lazy
+singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/config` from Flask.
+Imports use the `@/` alias (→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` —
+update both if you change it).
+
 Three server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
 dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them in sync:**
 - `/api/config` — returns only the public `SUPABASE_URL` + `SUPABASE_ANON_KEY`
   (Flask only; in prod Vite inlines these at build time).
 - `/api/trigger-coleta` (Vercel: `api/trigger-coleta.js`) — fires the GitHub
-  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side.
+  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side. An optional `item_id` in the POST
+  body is forwarded as the workflow input to trigger a pointwise (single-product) run.
 - `/api/remover` (Vercel: `api/remover.js`) — deletes a product or a history row using
   `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
   cascade rules in the DB.
 
+**Route parity gotcha (Flask, `app.py`):** Vercel's prod rewrite is `/((?!api/).*)` → SPA.
+Because Flask is mounted with `static_url_path=""`, its catch-all static route would otherwise
+swallow `/api/...` (404 HTML) and page deep-links like `/conta` (404 instead of SPA). `app.py`
+compensates with an explicit `/api/<path>` route (→ 404 JSON) and a 404 errorhandler that serves
+`index.html` for extension-less paths. Preserve this behavior when touching Flask routing —
+it exists to mirror the Vercel rewrite in dev.
+
 ## Collector flow (`main.py`)
 
-1. Query Supabase `itens` where `monitorando = true`.
+**Two collection modes** (`_selecionar_itens`): if the `ITEM_ID` env var is set, it collects
+*only* that one item even if `monitorando = false` (a **pointwise** run, fired by a per-product
+"Coletar Agora" button); otherwise it does a **full** run over every item with
+`monitorando = true` (the daily cron / global button). The value flows
+frontend → `/api/trigger-coleta` (`item_id` in the POST body) → `workflow_dispatch` input
+`item_id` (`.github/workflows/coletar.yml`) → the `ITEM_ID` env var read here.
+
+1. Query Supabase `itens` where `monitorando = true` (or `id = ITEM_ID` in pointwise mode).
 2. For each item, pick a scraper from the `SCRAPERS` dict keyed by the store name
    (`lojas.nome` lowercased + spaces stripped — e.g. `"terabyteshop"`).
 3. `Scraper().coletar(url)` returns a `DadosProduto` dataclass `(nome, preco, disponivel, url)`.
@@ -118,4 +141,11 @@ as GitHub Actions Secrets in `.github/workflows/coletar.yml`.
 ## CI
 
 `.github/workflows/coletar.yml` runs the collector daily at 12:00 UTC (09:00 BRT) and on
-manual `workflow_dispatch`. Python 3.11, installs Playwright Chromium, runs `python main.py`.
+manual `workflow_dispatch` (with an optional `item_id` input for pointwise runs).
+Python 3.11, installs Playwright Chromium, runs `python main.py`.
+
+## Project planning
+
+The `todo` file at the repo root is the source of truth for planned work (statuses:
+`OK-` done, `Pending-` started, `-` to do). The `sprint-planner` skill reads it and
+(re)generates the sprint report at `project/sprints.md`. Edit `todo`, not `sprints.md`.
