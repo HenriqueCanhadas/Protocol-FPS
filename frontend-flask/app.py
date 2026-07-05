@@ -46,6 +46,10 @@ _GITHUB_TOKEN    = os.getenv("GITHUB_TOKEN",    "")
 _GITHUB_OWNER    = os.getenv("GITHUB_OWNER",    "")
 _GITHUB_REPO     = os.getenv("GITHUB_REPO",     "")
 _GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "coletar.yml")
+# Branch alvo do workflow_dispatch. Em dev, aponte para a branch de trabalho
+# (ex.: Duplicate-Main) para testar inputs novos ANTES do merge na main —
+# o GitHub responde 422 se o workflow da branch alvo não conhecer os inputs.
+_GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH",   "main")
 
 
 def _supabase_delete(table, column, ids):
@@ -106,7 +110,7 @@ def api_trigger_coleta():
     item_id   = payload.get("item_id")
     categoria = payload.get("categoria")
     loja      = payload.get("loja")
-    dispatch  = {"ref": "main"}
+    dispatch  = {"ref": _GITHUB_BRANCH}
     inputs = {}
     if item_id:
         inputs["item_id"] = str(item_id)
@@ -142,7 +146,11 @@ def api_trigger_coleta():
         elif code == 404:
             detail = f'Workflow "{_GITHUB_WORKFLOW}" não encontrado (404).'
         elif code == 422:
-            detail = 'Branch "main" não encontrada (422).'
+            detail = (
+                f'Dispatch rejeitado (422): branch "{_GITHUB_BRANCH}" inexistente '
+                f'OU o workflow dessa branch não define os inputs enviados. '
+                f'Ajuste GITHUB_BRANCH no .env (ex.: Duplicate-Main para testar antes do merge).'
+            )
         return jsonify({"error": detail}), code
 
     except Exception as exc:
@@ -253,6 +261,8 @@ if __name__ == "__main__":
     print(f"  GITHUB_OWNER  : {_GITHUB_OWNER  or '✗ AUSENTE'}")
     print(f"  GITHUB_REPO   : {_GITHUB_REPO   or '✗ AUSENTE'}")
     print(f"  GITHUB_WORKFLOW: {_GITHUB_WORKFLOW}")
+    print(f"  GITHUB_BRANCH : {_GITHUB_BRANCH}"
+          + ("  (dispatch fora da main — modo teste)" if _GITHUB_BRANCH != "main" else ""))
     print(f"\n  Pressione Ctrl+C para parar.\n")
 
     app.run(host=args.host, port=args.port, debug=True)

@@ -131,7 +131,10 @@ The `.env` lives at the **repo root** (the collector loads it there; `app.py` lo
 - Email (Gmail SMTP): `EMAIL_REMETENTE`, `EMAIL_SENHA_APP`, `EMAIL_DESTINATARIO`.
 - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - GitHub dispatch (frontend "run now" button): `GITHUB_TOKEN` (PAT with `actions:write`),
-  `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_WORKFLOW`.
+  `GITHUB_OWNER`, `GITHUB_REPO`, `GITHUB_WORKFLOW`, and optional `GITHUB_BRANCH` —
+  the `workflow_dispatch` target ref (default `main`). Set it to a feature branch to
+  test new workflow inputs before merging; GitHub 422s a dispatch whose inputs the
+  target branch's workflow doesn't define.
 
 **Security rule that matters**: anything prefixed `VITE_` is inlined into the public JS
 bundle. The `GITHUB_TOKEN` must **never** carry a `VITE_` prefix — it is read only

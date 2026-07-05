@@ -10,6 +10,7 @@
  *   GITHUB_OWNER    → ex: HenriqueCanhadas
  *   GITHUB_REPO     → ex: Protocol-FPS
  *   GITHUB_WORKFLOW → ex: coletar.yml
+ *   GITHUB_BRANCH   → opcional; branch alvo do dispatch (default: main)
  *
  * Em desenvolvimento local, o Vite faz proxy de /api/* para o
  * Flask (localhost:5000), que tem o endpoint equivalente em app.py.
@@ -23,6 +24,10 @@ export default async function handler(req, res) {
   const owner    = process.env.GITHUB_OWNER;
   const repo     = process.env.GITHUB_REPO;
   const workflow = process.env.GITHUB_WORKFLOW || "coletar.yml";
+  // Branch alvo do workflow_dispatch (default: main). Configure GITHUB_BRANCH
+  // para testar inputs novos em outra branch antes do merge — o GitHub responde
+  // 422 se o workflow da branch alvo não conhecer os inputs enviados.
+  const branch   = process.env.GITHUB_BRANCH || "main";
 
   if (!token || !owner || !repo) {
     return res.status(500).json({
@@ -44,7 +49,7 @@ export default async function handler(req, res) {
   const itemId    = reqBody?.item_id;
   const categoria = reqBody?.categoria;
   const loja      = reqBody?.loja;
-  const dispatch  = { ref: "main" };
+  const dispatch  = { ref: branch };
   const inputs = {};
   if (itemId) {
     inputs.item_id = String(itemId);
@@ -77,7 +82,12 @@ export default async function handler(req, res) {
     if (resp.status === 404)
       return res.status(404).json({ error: `Workflow "${workflow}" não encontrado (404).` });
     if (resp.status === 422)
-      return res.status(422).json({ error: 'Branch "main" não encontrada (422).' });
+      return res.status(422).json({
+        error:
+          `Dispatch rejeitado (422): branch "${branch}" inexistente OU o workflow ` +
+          `dessa branch não define os inputs enviados. Ajuste GITHUB_BRANCH ` +
+          `(ex.: Duplicate-Main para testar antes do merge).`,
+      });
 
     return res.status(resp.status).json({ error: body });
   } catch (err) {
