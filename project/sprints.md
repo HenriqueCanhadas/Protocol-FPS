@@ -26,11 +26,12 @@
 | Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 ✅ |
 | Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 ✅ |
 | Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 ✅ |
-| Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 3 |
+| Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 3 ✅ |
 | Sprint 7 | Gestão de usuários (admin) | 24/07 – 25/07 | 2 | 2 ✅ |
 
-**Total planejado (Sprints 1–7):** 21 dias úteis · 3 tarefas a fazer
-(15 concluídas nas Sprints 1–5 e 7; nenhuma pendente).
+**Total planejado (Sprints 1–7):** 21 dias úteis · **0 tarefas a fazer** —
+🏁 **todas as 18 tarefas das Sprints 1–7 concluídas em 05/07/2026** (39 no total
+contando o baseline da Sprint 0; nenhuma pendente).
 
 ---
 
@@ -127,12 +128,14 @@ no SQL Editor do Supabase pelo usuário; DDL não roda pela service key).
 ## Sprint 6 — Documentação & refino (22/07 – 23/07)
 
 Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
+**Executada em 05/07/2026 — última sprint do projeto** (rodou após a Sprint 7,
+que foi adicionada e concluída no mesmo dia).
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S6 · Documentação do banco (estrutura e referências) (todo:75) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas`, `usuarios` + RPC `verificar_alertas` | ⬜ Todo | Esperado: `project/banco.md` com esquema, relacionamentos e RPCs |
-| S6 · Repensar métrica "Alertas hoje" (todo:65) | Validar novo cálculo/exibição de "Alertas hoje" | ⬜ Todo | Ainda em definição; esperado: novo modelo de métrica |
-| S6 · Atualizar README.md do projeto (todo:77) | Ler o README no GitHub e entender o projeto sem abrir o código | ⬜ Todo | Esperado: README explicando o projeto — **somente ao final de todas as sprints**, com o projeto concluído (condição registrada no `todo`) |
+| S6 · Documentação do banco (estrutura e referências) (todo:75) | Abrir o doc e conferir tabelas `itens`, `lojas`, `historico_precos`, `alertas`, `usuarios` + RPC `verificar_alertas` | ✅ Done | **Criado `project/banco.md` (05/07/2026) por introspecção do banco REAL** (OpenAPI do PostgREST + sondas read-only): matriz de acesso (quem usa qual chave × RLS), diagrama de relacionamentos, **6 tabelas ativas coluna a coluna** com tipos/defaults/FKs reais, dados de referência (3 lojas com slugs do `SCRAPERS`, 6 categorias), view `ultimo_preco` (registrada como não usada pelo front), **RPC `verificar_alertas` decifrada por sonda** — read-only confirmado (contagem de `alertas` idêntica antes/depois); `queda_preco` = qualquer queda vs. última leitura; `abaixo_meta` = preço < meta; ambas podem vir juntas —, `is_admin()` + trigger de perfil, tabela completa das políticas RLS com ausências deliberadas, fluxos de dados, **6 tabelas legadas descobertas** (Funko/Kabum antigas, candidatas a limpeza) e convenção de migrações |
+| S6 · Repensar métrica "Alertas hoje" (todo:65) | Validar novo cálculo/exibição de "Alertas hoje" | ✅ Done | **Modelo definido pelo usuário (05/07/2026): "Oportunidades agora".** Card virou **"ABAIXO DA META"**: conta itens ativos com preço atual < `preco_meta`, sub "de N com meta definida". Resolve os 3 defeitos do modelo antigo (quase sempre 0 com 1 coleta/dia; zerava à meia-noite; contava em dobro `abaixo_meta`+`queda_preco` da mesma leitura). Cálculo 100% client-side a partir dos dados já carregados (estado `statsAlertas` removido); a seção "Alertas recentes" continua listando os disparos do dia. **Validado contra o banco real:** card "0 de 4 com meta definida" correto (4 itens com meta, todos acima dela); build 88 módulos |
+| S6 · Atualizar README.md do projeto (todo:77) | Ler o README no GitHub e entender o projeto sem abrir o código | ✅ Done | **Escrito no fechamento de todas as sprints (05/07/2026)**, respeitando a condição do `todo`. README completo em português: funcionalidades, limitação conhecida (Pichau × IP de datacenter), **diagrama de arquitetura** (coletor × SPA × Supabase × 4 pares de endpoints Flask/Vercel), stack, como rodar local (coletor com escopos `ITEM_ID`/`CATEGORIA`/`LOJA` + front em 2 terminais), tabela de envs com a regra de segurança `VITE_`, CI (cron + inputs do dispatch), deploy Vercel, papéis do multiusuário, estrutura do repo e links para `project/banco.md`, `project/sprints.md` e LICENSE (MIT) |
 
 ---
 
@@ -152,9 +155,9 @@ Supabase. Executada em 05/07/2026, na sequência da Sprint 5 (usa a mesma base d
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 36 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,67,69,71,73 |
+| ✅ Done | 39 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,65,67,69,71,73,75,77 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 3 | 65,75,77 |
+| ⬜ Todo | 0 | — 🏁 **projeto concluído** |
 
 > **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:55, todo:57 e
 > todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
@@ -202,6 +205,16 @@ Supabase. Executada em 05/07/2026, na sequência da Sprint 5 (usa a mesma base d
 > usuário**, via novo endpoint `/api/usuarios` (4º par Flask × Vercel, admin API do
 > Supabase server-side). **Validação:** 16/16 + 17/17 mockados e **E2E real 18/18**
 > (criação normal+admin, login com a senha definida, troca de senha efetiva, 401/403).
+>
+> **Sprint 6 concluída em 05/07/2026 — 🏁 PROJETO CONCLUÍDO.** todo:65 (métrica
+> **"Abaixo da meta"** no lugar de "Alertas hoje" — modelo "Oportunidades agora"
+> escolhido pelo usuário, validado contra o banco real: "0 de 4 com meta definida"),
+> todo:75 (**`project/banco.md`** por introspecção do banco real, incl. RPC
+> `verificar_alertas` decifrada por sonda read-only e 6 tabelas legadas descobertas)
+> e todo:77 (**README.md** completo, escrito no fechamento como pedia a condição).
+> Com isso, **as 7 sprints (39 tarefas) estão fechadas** — restam apenas as
+> melhorias futuras registradas em "Skills Futuras" e a limpeza opcional das
+> tabelas legadas apontada no `banco.md`.
 
 ---
 
@@ -220,7 +233,7 @@ este relatório sincronizado com o `todo`.
 | `timezone-audit` | S1/S3 | Auditar e normalizar timestamps para America/Sao_Paulo (UTC-3) em back, front e banco | Alta |
 | `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | — (entregue na Sprint 4 sem necessidade de skill) |
 | `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | — (entregue na Sprint 5; migração versionada em `project/migrations/`) |
-| `db-docs` | S6 | Gerar/atualizar `project/banco.md` (tabelas, relacionamentos, RPC `verificar_alertas`) | Média |
+| `db-docs` | S6 | Gerar/atualizar `project/banco.md` (tabelas, relacionamentos, RPC `verificar_alertas`) | — (entregue na Sprint 6; regenerável por introspecção) |
 
 > **Como evoluir:** ao concluir uma tarefa, marque o item correspondente no `todo` com o prefixo
 > `OK-` (ou `Pending-` se ficar parcial) e rode a skill `sprint-planner` para regenerar este arquivo.
