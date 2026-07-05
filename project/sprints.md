@@ -25,11 +25,11 @@
 | Sprint 2 | Refatoração do Frontend (Flask + React) | 07/07 – 09/07 | 3 | 2 ✅ |
 | Sprint 3 | Enriquecimento de dados na UI | 10/07 – 12/07 | 3 | 3 ✅ |
 | Sprint 4 | Coleta segmentada & filtros | 14/07 – 16/07 | 3 | 3 ✅ |
-| Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 |
+| Sprint 5 | Multiusuário & Admin | 17/07 – 21/07 | 5 | 2 ✅ |
 | Sprint 6 | Documentação & refino | 22/07 – 23/07 | 2 | 3 |
 
-**Total planejado (Sprints 1–6):** 19 dias úteis · 5 tarefas a fazer
-(11 concluídas nas Sprints 1–4; nenhuma pendente).
+**Total planejado (Sprints 1–6):** 19 dias úteis · 3 tarefas a fazer
+(13 concluídas nas Sprints 1–5; nenhuma pendente).
 
 ---
 
@@ -112,12 +112,14 @@ Foco: filtrar e coletar por categoria/loja em vez de sempre tudo.
 
 ## Sprint 5 — Multiusuário & Admin (17/07 – 21/07)
 
-Foco: isolar monitoramentos por usuário e criar papel de administrador. **Requer refatoração do banco.**
+Foco: isolar monitoramentos por usuário e criar papel de administrador. **Refatoração do
+banco aplicada em 05/07/2026** via `project/migrations/sprint5_multiusuario.sql` (rodada
+no SQL Editor do Supabase pelo usuário; DDL não roda pela service key).
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S5 · Monitoramentos separados por usuário (todo:67) | Usuário A vê só itens A; usuário B só itens B | ⬜ Todo | Esperado: refatorar banco com `user_id`; isolamento de dados por usuário |
-| S5 · Usuário Admin vê todos os produtos por usuário (todo:69) | Logar como admin e ver os itens de todos, agrupados por usuário | ⬜ Todo | Esperado: papel admin + visão consolidada por usuário |
+| S5 · Monitoramentos separados por usuário (todo:67) | Usuário A vê só itens A; usuário B só itens B | ✅ Done | **Implementado (05/07/2026)** com refatoração do banco registrada em `project/migrations/sprint5_multiusuario.sql` (primeira migração versionada do repo): tabela **`usuarios`** (`nivel` 1=normal · 2=admin) espelhando `auth.users` via trigger de signup; **`itens.user_id`** (default `auth.uid()`, backfill dos 4 itens para a conta principal); **RLS por dono** em `itens`/`historico_precos`/`alertas` com `is_admin()` SECURITY DEFINER. `NovoProduto` grava o dono; **`/api/remover` agora exige o token da sessão** e autoriza só dono/admin (401 sem sessão, 403 alheio) em paridade Flask × Vercel (9/9 casos mockados em cada). Coletor (SERVICE_KEY) segue ignorando RLS. **E2E real 27/27 (05/07/2026):** usuário B de teste viu 0 itens, cadastrou 1 e viu só o dele; 0 histórico/alertas/perfis alheios; UPDATE em item alheio = 0 linhas; remover alheio = 403; cleanup completo |
+| S5 · Usuário Admin vê todos os produtos por usuário (todo:69) | Logar como admin e ver os itens de todos, agrupados por usuário | ✅ Done | **Implementado (05/07/2026):** `pedrosacanhadas@gmail.com` promovido a **admin** (`usuarios.nivel=2`; decisão registrada). `useAuth` carrega o perfil e expõe `isAdmin`; Dashboard admin ganha a linha **◈ USUÁRIOS** com chips por dono (com contagem por usuário) + etiqueta do dono em cada item ("você" para os próprios); página Conta exibe o papel (ADMIN/NORMAL). **E2E real:** admin de teste viu **todos** os itens (5 de 5, 2 donos distintos), todos os perfis e o histórico de todos; removeu item de outro usuário via `/api/remover` (200). Usuário normal permanece com a UI de sempre, só com os itens dele |
 
 ---
 
@@ -137,9 +139,9 @@ Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 32 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63 |
+| ✅ Done | 34 | 1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39,41,43,45,47,49,51,53,55,57,59,61,63,67,69 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 5 | 65,67,69,71,73 |
+| ⬜ Todo | 3 | 65,71,73 |
 
 > **Sprint 1 concluída em 01/07/2026** (antes do prazo de 04/07): todo:55, todo:57 e
 > todo:47 fechados e validados em 3 runs de CI (64/65/66). Pichau permanece coletável
@@ -170,6 +172,16 @@ Foco: documentar o banco, repensar a métrica de alertas e fechar o README.
 > `categoria=GPU` e [#83](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28750995029)
 > `loja=kabum`, ambos `success` — em cada um, **somente o escopo ganhou registros** em
 > `historico_precos`, verificado por snapshot antes/depois).
+>
+> **Sprint 5 concluída em 05/07/2026** (antes do prazo de 17–21/07): todo:67 e todo:69.
+> Banco refatorado com a **primeira migração versionada** do repo
+> (`project/migrations/sprint5_multiusuario.sql`): tabela `usuarios` (nivel 1/2), trigger
+> de auto-perfil, `itens.user_id` com backfill e **RLS por dono + admin** (`is_admin()`).
+> `/api/remover` deixou de ser aberto: exige token de sessão e autoriza dono/admin
+> (401/403) em paridade Flask × Vercel. UI: filtro por usuário + dono por item (admin),
+> papel na página Conta. **Validação em dupla camada:** 9/9 casos mockados por endpoint
+> e **E2E real 27/27** com usuários de teste criados/removidos via admin API (isolamento
+> A×B, visão admin consolidada, autorização e coletor intactos).
 
 ---
 
@@ -187,7 +199,7 @@ este relatório sincronizado com o `todo`.
 | `frontend-refactor` | S2 | Guiar reorganização de pastas do front mantendo build Vite, alias `@/`, proxy `/api/*` e paridade `app.py` × Vercel Functions | Média |
 | `timezone-audit` | S1/S3 | Auditar e normalizar timestamps para America/Sao_Paulo (UTC-3) em back, front e banco | Alta |
 | `coleta-segmentada` | S4 | Adicionar escopo de coleta (categoria/loja/produto) ao `main.py` e ao gatilho de disparo | — (entregue na Sprint 4 sem necessidade de skill) |
-| `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | Alta (impacto grande) |
+| `db-multiusuario` | S5 | Planejar refatoração do Supabase para `user_id`, RLS e papel admin | — (entregue na Sprint 5; migração versionada em `project/migrations/`) |
 | `db-docs` | S6 | Gerar/atualizar `project/banco.md` (tabelas, relacionamentos, RPC `verificar_alertas`) | Média |
 
 > **Como evoluir:** ao concluir uma tarefa, marque o item correspondente no `todo` com o prefixo
