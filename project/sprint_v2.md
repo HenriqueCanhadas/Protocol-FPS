@@ -25,14 +25,14 @@
 |--------|------|---------|------|-------|
 | Sprint 8 | Categoria "Diversos" & migração de dados legados | 07/07 (concluída) | 1 | 2 ✅ |
 | Sprint 9 | Coleta & alertas por usuário | 07/07 (concluída) | 1 | 3 ✅ |
-| Sprint 10 | Histórico: gráfico & lista completa | 14/07 – 17/07 | 4 | 4 ⬜ |
+| Sprint 10 | Histórico: gráfico & lista completa | 07/07 (concluída) | 1 | 4 ✅ |
 | Sprint 11 | Gestão & filtro de usuários (admin) | 20/07 – 22/07 | 3 | 3 ⬜ |
 | Sprint 12 | Edição de produto & menor preço | 23/07 – 27/07 | 3 | 3 ⬜ |
 | Sprint 13 | Sessão & conta | 28/07 – 29/07 | 2 | 2 ⬜ |
 | Sprint 14 | Refino final do Dashboard | 30/07 – 31/07 | 2 | 1 ⬜ |
 
-**Total da V2:** 18 tarefas · **5 concluídas** (Sprints 8 e 9, ambas executadas e
-validadas E2E em 07/07) · **13 a fazer** · 0 pendentes. A Sprint 14 fica por último
+**Total da V2:** 18 tarefas · **9 concluídas** (Sprints 8, 9 e 10, todas executadas
+e validadas em 07/07) · **9 a fazer** · 0 pendentes. A Sprint 14 fica por último
 por exigência do `todo` ("apenas no final").
 
 ---
@@ -70,18 +70,18 @@ sem o input `user_id`).
 
 ---
 
-## Sprint 10 — Histórico: gráfico & lista completa (14/07 – 17/07)
+## Sprint 10 — Histórico: gráfico & lista completa ✅ (concluída em 07/07)
 
 Foco: visualização do histórico como gráfico tempo × valor e fim do corte da lista,
-sem perder nada do que o modal já faz hoje. Relevante após a Sprint 8: itens migrados
-têm até **485 leituras** (o modal atual mostra só as 30 mais recentes).
+sem perder nada do que o modal já faz hoje. **Executada em 07/07/2026** — gráfico em
+SVG puro (sem dependência nova), validado visualmente com dados reais.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S10 · Gráfico tempo × valor no topo do histórico (todo:114) | Abrir o histórico de um item e ver primeiro o gráfico (eixo X = tempo, eixo Y = preço) e abaixo a lista cronológica que já existe | ⬜ Todo | Modal de histórico com gráfico de linha no topo alimentado por `historico_precos`, lista atual mantida logo abaixo |
-| S10 · Tooltip no ponto + clique → item da lista (todo:116) | Passar o mouse num ponto e ver legenda com dia e valor; clicar no ponto e a lista rolar/destacar a leitura correspondente | ⬜ Todo | Hover mostra tooltip `dd/mm/aaaa · R$ valor`; clique navega para a linha da leitura na lista abaixo |
-| S10 · Preservar remoção unitária de leituras (todo:118) | Após o gráfico, remover uma leitura específica (e múltiplas) continua funcionando como hoje | ⬜ Todo | Toda a lógica atual de seleção/remoção unitária e múltipla intacta — o gráfico é só uma camada de visualização (e reflete remoções) |
-| S10 · Histórico mostra a lista completa (todo:132) | Abrir o histórico de um item migrado (ex.: 485 leituras) e conseguir ver **todas** as leituras, não só as 30 mais recentes | ⬜ Todo | Remover o `limit(30)` do modal com rolagem/paginação — atenção ao teto de 1.000 linhas do PostgREST (paginar com `range` para itens grandes, mesmo aprendizado do fix da Sprint 8) |
+| S10 · Gráfico tempo × valor no topo do histórico (todo:114) | Abrir o histórico de um item e ver primeiro o gráfico (eixo X = tempo, eixo Y = preço) e abaixo a lista cronológica que já existe | ✅ Done | **Implementado (07/07/2026):** componente `GraficoHistorico` (SVG puro) no topo do modal — linha 2px tempo × preço, grade recessiva (3 rótulos R$ no Y, 4 datas no X), marcador âmbar no **menor preço histórico**, tema do app; lista mantida logo abaixo; oculto com < 2 leituras. **Validação visual** com o item mais denso do banco real (361 leituras) via réplica + screenshot Playwright: sem colisões, geometria correta |
+| S10 · Tooltip no ponto + clique → item da lista (todo:116) | Passar o mouse num ponto e ver legenda com dia e valor; clicar no ponto e a lista rolar/destacar a leitura correspondente | ✅ Done | **Implementado (07/07/2026):** hover mostra crosshair pontilhado + marcador no ponto mais próximo e tooltip `dd/mm/aaaa · hh:mm` + `R$ valor` (badge "esgotado" quando `disponivel=false`); clique rola suavemente até a leitura na lista (`scrollIntoView`) e a destaca com flash verde (re-dispara até no mesmo ponto); dica de uso no rodapé do gráfico |
+| S10 · Preservar remoção unitária de leituras (todo:118) | Após o gráfico, remover uma leitura específica (e múltiplas) continua funcionando como hoje | ✅ Done | **Preservado:** nenhuma linha do fluxo de remoção foi alterada (seleção unitária/múltipla, "Selecionar todos", `/api/remover`); a linha da lista só ganhou `id` e classe de destaque. Após remover, o reload refaz o fetch e o **gráfico reflete automaticamente** as leituras removidas |
+| S10 · Histórico mostra a lista completa (todo:132) | Abrir o histórico de um item migrado (ex.: centenas de leituras) e conseguir ver **todas** as leituras, não só as 30 mais recentes | ✅ Done | **Corrigido (07/07/2026):** o `limit(30)` virou busca **completa paginada** em blocos de 1.000 (`range` em loop — mesmo aprendizado do teto do PostgREST da Sprint 8); contagem "N leitura(s)" exibida ao lado do menor preço |
 
 ---
 
@@ -136,9 +136,9 @@ Foco: acabamento visual — executar **somente após as demais sprints**, como p
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 5 | 102,104,108,112,126 |
+| ✅ Done | 9 | 102,104,108,112,114,116,118,126,132 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 13 | 106,110,114,116,118,120,122,124,128,130,132,134,136 |
+| ⬜ Todo | 9 | 106,110,120,122,124,128,130,134,136 |
 
 > **Sprint 8 concluída em 07/07/2026** (1 dia, contra 5 planejados): categoria
 > DIVERSOS + migração dos dados legados Kabum (23 itens, 2.691 leituras reais) com
@@ -155,6 +155,15 @@ Foco: acabamento visual — executar **somente após as demais sprints**, como p
 > chegando ao dono + Telegram bloqueado. Código nos commits `d5452c2`/`4fcc16c`
 > (push na `Duplicate-Main` resolveu o 422 do dispatch). **Opcional:** rodar
 > `sprint9_alertas_por_usuario.sql` (flag de Telegram por usuário; UI na Sprint 11).
+> Extra pós-sprint (pedido do usuário): o chip ◈ USUÁRIOS do admin também segmenta
+> o Coletar, e a confirmação mostra **quantos itens serão coletados** (previsão
+> validada contra o coletor real em 6/6 escopos — commit `f6752ed`).
+>
+> **Sprint 10 concluída em 07/07/2026** (todo:114/116/118/132 ✅): modal de
+> histórico ganhou gráfico tempo × preço em SVG puro (tooltip no hover, clique →
+> leitura na lista com destaque, marcador do menor preço) e a lista passou a ser
+> **completa** (busca paginada em blocos de 1.000). Remoção unitária/múltipla
+> intacta. Validação visual com dados reais (361 leituras) via screenshot.
 >
 > Regras herdadas da V1: banco primeiro (migração versionada em
 > `project/migrations/`), endpoints sempre em **paridade Flask × Vercel**, validação
