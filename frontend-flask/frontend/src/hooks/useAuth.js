@@ -69,15 +69,13 @@ export function useAuth() {
     return client.auth.signOut({ scope });
   };
 
-  const updatePassword = async (password) => {
-    const client = await getSupabase();
-    return client.auth.updateUser({ password });
-  };
+  // (updatePassword removido na Sprint 13 — troca de senha só pelo fluxo
+  // admin em /usuarios, via /api/usuarios acao=trocar_senha)
 
   const isAdmin = (perfil?.nivel ?? 1) >= 2;
   // true enquanto há sessão mas o perfil dela ainda não chegou — páginas
   // que dependem de isAdmin devem esperar antes de redirecionar "não-admin"
   const perfilLoading = Boolean(user) && perfilDe !== user.id;
 
-  return { user, perfil, isAdmin, loading, perfilLoading, sb, signIn, signOut, updatePassword };
+  return { user, perfil, isAdmin, loading, perfilLoading, sb, signIn, signOut };
 }

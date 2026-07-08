@@ -1,6 +1,9 @@
 /**
  * pages/Conta.jsx — PROTOCOL FPS
- * Página de conta do usuário: info de sessão, troca de senha, encerrar sessões.
+ * Página de conta do usuário: info de sessão e encerrar sessões.
+ * A troca de senha própria foi removida (Sprint 13, todo:120): senhas são
+ * gerenciadas apenas pelo fluxo admin (página Usuários); o card Segurança
+ * orienta a pedir a um admin, sem revelar quem são os admins.
  */
 import { Link } from "react-router-dom";
 import { dataHoraBRT } from "@/utils/datas";
@@ -25,6 +28,10 @@ const css = `
 .conta-form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 1.75rem; border-top:1px solid var(--border2); background:var(--bg3); }
 .danger-zone { border-top-color:var(--red) !important; }
 .danger-zone::before { color:var(--red) !important; }
+.seguranca-card { border-top-color:var(--blue) !important; }
+.seguranca-card::before { color:var(--blue) !important; }
+.aviso-senha { display:flex; align-items:center; gap:.9rem; border:1px solid rgba(77,166,255,.35); background:rgba(77,166,255,.07); color:var(--blue); padding:1rem 1.2rem; font-size:var(--fs-base); line-height:1.6; letter-spacing:.03em; }
+.aviso-senha .as-ic { font-size:1.2rem; }
 
 @media (max-width:640px) {
   .conta-main { padding:1.25rem 1rem; }
@@ -34,28 +41,7 @@ const css = `
 }
 `;
 
-import { useState } from "react";
-
-export default function Conta({ user, perfil, updatePassword, signOut, showToast }) {
-  const [novaSenha, setNovaSenha] = useState("");
-  const [confSenha, setConfSenha] = useState("");
-  const [erroSenha, setErroSenha] = useState("");
-  const [erroConf,  setErroConf]  = useState("");
-  const [salvando,  setSalvando]  = useState(false);
-
-  const salvarSenha = async () => {
-    setErroSenha(""); setErroConf("");
-    let ok = true;
-    if (novaSenha.length < 8) { setErroSenha("Senha deve ter pelo menos 8 caracteres"); ok = false; }
-    if (novaSenha !== confSenha) { setErroConf("As senhas não coincidem"); ok = false; }
-    if (!ok) return;
-    setSalvando(true);
-    const { error } = await updatePassword(novaSenha);
-    setSalvando(false);
-    if (error) { showToast("Erro: " + error.message, "error"); }
-    else { setNovaSenha(""); setConfSenha(""); showToast("✓ Senha atualizada com sucesso!"); }
-  };
-
+export default function Conta({ user, perfil, signOut }) {
   const lastLogin = user?.last_sign_in_at
     ? dataHoraBRT(user.last_sign_in_at)
     : "—";
@@ -103,30 +89,13 @@ export default function Conta({ user, perfil, updatePassword, signOut, showToast
             </div>
           </div>
 
-          {/* Segurança */}
-          <div className="info-card" data-label="SEGURANÇA">
+          {/* Segurança — troca de senha só pelo fluxo admin (Sprint 13) */}
+          <div className="info-card seguranca-card" data-label="SEGURANÇA">
             <div className="info-body">
-              <div className="field-group">
-                <div className="field-label">Nova senha</div>
-                <input className="field-input" type="password" placeholder="••••••••"
-                  autoComplete="new-password" value={novaSenha}
-                  onChange={(e) => setNovaSenha(e.target.value)} />
-                <div className="field-hint">Mínimo 8 caracteres</div>
-                {erroSenha && <div className="field-error">{erroSenha}</div>}
+              <div className="aviso-senha">
+                <span className="as-ic">⚿</span>
+                <span>Solicite ao usuário admin para alterar sua senha.</span>
               </div>
-              <div className="field-group">
-                <div className="field-label">Confirmar nova senha</div>
-                <input className="field-input" type="password" placeholder="••••••••"
-                  autoComplete="new-password" value={confSenha}
-                  onChange={(e) => setConfSenha(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && salvarSenha()} />
-                {erroConf && <div className="field-error">{erroConf}</div>}
-              </div>
-            </div>
-            <div className="conta-form-actions">
-              <button className="btn-primary" onClick={salvarSenha} disabled={salvando}>
-                {salvando ? "SALVANDO..." : "ATUALIZAR SENHA"}
-              </button>
             </div>
           </div>
 

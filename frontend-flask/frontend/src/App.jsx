@@ -5,8 +5,9 @@
 import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 
-import { useAuth }  from "@/hooks/useAuth";
-import { useToast } from "@/hooks/useToast";
+import { useAuth }       from "@/hooks/useAuth";
+import { useToast }      from "@/hooks/useToast";
+import { useAutoLogout } from "@/hooks/useAutoLogout";
 
 import LoginScreen from "@/components/LoginScreen";
 import NavDrawer   from "@/components/NavDrawer";
@@ -19,9 +20,15 @@ import Usuarios    from "@/pages/Usuarios";
 import Conta       from "@/pages/Conta";
 
 export default function App() {
-  const { user, perfil, isAdmin, loading, perfilLoading, signIn, signOut, updatePassword } = useAuth();
+  const { user, perfil, isAdmin, loading, perfilLoading, signIn, signOut } = useAuth();
   const { toast, showToast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Sprint 13: sessão expira após 30 min sem atividade (ou janela fechada)
+  useAutoLogout(user, () => {
+    signOut();
+    showToast("Sessão encerrada por inatividade — faça login novamente.", "error");
+  });
 
   // Enquanto verifica sessão, mostra spinner mínimo
   if (loading) {
@@ -64,13 +71,7 @@ export default function App() {
           <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} />} />
           <Route path="/usuarios"     element={<Usuarios showToast={showToast} isAdmin={isAdmin} perfilLoading={perfilLoading} user={user} />} />
           <Route path="/conta"        element={
-            <Conta
-              user={user}
-              perfil={perfil}
-              updatePassword={updatePassword}
-              signOut={signOut}
-              showToast={showToast}
-            />
+            <Conta user={user} perfil={perfil} signOut={signOut} />
           } />
           {/* Rotas legadas → redireciona */}
           <Route path="/novo_produto" element={<Navigate to="/novo-produto" replace />} />
