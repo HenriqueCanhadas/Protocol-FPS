@@ -704,7 +704,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
-  const escopado  = filtro !== "all" || filtroLoja !== "all";
+  const escopado  = filtro !== "all" || filtroLoja !== "all" || (isAdmin && filtroUsuario !== "all");
 
   // Admin: donos distintos dos itens carregados (usuário normal só recebe os seus)
   const donos = isAdmin
@@ -722,20 +722,41 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
    * Resolve o escopo da coleta a partir dos filtros ativos na toolbar:
    *   produto selecionado → pontual (item_id)
    *   categoria/loja      → segmentada (inputs combináveis)
+   *   ◈ USUÁRIOS (admin)  → segmentada por dono (user_id)
    *   sem filtros         → completa
    * Usuário NORMAL sempre coleta só os próprios itens (user_id — Sprint 9);
-   * admin/cron mantêm a coleta global.
+   * o admin coleta global, exceto quando filtra por um dono.
+   * `total` = quantos itens o coletor vai pegar (mesma semântica do main.py).
    */
   const escopoColeta = () => {
     if (filtroLoja !== "all" && filtroProduto !== "all") {
       const prod = dados.find((x) => x.item_id === filtroProduto);
-      return { item_id: filtroProduto, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
+      // pontual coleta mesmo com monitoramento pausado
+      return { item_id: filtroProduto, total: 1, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
     }
     const esc    = {};
     const partes = [];
     if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
     if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
-    if (!isAdmin && user?.id) { esc.user_id = user.id;          partes.push("apenas os seus produtos"); }
+    if (isAdmin) {
+      if (filtroUsuario !== "all") {
+        esc.user_id = filtroUsuario;
+        const dono  = donos.find((d) => d.id === filtroUsuario);
+        partes.push(filtroUsuario === user?.id ? "apenas os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
+      }
+    } else if (user?.id) {
+      esc.user_id = user.id;
+      partes.push("apenas os seus produtos");
+    }
+    // Contagem com os mesmos critérios do coletor: monitorando=true +
+    // categoria + loja (comparada pelo slug, como no dict SCRAPERS) + dono
+    const slugLoja = (nome) => (nome || "").toLowerCase().replace(/ /g, "");
+    esc.total = dados.filter((x) =>
+      x.monitorando &&
+      (!esc.categoria || x.categoria === esc.categoria) &&
+      (!esc.loja      || slugLoja(x.loja) === esc.loja) &&
+      (!esc.user_id   || x.dono_id === esc.user_id)
+    ).length;
     esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
     return esc;
   };
@@ -944,12 +965,15 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               </div>
               <button className="btn-coletar" disabled={coletando} onClick={() => {
                 const esc = escopoColeta();
-                const segmentada = esc.item_id || esc.categoria || esc.loja;
+                const segmentada = esc.item_id || esc.categoria || esc.loja || (isAdmin && esc.user_id);
+                const qtd = esc.total > 0
+                  ? `⚡ <strong>${esc.total} ${esc.total === 1 ? "item será coletado" : "itens serão coletados"}</strong>`
+                  : `<span style="color:var(--amber)">⚠ Nenhum item monitorado nesse escopo — nada será coletado</span>`;
                 confirmar(
                   "COLETAR AGORA",
                   segmentada
-                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>Somente os itens desse escopo serão coletados. O processo pode levar alguns minutos.`
-                    : `Isso irá disparar uma coleta imediata de preços de <strong>todos os ${isAdmin ? "produtos monitorados" : "seus produtos monitorados"}</strong>.<br><br>O processo pode levar alguns minutos.`,
+                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>${qtd}<br><br>O processo pode levar alguns minutos.`
+                    : `Isso irá disparar uma coleta imediata de preços de <strong>todos os ${isAdmin ? "produtos monitorados" : "seus produtos monitorados"}</strong>.<br><br>${qtd}<br><br>O processo pode levar alguns minutos.`,
                   "⚡",
                   () => iniciarColeta(esc),
                   false,
