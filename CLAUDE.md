@@ -29,11 +29,24 @@ through Vercel serverless functions under `frontend-flask/frontend/api/`.
 **SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
 Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
 `BrowserRouter` with four pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`,
-`NovoUsuario` `/novo-usuario` — admin-only user management — and `Conta` `/conta`)
-plus redirects for legacy HTML routes. The Supabase client (`services/supabase.js`) is a lazy
+`Usuarios` `/usuarios` — admin-only user management — and `Conta` `/conta`)
+plus redirects for legacy HTML routes. Sessions auto-expire after 30 min of inactivity or
+closed window (`useAutoLogout`, last-activity timestamp in localStorage), and password
+changes happen only through the admin flow in `/usuarios` — never self-service (Sprint 13).
+The Supabase client (`services/supabase.js`) is a lazy
 singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/config` from Flask.
 Imports use the `@/` alias (→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` —
 update both if you change it).
+
+**PostgREST 1000-row cap (bit us twice — Sprints 8 and 10):** Supabase/PostgREST silently
+truncates every response at 1000 rows. Any frontend query that can exceed that must
+compensate: the Dashboard embeds per-item aggregates in the `itens` select via **aliased
+embeds** of the same table — `ultima:historico_precos(...)` (latest reading) and
+`minimo:historico_precos(...)` (lowest price), each with its own `order`/`limit(1)`/filter
+keyed by the alias in `referencedTable` — instead of fetching `historico_precos` whole; the
+history modal fetches the full history with a `.range()` pagination loop in blocks of 1000
+(both in `Dashboard.jsx`). Follow one of these two patterns for any new query over
+`historico_precos`.
 
 Four server-side endpoints exist in **two parallel implementations** — Flask (`app.py`,
 dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them in sync:**
@@ -48,9 +61,13 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
   cascade rules in the DB.
 - `/api/usuarios` (Vercel: `api/usuarios.js`) — admin-only user management via the
-  Supabase admin API (`acao: "criar"` with email/senha/nivel, `acao: "trocar_senha"`).
-  Requires a session token whose profile has `nivel >= 2`; the signup trigger creates
-  profiles at nivel 1 and the endpoint promotes to 2 when creating an admin.
+  Supabase admin API. Ações: `criar` (email/senha/nivel), `trocar_senha`, `listar`
+  (profiles + `auth.users` last-sign-in/confirmation + item counts), `telegram`
+  (toggles `usuarios.notificar_telegram`), and `excluir` (manual cascade
+  alertas → historico_precos → itens, then deletes the auth account, which cascades
+  to `usuarios`; self-deletion is rejected). Requires a session token whose profile
+  has `nivel >= 2`; the signup trigger creates profiles at nivel 1 and the endpoint
+  promotes to 2 when creating an admin.
 
 **Route parity gotcha (Flask, `app.py`):** Vercel's prod rewrite is `/((?!api/).*)` → SPA.
 Because Flask is mounted with `static_url_path=""`, its catch-all static route would otherwise

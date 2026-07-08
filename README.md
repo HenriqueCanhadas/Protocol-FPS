@@ -51,7 +51,7 @@ Duas metades independentes que só se encontram no Supabase e no `workflow_dispa
 │  GitHub Actions · cron diário │        │  Vercel (prod) · Vite (dev)     │
 │                               │        │                                 │
 │  main.py                      │        │  Dashboard · Novo Produto ·     │
-│   ├─ scrapers/ (Playwright)   │        │  Novo Usuário (admin) · Conta   │
+│   ├─ scrapers/ (Playwright)   │        │  Usuários (admin) · Conta       │
 │   ├─ notificacoes/ (📧 + 📱)  │        │        │                        │
 │   └─ SUPABASE_SERVICE_KEY     │        │  ANON_KEY + sessão (RLS)        │
 └──────────────┬────────────────┘        └───────┬─────────────────────────┘
@@ -176,7 +176,7 @@ Secrets necessários no repositório: os mesmos do grupo Supabase/Email/Telegram
 | Papel | `usuarios.nivel` | Pode |
 |---|---|---|
 | Usuário padrão | `1` | ver/gerenciar **apenas os próprios** itens, histórico e alertas |
-| Admin | `2` | ver os itens **de todos** (filtro por usuário no Dashboard), criar usuários e trocar senhas pela página **Novo Usuário** |
+| Admin | `2` | ver os itens **de todos** (filtro por usuário no Dashboard: Todos · Eu · dropdown) e, pela página **Usuários**: listar todos (último acesso, papel, status, nº de itens), criar usuários, trocar senhas, ligar/desligar o Telegram por usuário e **excluir usuário** (em cascata, com os dados dele) |
 
 O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 `SERVICE_KEY` e continua coletando os itens de todos os usuários.

@@ -70,13 +70,16 @@ Espelho leve de `auth.users`, criado pela migração `sprint5_multiusuario.sql`.
 | `email` | `text` | sim | — | cópia do email do auth (preenchida pelo trigger); **destino dos alertas por email** do dono (Sprint 9) |
 | `nome` | `text` | sim | — | nome de exibição (opcional; UI usa email como fallback) |
 | `nivel` | `integer` | não | `1` | **papel**: `1` = normal · `2` = admin |
-| `notificar_telegram` | `boolean` | não | `false` | Sprint 9: recebe alertas no Telegram (bot/chat pessoal); `true` só p/ pedrosacanhadas — UI de seleção prevista p/ Sprint 11 |
+| `notificar_telegram` | `boolean` | não | `false` | Sprint 9: recebe alertas no Telegram (bot/chat pessoal); toggle por usuário na página **Usuários** (Sprint 11, `/api/usuarios` `acao=telegram`) |
 | `criado_em` | `timestamptz` | não | `now()` | — |
 
 - Preenchida automaticamente pelo trigger `trg_criar_perfil` a cada signup.
 - Promoção a admin: manual (`update usuarios set nivel = 2 ...`) ou pela página
-  **Novo Usuário** (endpoint `/api/usuarios`, Sprint 7).
+  **Usuários** (endpoint `/api/usuarios`, Sprint 7; página unificada na Sprint 11).
 - Admin atual: `pedrosacanhadas@gmail.com` (decisão registrada em 05/07/2026).
+- **Exclusão de usuário (Sprint 11):** `/api/usuarios` `acao=excluir` faz a cascata
+  manual `alertas → historico_precos → itens` e então remove a conta em
+  `auth.users` — só esta última cascateia para `usuarios`. Auto-exclusão → 400.
 
 ### 3.2 `lojas` — lojas suportadas
 
@@ -132,8 +135,10 @@ form de cadastro e na coleta segmentada (`CATEGORIA` do `main.py`):
 | `criado_em` | `timestamptz` | não | `now()` | — |
 | `user_id` | `uuid` | não | `auth.uid()` | **dono** (Sprint 5); FK → `usuarios.id`; índice `idx_itens_user_id` |
 
-- Escrita: frontend (INSERT no cadastro, UPDATE de meta/monitorando — RLS exige ser
-  dono ou admin); DELETE apenas via `/api/remover` (SERVICE_KEY, sem política de DELETE).
+- Escrita: frontend (INSERT no cadastro; UPDATE de meta/monitorando e, desde a
+  Sprint 12, de `nome_na_loja` e `produto_id` pelos modais "Alterar nome"/"Alterar
+  categoria" — RLS exige ser dono ou admin); DELETE apenas via `/api/remover`
+  (SERVICE_KEY, sem política de DELETE).
 - Leitura: frontend (RLS filtra por dono/admin) e coletor (SERVICE_KEY, vê tudo).
 - **Unicidade** (Sprint 8): `unique (url, user_id)` — constraint `itens_url_user_key`.
   Substituiu a `itens_url_key` original (URL única **global**, resquício
@@ -266,11 +271,13 @@ COLETA (diária 12:00 UTC ou manual):
 FRONTEND (sessão autenticada, RLS ativo):
   Dashboard ─▶ SELECT itens (+lojas/produtos/usuarios) + historico_precos + alertas
   NovoProduto ─▶ INSERT itens (user_id = usuário logado)
-  Ações ─▶ UPDATE itens (meta/monitorando) · POST /api/remover · POST /api/trigger-coleta
+  Ações ─▶ UPDATE itens (meta/monitorando/nome/categoria) · POST /api/remover · POST /api/trigger-coleta
 
 SERVER-SIDE (SERVICE_KEY + autorização por token de sessão):
   /api/remover  ─▶ valida dono/admin ─▶ DELETE alertas → historico_precos → itens
-  /api/usuarios ─▶ exige admin ─▶ GoTrue admin API (criar usuário / trocar senha)
+  /api/usuarios ─▶ exige admin ─▶ GoTrue admin API + PostgREST:
+                    criar · trocar_senha · listar (perfis + auth.users + nº itens)
+                    telegram (notificar_telegram) · excluir (cascata + conta)
 ```
 
 ---
