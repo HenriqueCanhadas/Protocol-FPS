@@ -275,19 +275,21 @@ SERVER-SIDE (SERVICE_KEY + autorização por token de sessão):
 
 ---
 
-## 8. Estruturas legadas (não usadas pelo código atual)
+## 8. Estruturas legadas
 
-A introspecção revelou tabelas de fases antigas do projeto, **fora do fluxo atual**
-(nenhum código deste repo as referencia). Ficam registradas como candidatas a limpeza:
+Tabelas de fases antigas do projeto, fora do fluxo atual. **Situação em 08/07/2026:**
 
-| Tabela | Observação |
+| Tabela | Situação |
 |---|---|
-| `Menores Preços Kabum` | protótipo antigo (PK `bigint`, `product_key`) |
+| `Menores Preços Kabum` | **dropada pelo usuário** (08/07/2026), após a migração da Sprint 8 |
 | `Monitoramento Kabum` | idem |
-| `produtos_kabum` / `historico_precos_kabum` | fase 2 (uuid, timestamps em hora local) |
-| `produtos_funko` / `historico_precos_funko` | experimento de monitorar Funko Pop |
+| `produtos_kabum` / `historico_precos_kabum` | idem — o drop também **desativou o coletor legado** que ainda gravava nelas |
+| `produtos_funko` / `historico_precos_funko` | **mantidas e intactas** (9 / 675 linhas — restrição do todo:104; nenhum código deste repo as toca) |
 
-> ⚠️ Antes de dropar, confirmar que nenhum outro projeto/consulta externa as usa.
+> Os dados Kabum legados vivem agora em `itens`/`historico_precos` (categoria
+> `DIVERSOS`, dono pedrosacanhadas) — migrados pela `sprint8_diversos_migracao.sql`.
+> A migração referenciava as tabelas dropadas, então ela **não é re-executável**;
+> permanece versionada como registro histórico.
 
 ---
 
