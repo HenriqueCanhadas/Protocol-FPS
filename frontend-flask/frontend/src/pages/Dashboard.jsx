@@ -150,6 +150,11 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.45rem; letter-spacing:.03em; color:var(--green); }
 .price-meta      { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-menor     { font-size:var(--fs-xs); color:var(--amber); margin-top:.15rem; opacity:.9; }
+.catm-grid { display:flex; flex-wrap:wrap; gap:.6rem; }
+.catm-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; }
+.catm-chip:hover { border-color:var(--green-dim); color:var(--text); }
+.catm-chip.sel { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .price-timestamp { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.2rem; letter-spacing:.04em; opacity:.75; }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
 .status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
@@ -230,7 +235,7 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 /* modal meta */
 .meta-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:250; animation:fadeIn .2s ease; }
 .meta-modal { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--amber); width:min(460px,94vw); display:flex; flex-direction:column; position:relative; }
-.meta-modal::before { content:'EDITAR META DE PREÇO'; position:absolute; top:-1px; left:1.5rem; background:var(--bg2); color:var(--amber); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
+.meta-modal::before { content:attr(data-label); position:absolute; top:-1px; left:1.5rem; background:var(--bg2); color:var(--amber); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
 .meta-modal-header { display:flex; align-items:flex-start; justify-content:space-between; padding:1.5rem 1.5rem 0; gap:1rem; }
 .meta-modal-produto { font-size:var(--fs-sm); color:var(--text); line-height:1.5; flex:1; }
 .meta-modal-produto .mm-label { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:.3rem; }
@@ -579,7 +584,7 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
 }
 
 // ── Componente Modal de Opções (menu de ações do produto) ──────
-function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
+function OpcoesModal({ item, onMeta, onRenomear, onCategoria, onColetar, onToggle, onClose }) {
   if (!item) return null;
   const monitorando = item.monitorando !== false;
   const metaSub = item.preco_meta
@@ -600,6 +605,16 @@ function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
           <button className="opcao-btn meta" onClick={() => onMeta(item)}>
             <span className="op-ic">◎</span>
             <span className="op-tx"><span className="op-tt">Editar meta</span><span className="op-sub">{metaSub}</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className="opcao-btn" onClick={() => onRenomear(item)}>
+            <span className="op-ic">✎</span>
+            <span className="op-tx"><span className="op-tt">Alterar nome</span><span className="op-sub">Renomeia o produto na tabela e nos alertas</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className="opcao-btn" onClick={() => onCategoria(item)}>
+            <span className="op-ic">▤</span>
+            <span className="op-tx"><span className="op-tt">Alterar categoria</span><span className="op-sub">{`Categoria atual: ${item.categoria || "—"}`}</span></span>
             <span className="op-arr">→</span>
           </button>
           <button className="opcao-btn coletar" onClick={() => onColetar(item)}>
@@ -643,7 +658,7 @@ function MetaModal({ item, onClose, onSave }) {
 
   return (
     <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="meta-modal">
+      <div className="meta-modal" data-label="EDITAR META DE PREÇO">
         <div className="meta-modal-header">
           <div className="meta-modal-produto">
             <div className="mm-label">Produto</div>
@@ -698,6 +713,99 @@ function MetaModal({ item, onClose, onSave }) {
   );
 }
 
+// ── Componente Modal Renomear (Sprint 12) ──────────────────────
+function RenomearModal({ item, onClose, onSave }) {
+  const [nome, setNome] = useState(item?.nome_na_loja || "");
+  const [erro, setErro] = useState(false);
+
+  if (!item) return null;
+
+  const salvar = () => {
+    const v = nome.trim();
+    if (!v) { setErro(true); return; }
+    if (v === item.nome_na_loja) { onClose(); return; } // nada mudou
+    onSave(item.item_id, v);
+  };
+
+  return (
+    <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="meta-modal" data-label="ALTERAR NOME">
+        <div className="meta-modal-header">
+          <div className="meta-modal-produto">
+            <div className="mm-label">Produto</div>
+            <div>{item.nome_na_loja}</div>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="meta-modal-body">
+          <div>
+            <div className="field-label">Novo nome</div>
+            <input
+              className="field-input" type="text" maxLength={120} autoFocus
+              value={nome}
+              onChange={(e) => { setNome(e.target.value); setErro(false); }}
+              onKeyDown={(e) => e.key === "Enter" && salvar()}
+            />
+            <div className="field-hint">Como o produto aparece na tabela, no histórico e nos alertas</div>
+            {erro && <div className="field-error">Informe um nome não vazio</div>}
+          </div>
+        </div>
+        <div className="meta-modal-footer">
+          <button className="btn-secondary" onClick={onClose}>CANCELAR</button>
+          <button className="btn-primary" onClick={salvar}>SALVAR NOME</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente Modal Categoria (Sprint 12) ─────────────────────
+function CategoriaModal({ item, onClose, onSave }) {
+  const [cat, setCat] = useState(item?.categoria || "");
+
+  if (!item) return null;
+  const cats = FILTROS_CAT.filter((c) => c !== "all");
+
+  const salvar = () => {
+    if (!cat) return;
+    if (cat === item.categoria) { onClose(); return; } // nada mudou
+    onSave(item.item_id, cat);
+  };
+
+  return (
+    <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="meta-modal" data-label="ALTERAR CATEGORIA">
+        <div className="meta-modal-header">
+          <div className="meta-modal-produto">
+            <div className="mm-label">Produto</div>
+            <div>{item.nome_na_loja}</div>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="meta-modal-body">
+          <div>
+            <div className="field-label" style={{ marginBottom: ".6rem" }}>Nova categoria</div>
+            <div className="catm-grid">
+              {cats.map((c) => (
+                <div key={c} className={`catm-chip${cat === c ? " sel" : ""}`} onClick={() => setCat(c)}>
+                  {CAT_LABEL[c] || c}
+                </div>
+              ))}
+            </div>
+            <div className="field-hint" style={{ marginTop: ".6rem" }}>
+              Reclassifica o produto nos filtros do Dashboard e na coleta por categoria
+            </div>
+          </div>
+        </div>
+        <div className="meta-modal-footer">
+          <button className="btn-secondary" onClick={onClose}>CANCELAR</button>
+          <button className="btn-primary" onClick={salvar}>SALVAR CATEGORIA</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard principal ────────────────────────────────────────
 const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 
@@ -733,6 +841,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
   const [metaItem,     setMetaItem]     = useState(null);
+  const [nomeItem,     setNomeItem]     = useState(null); // modal Alterar Nome (Sprint 12)
+  const [catItem,      setCatItem]      = useState(null); // modal Alterar Categoria (Sprint 12)
   const [opcoesItem,   setOpcoesItem]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
 
@@ -743,12 +853,19 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     // A última leitura vem EMBUTIDA com order+limit por item (referencedTable):
     // buscar historico_precos inteiro estoura o teto de 1000 linhas do PostgREST
     // desde a migração dos dados legados (Sprint 8, ~5,4k leituras).
+    // Dois embeds da MESMA tabela com alias (Sprint 12): "ultima" = leitura
+    // mais recente; "minimo" = menor preço já registrado (preco > 0 exclui
+    // sentinelas de esgotado). Cada alias tem seu próprio order+limit — o
+    // mínimo vem do banco, sem buscar o histórico inteiro (teto de 1000).
     let { data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), historico_precos(preco, disponivel, coletado_em)")
+      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), ultima:historico_precos(preco, disponivel, coletado_em), minimo:historico_precos(preco, coletado_em)")
       .order("nome_na_loja", { ascending: true })
-      .order("coletado_em", { referencedTable: "historico_precos", ascending: false })
-      .limit(1, { referencedTable: "historico_precos" });
+      .order("coletado_em", { referencedTable: "ultima", ascending: false })
+      .limit(1, { referencedTable: "ultima" })
+      .gt("minimo.preco", 0)
+      .order("preco", { referencedTable: "minimo", ascending: true })
+      .limit(1, { referencedTable: "minimo" });
 
     if (error) {
       // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
@@ -764,13 +881,17 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     if (!itens?.length) { setDados([]); return; }
 
     setDados(itens.map((item) => {
-      const ult = item.historico_precos?.[0] || {};
+      const ult = (item.ultima || item.historico_precos)?.[0] || {};
+      const min = item.minimo?.[0] || {};
       return {
         item_id: item.id, nome_na_loja: item.nome_na_loja, url: item.url || null,
         loja: item.lojas?.nome || "—", categoria: item.produtos?.categoria || "—",
         monitorando: item.monitorando, preco_meta: item.preco_meta,
         preco: ult.preco ?? null, disponivel: ult.disponivel ?? false,
         coletado_em: ult.coletado_em ?? null,
+        // Menor preço já obtido (Sprint 12) — convive com a meta, não a substitui
+        menor:    min.preco       ?? null,
+        menor_em: min.coletado_em ?? null,
         // Dono do item (visão de admin; usuário normal só recebe os seus via RLS)
         dono_id:    item.user_id || null,
         dono_email: item.usuarios?.email || null,
@@ -833,8 +954,16 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
         return sortDir === "asc" ? cmp : -cmp;
       }
-      const pa = a.preco ?? (sortDir === "asc" ? Infinity : -Infinity);
-      const pb = b.preco ?? (sortDir === "asc" ? Infinity : -Infinity);
+      // Campos numéricos (Sprint 12): preco · menor (menor valor obtido) ·
+      // data (timestamp da última coleta). Itens sem valor vão para o fim.
+      const valor = (x) => {
+        if (sortCampo === "data") return x.coletado_em ? new Date(x.coletado_em).getTime() : null;
+        if (sortCampo === "menor") return x.menor;
+        return x.preco;
+      };
+      const semValor = sortDir === "asc" ? Infinity : -Infinity;
+      const pa = valor(a) ?? semValor;
+      const pb = valor(b) ?? semValor;
       return sortDir === "asc" ? pa - pb : pb - pa;
     });
     return d;
@@ -939,6 +1068,33 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     carregarPrecos();
   };
 
+  // Sprint 12: renomear e reclassificar direto em itens (RLS dono/admin,
+  // mesmo caminho do Editar Meta)
+  const salvarNome = async (itemId, nome) => {
+    const sb = await getSupabase();
+    const { error } = await sb.from("itens").update({ nome_na_loja: nome }).eq("id", itemId);
+    if (error) { showToast("Erro ao renomear: " + error.message, "error"); return; }
+    setNomeItem(null);
+    showToast(`✓ Produto renomeado para "${nome}".`, "ok");
+    carregarPrecos();
+  };
+
+  const salvarCategoria = async (itemId, categoria) => {
+    const sb = await getSupabase();
+    // categoria → produtos.id (mesmo lookup do cadastro no NovoProduto)
+    const { data: prods, error: e1 } = await sb
+      .from("produtos").select("id").eq("categoria", categoria).limit(1);
+    if (e1 || !prods?.length) {
+      showToast(`Categoria "${categoria}" não encontrada no banco.`, "error");
+      return;
+    }
+    const { error } = await sb.from("itens").update({ produto_id: prods[0].id }).eq("id", itemId);
+    if (error) { showToast("Erro ao alterar categoria: " + error.message, "error"); return; }
+    setCatItem(null);
+    showToast(`✓ Categoria alterada para ${CAT_LABEL[categoria] || categoria}.`, "ok");
+    carregarPrecos();
+  };
+
   const iniciarColeta = async (escopo = {}) => {
     setColetando(true);
     const descricao = escopo.descricao || "todos os produtos";
@@ -1039,10 +1195,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
         showToast={showToast} onChange={carregarPrecos}
       />
       <MetaModal item={metaItem} onClose={() => setMetaItem(null)} onSave={salvarMeta} />
+      <RenomearModal item={nomeItem} onClose={() => setNomeItem(null)} onSave={salvarNome} />
+      <CategoriaModal item={catItem} onClose={() => setCatItem(null)} onSave={salvarCategoria} />
       <OpcoesModal
         item={opcoesItem}
         onClose={() => setOpcoesItem(null)}
         onMeta={opcMeta}
+        onRenomear={(item) => { setOpcoesItem(null); setNomeItem(item); }}
+        onCategoria={(item) => { setOpcoesItem(null); setCatItem(item); }}
         onColetar={opcColetar}
         onToggle={opcToggle}
       />
@@ -1212,7 +1372,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                 )}
               </div>
               <div className="sort-controls sort-controls-right">
-                {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
+                {[["nome", "Nome"], ["preco", "Preço"], ["menor", "Menor"], ["data", "Coleta"]].map(([campo, label]) => (
                   <button key={campo} className={`sort-btn${sortCampo === campo ? " active" : ""}`} onClick={() => toggleSort(campo)}>
                     <span>{label}</span>
                     <span style={{ fontSize: ".7rem", opacity: .7 }}>
@@ -1291,6 +1451,12 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                                 {item.preco_meta && (
                                   <div className="price-meta">
                                     meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                                {item.menor != null && (
+                                  <div className="price-menor"
+                                    title={item.menor_em ? `Menor preço registrado em ${dataHoraBRT(item.menor_em, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "Menor preço já registrado"}>
+                                    ★ menor: R$ {Number(item.menor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                                   </div>
                                 )}
                                 {item.coletado_em && (
