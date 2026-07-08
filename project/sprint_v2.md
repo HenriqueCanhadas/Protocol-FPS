@@ -24,16 +24,16 @@
 | Sprint | Tema | Período | Dias | Itens |
 |--------|------|---------|------|-------|
 | Sprint 8 | Categoria "Diversos" & migração de dados legados | 07/07 (concluída) | 1 | 2 ✅ |
-| Sprint 9 | Coleta & alertas por usuário | 08/07 – 13/07 | 4 | 1 ✅ · 2 🟡 |
+| Sprint 9 | Coleta & alertas por usuário | 07/07 (concluída) | 1 | 3 ✅ |
 | Sprint 10 | Histórico: gráfico & lista completa | 14/07 – 17/07 | 4 | 4 ⬜ |
 | Sprint 11 | Gestão & filtro de usuários (admin) | 20/07 – 22/07 | 3 | 3 ⬜ |
 | Sprint 12 | Edição de produto & menor preço | 23/07 – 27/07 | 3 | 3 ⬜ |
 | Sprint 13 | Sessão & conta | 28/07 – 29/07 | 2 | 2 ⬜ |
 | Sprint 14 | Refino final do Dashboard | 30/07 – 31/07 | 2 | 1 ⬜ |
 
-**Total da V2:** 18 tarefas · **3 concluídas** · **2 pendentes** (Sprint 9
-implementada e testada em 07/07; faltam a migração do Telegram e os E2E ao vivo) ·
-**13 a fazer**. A Sprint 14 fica por último por exigência do `todo` ("apenas no final").
+**Total da V2:** 18 tarefas · **5 concluídas** (Sprints 8 e 9, ambas executadas e
+validadas E2E em 07/07) · **13 a fazer** · 0 pendentes. A Sprint 14 fica por último
+por exigência do `todo` ("apenas no final").
 
 ---
 
@@ -54,16 +54,18 @@ estrutura atual. **Executada e validada em 07/07/2026**, com migração versiona
 
 ---
 
-## Sprint 9 — Coleta & alertas por usuário (08/07 – 13/07)
+## Sprint 9 — Coleta & alertas por usuário ✅ (concluída em 07/07)
 
 Foco: coleta e alertas respeitarem o **dono do item** — o alerta chega ao email de quem
 cadastrou (não ao email fixo do `.env`), o Telegram fica restrito, e "coletar todos" de
-um usuário normal coleta só os itens dele.
+um usuário normal coleta só os itens dele. **Executada e validada E2E em 07/07/2026**
+(commit `4fcc16c`, push na `Duplicate-Main` — o 422 do dispatch era o workflow remoto
+sem o input `user_id`).
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S9 · Alerta por email só para o dono do item (todo:112) | Disparar um alerta de item do usuário X e confirmar que o email vai para o endereço cadastrado dele (ex.: item do pedrosacanhadas → c0ntr0leg4mer@gmail.com) e para mais ninguém; o **Telegram NÃO dispara** para itens de outros usuários | 🟡 Pending | **Implementado (07/07/2026):** `main.py` roteia por dono — email vai para `usuarios.email` do `itens.user_id` (`enviar_email` ganhou o param `destinatario`; `EMAIL_DESTINATARIO` vira fallback); Telegram só dispara para quem tem `usuarios.notificar_telegram = true` (migração `sprint9_alertas_por_usuario.sql` cria a coluna e habilita só o pedrosacanhadas; coletor tem fallback pré-migração restrito ao admin). Testes de roteamento mockados 5/5. **Falta:** rodar a migração no SQL Editor + E2E real de um alerta disparado |
-| S9 · "Coletar todos" respeita os itens do usuário (todo:126) | Usuário normal com 1 item clica em COLETAR AGORA (sem filtros) e **só o item dele** é coletado; itens de outros donos ficam intocados no banco | 🟡 Pending | **Implementado ponta a ponta (07/07/2026):** Dashboard envia `user_id` da sessão para não-admin (admin segue global; confirmação diz "todos os seus produtos"); endpoints Flask × Vercel repassam `user_id` (paridade 8/8 + 9/9 mockados, payloads idênticos); `coletar.yml` ganhou input `user_id` → env `USER_ID`; `main.py` filtra `itens.user_id` no modo SEGMENTADO (combinável com CATEGORIA/LOJA; ITEM_ID mantém precedência). Scoping validado read-only no banco real 7/7. **Falta:** E2E ao vivo do dispatch (requer commit/push do workflow — GitHub 422 se o input não existir na branch alvo) |
+| S9 · Alerta por email só para o dono do item (todo:112) | Disparar um alerta de item do usuário X e confirmar que o email vai para o endereço cadastrado dele (ex.: item do pedrosacanhadas → c0ntr0leg4mer@gmail.com) e para mais ninguém; o **Telegram NÃO dispara** para itens de outros usuários | ✅ Done | **Implementado e validado E2E (07/07/2026):** `main.py` roteia por dono — email vai para `usuarios.email` do `itens.user_id` (`enviar_email` ganhou o param `destinatario`; `EMAIL_DESTINATARIO` vira fallback); Telegram só para quem tem `usuarios.notificar_telegram = true` (migração `sprint9_alertas_por_usuario.sql`; fallback pré-migração restrito ao admin). **E2E real:** alerta `abaixo_meta` de item do c0ntr0leg4mer → log "Email enviado para c0ntr0leg4mer@gmail.com" + "Telegram desabilitado para o dono — não enviado"; registro em `alertas` com `notificado_email=true` / `notificado_telegram=false`. Rodar a migração é **opcional** (habilita a seleção por flag; UI prevista na Sprint 11) |
+| S9 · "Coletar todos" respeita os itens do usuário (todo:126) | Usuário normal com 1 item clica em COLETAR AGORA (sem filtros) e **só o item dele** é coletado; itens de outros donos ficam intocados no banco | ✅ Done | **Implementado ponta a ponta e validado E2E (07/07/2026):** Dashboard envia `user_id` da sessão para não-admin (admin segue global); endpoints Flask × Vercel repassam `user_id` (paridade 8/8 + 9/9 mockados, payloads idênticos); `coletar.yml` input `user_id` → env `USER_ID`; `main.py` filtra `itens.user_id` (combinável com CATEGORIA/LOJA; ITEM_ID tem precedência); scoping read-only 7/7. **E2E ao vivo:** run [#98](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28908278032) `success` com `user_id` do c0ntr0leg4mer — só o "teste 1" dele ganhou leitura (+1, R$ 109,90); os **26 itens monitorados de outros donos ficaram intocados** (snapshot antes/depois) |
 | S9 · Auditar "% de queda" do Novo Produto (todo:108) | Rastrear o campo "% de queda para alertar" do form ao banco e à RPC `verificar_alertas` e responder: ele participa de algum cálculo? | ✅ Done | **Auditado (07/07/2026): o campo era MORTO** — entrava na fila local do form mas nunca era enviado no INSERT de `itens` (não existe coluna no banco) e a RPC `verificar_alertas` dispara `queda_preco` em **qualquer** queda, sem usar %. **Decisão:** campo removido do `NovoProduto.jsx` (comentário no código explica); se um dia quiser alertar só quedas ≥ X%, será preciso coluna nova + mudança na RPC |
 
 ---
@@ -134,8 +136,8 @@ Foco: acabamento visual — executar **somente após as demais sprints**, como p
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 3 | 102,104,108 |
-| 🟡 Pending | 2 | 112,126 |
+| ✅ Done | 5 | 102,104,108,112,126 |
+| 🟡 Pending | 0 | — |
 | ⬜ Todo | 13 | 106,110,114,116,118,120,122,124,128,130,132,134,136 |
 
 > **Sprint 8 concluída em 07/07/2026** (1 dia, contra 5 planejados): categoria
@@ -145,11 +147,14 @@ Foco: acabamento visual — executar **somente após as demais sprints**, como p
 > Pendências operacionais registradas: **desligar o coletor legado** (ainda grava em
 > `historico_precos_kabum`) e **commitar/deployar** o código da Sprint 8 na Vercel.
 >
-> **Sprint 9 implementada em 07/07/2026** (todo:108 ✅ · todo:112/126 🟡): coleta e
-> alertas por dono ponta a ponta, com validação mockada (22/22 Python + 9/9 Vercel,
-> paridade idêntica) e scoping read-only no banco real. Para fechar: rodar
-> `sprint9_alertas_por_usuario.sql` no SQL Editor, commitar/push (o input `user_id`
-> precisa existir no workflow da branch alvo do dispatch) e E2E ao vivo.
+> **Sprint 9 concluída em 07/07/2026** (todo:108/112/126 ✅): coleta e alertas por
+> dono ponta a ponta — validação mockada (22/22 Python + 9/9 Vercel, paridade
+> idêntica), scoping read-only 7/7 e **dois E2E reais**: run
+> [#98](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/28908278032)
+> (dispatch com `user_id` coletou só o item do usuário alvo) e alerta real com email
+> chegando ao dono + Telegram bloqueado. Código nos commits `d5452c2`/`4fcc16c`
+> (push na `Duplicate-Main` resolveu o 422 do dispatch). **Opcional:** rodar
+> `sprint9_alertas_por_usuario.sql` (flag de Telegram por usuário; UI na Sprint 11).
 >
 > Regras herdadas da V1: banco primeiro (migração versionada em
 > `project/migrations/`), endpoints sempre em **paridade Flask × Vercel**, validação
