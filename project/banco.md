@@ -67,9 +67,10 @@ Espelho leve de `auth.users`, criado pela migração `sprint5_multiusuario.sql`.
 | Coluna | Tipo | Null | Default | Descrição |
 |---|---|---|---|---|
 | `id` | `uuid` | não | — | **PK**; FK → `auth.users.id` `ON DELETE CASCADE` |
-| `email` | `text` | sim | — | cópia do email do auth (preenchida pelo trigger) |
+| `email` | `text` | sim | — | cópia do email do auth (preenchida pelo trigger); **destino dos alertas por email** do dono (Sprint 9) |
 | `nome` | `text` | sim | — | nome de exibição (opcional; UI usa email como fallback) |
 | `nivel` | `integer` | não | `1` | **papel**: `1` = normal · `2` = admin |
+| `notificar_telegram` | `boolean` | não | `false` | Sprint 9: recebe alertas no Telegram (bot/chat pessoal); `true` só p/ pedrosacanhadas — UI de seleção prevista p/ Sprint 11 |
 | `criado_em` | `timestamptz` | não | `now()` | — |
 
 - Preenchida automaticamente pelo trigger `trg_criar_perfil` a cada signup.
@@ -134,6 +135,10 @@ form de cadastro e na coleta segmentada (`CATEGORIA` do `main.py`):
 - Escrita: frontend (INSERT no cadastro, UPDATE de meta/monitorando — RLS exige ser
   dono ou admin); DELETE apenas via `/api/remover` (SERVICE_KEY, sem política de DELETE).
 - Leitura: frontend (RLS filtra por dono/admin) e coletor (SERVICE_KEY, vê tudo).
+- **Unicidade** (Sprint 8): `unique (url, user_id)` — constraint `itens_url_user_key`.
+  Substituiu a `itens_url_key` original (URL única **global**, resquício
+  pré-multiusuário descoberto na migração dos dados legados): usuários diferentes
+  podem monitorar a mesma URL; o mesmo usuário, não.
 
 ### 3.5 `historico_precos` — leituras de preço
 
@@ -297,6 +302,8 @@ A introspecção revelou tabelas de fases antigas do projeto, **fora do fluxo at
 | Arquivo | Sprint | Conteúdo |
 |---|---|---|
 | `sprint5_multiusuario.sql` | S5 (05/07/2026) | `usuarios`, trigger de perfil, `itens.user_id` + backfill, `is_admin()`, políticas RLS |
+| `sprint8_diversos_migracao.sql` | S8 (07/07/2026) | categoria `DIVERSOS`, troca `itens_url_key` → `unique (url, user_id)`, migração dos dados legados Kabum (itens + histórico) p/ pedrosacanhadas |
+| `sprint9_alertas_por_usuario.sql` | S9 (07/07/2026) | `usuarios.notificar_telegram` (flag do bot pessoal; `true` só p/ pedrosacanhadas) — email do alerta passa a ir ao dono do item |
 
 O que **não** está versionado (criado antes da convenção): `lojas`, `produtos`,
 `itens` (colunas originais), `historico_precos`, `alertas`, a view `ultimo_preco`

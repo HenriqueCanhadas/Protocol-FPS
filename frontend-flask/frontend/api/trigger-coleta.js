@@ -39,9 +39,10 @@ export default async function handler(req, res) {
   const apiUrl = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflow}/dispatches`;
 
   // Escopo opcional no corpo (mesma semântica do main.py):
-  //   item_id          → coleta pontual (só aquele produto; tem precedência)
-  //   categoria / loja → coleta segmentada (combináveis: ex. GPUs da Kabum)
-  //   nada             → coleta completa (todos os monitorados)
+  //   item_id                    → coleta pontual (só aquele produto; tem precedência)
+  //   categoria / loja / user_id → coleta segmentada (combináveis: ex. GPUs
+  //                                da Kabum, ou só os itens do usuário logado)
+  //   nada                       → coleta completa (todos os monitorados)
   let reqBody = req.body;
   if (typeof reqBody === "string") {
     try { reqBody = JSON.parse(reqBody); } catch { reqBody = {}; }
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
   const itemId    = reqBody?.item_id;
   const categoria = reqBody?.categoria;
   const loja      = reqBody?.loja;
+  const userId    = reqBody?.user_id;
   const dispatch  = { ref: branch };
   const inputs = {};
   if (itemId) {
@@ -56,6 +58,7 @@ export default async function handler(req, res) {
   } else {
     if (categoria) inputs.categoria = String(categoria);
     if (loja)      inputs.loja      = String(loja);
+    if (userId)    inputs.user_id   = String(userId);
   }
   if (Object.keys(inputs).length) dispatch.inputs = inputs;
 

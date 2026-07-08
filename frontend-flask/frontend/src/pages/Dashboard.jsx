@@ -555,14 +555,15 @@ function MetaModal({ item, onClose, onSave }) {
 }
 
 // ── Dashboard principal ────────────────────────────────────────
-const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
+const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 
 // Rótulos amigáveis para as siglas de categoria salvas em produtos.categoria
 const CAT_LABEL = {
-  all:     "Todos",
-  PSU:     "Fonte",
-  MOBO:    "Placa Mãe",
-  STORAGE: "Armazenamento",
+  all:      "Todos",
+  PSU:      "Fonte",
+  MOBO:     "Placa Mãe",
+  STORAGE:  "Armazenamento",
+  DIVERSOS: "Diversos",
 };
 
 // `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
@@ -595,36 +596,31 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const carregarPrecos = useCallback(async () => {
     const sb = await getSupabase();
     // Inclui o dono (usuarios via FK itens.user_id) para a visão de admin.
+    // A última leitura vem EMBUTIDA com order+limit por item (referencedTable):
+    // buscar historico_precos inteiro estoura o teto de 1000 linhas do PostgREST
+    // desde a migração dos dados legados (Sprint 8, ~5,4k leituras).
     let { data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome)")
-      .order("nome_na_loja", { ascending: true });
+      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), historico_precos(preco, disponivel, coletado_em)")
+      .order("nome_na_loja", { ascending: true })
+      .order("coletado_em", { referencedTable: "historico_precos", ascending: false })
+      .limit(1, { referencedTable: "historico_precos" });
 
     if (error) {
       // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
       ({ data: itens, error } = await sb
         .from("itens")
-        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
-        .order("nome_na_loja", { ascending: true }));
+        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria), historico_precos(preco, disponivel, coletado_em)")
+        .order("nome_na_loja", { ascending: true })
+        .order("coletado_em", { referencedTable: "historico_precos", ascending: false })
+        .limit(1, { referencedTable: "historico_precos" }));
     }
 
     if (error) { showToast("Erro ao carregar dados", "error"); return; }
     if (!itens?.length) { setDados([]); return; }
 
-    const ids = itens.map((i) => i.id);
-    const { data: precos } = await sb
-      .from("historico_precos")
-      .select("item_id, preco, disponivel, coletado_em")
-      .in("item_id", ids)
-      .order("coletado_em", { ascending: false });
-
-    const ultimoPreco = {};
-    for (const p of precos || []) {
-      if (!ultimoPreco[p.item_id]) ultimoPreco[p.item_id] = p;
-    }
-
     setDados(itens.map((item) => {
-      const ult = ultimoPreco[item.id] || {};
+      const ult = item.historico_precos?.[0] || {};
       return {
         item_id: item.id, nome_na_loja: item.nome_na_loja, url: item.url || null,
         loja: item.lojas?.nome || "—", categoria: item.produtos?.categoria || "—",
@@ -727,6 +723,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
    *   produto selecionado → pontual (item_id)
    *   categoria/loja      → segmentada (inputs combináveis)
    *   sem filtros         → completa
+   * Usuário NORMAL sempre coleta só os próprios itens (user_id — Sprint 9);
+   * admin/cron mantêm a coleta global.
    */
   const escopoColeta = () => {
     if (filtroLoja !== "all" && filtroProduto !== "all") {
@@ -737,6 +735,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     const partes = [];
     if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
     if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
+    if (!isAdmin && user?.id) { esc.user_id = user.id;          partes.push("apenas os seus produtos"); }
     esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
     return esc;
   };
@@ -784,13 +783,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
       // Corpo do dispatch (mesma semântica do main.py):
-      //   item_id → pontual; categoria/loja → segmentada; vazio → completa
+      //   item_id → pontual; categoria/loja/user_id → segmentada; vazio → completa
       const body = {};
       if (escopo.item_id) {
         body.item_id = escopo.item_id;
       } else {
         if (escopo.categoria) body.categoria = escopo.categoria;
         if (escopo.loja)      body.loja      = escopo.loja;
+        if (escopo.user_id)   body.user_id   = escopo.user_id;
       }
 
       const resp = await fetch("/api/trigger-coleta", {
@@ -949,7 +949,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                   "COLETAR AGORA",
                   segmentada
                     ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>Somente os itens desse escopo serão coletados. O processo pode levar alguns minutos.`
-                    : "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
+                    : `Isso irá disparar uma coleta imediata de preços de <strong>todos os ${isAdmin ? "produtos monitorados" : "seus produtos monitorados"}</strong>.<br><br>O processo pode levar alguns minutos.`,
                   "⚡",
                   () => iniciarColeta(esc),
                   false,

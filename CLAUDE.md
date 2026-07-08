@@ -28,7 +28,8 @@ through Vercel serverless functions under `frontend-flask/frontend/api/`.
 
 **SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
 Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
-`BrowserRouter` with three pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`, `Conta` `/conta`)
+`BrowserRouter` with four pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`,
+`NovoUsuario` `/novo-usuario` — admin-only user management — and `Conta` `/conta`)
 plus redirects for legacy HTML routes. The Supabase client (`services/supabase.js`) is a lazy
 singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/config` from Flask.
 Imports use the `@/` alias (→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` —
@@ -39,8 +40,9 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
 - `/api/config` — returns only the public `SUPABASE_URL` + `SUPABASE_ANON_KEY`
   (Flask only; in prod Vite inlines these at build time).
 - `/api/trigger-coleta` (Vercel: `api/trigger-coleta.js`) — fires the GitHub
-  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side. An optional `item_id` in the POST
-  body is forwarded as the workflow input to trigger a pointwise (single-product) run.
+  `workflow_dispatch`; holds `GITHUB_TOKEN` server-side. Optional POST-body fields become
+  workflow inputs: `item_id` (pointwise single-product run, takes precedence) or
+  `categoria`/`loja` (segmented run, combinable).
 - `/api/remover` (Vercel: `api/remover.js`) — deletes a product or a history row using
   `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
@@ -59,14 +61,24 @@ it exists to mirror the Vercel rewrite in dev.
 
 ## Collector flow (`main.py`)
 
-**Two collection modes** (`_selecionar_itens`): if the `ITEM_ID` env var is set, it collects
-*only* that one item even if `monitorando = false` (a **pointwise** run, fired by a per-product
-"Coletar Agora" button); otherwise it does a **full** run over every item with
-`monitorando = true` (the daily cron / global button). The value flows
-frontend → `/api/trigger-coleta` (`item_id` in the POST body) → `workflow_dispatch` input
-`item_id` (`.github/workflows/coletar.yml`) → the `ITEM_ID` env var read here.
+**Three collection modes** (`_selecionar_itens`), by precedence:
+1. `ITEM_ID` env var set → **pointwise**: collects *only* that item even if
+   `monitorando = false` (a per-product "Coletar Agora" is an explicit manual request).
+   Ignores `CATEGORIA`/`LOJA`.
+2. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
+   that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
+   (`kabum`/`terabyteshop`/`pichau`) and/or owner (`itens.user_id`). Combinable. The
+   category/store filters run in Python; the user filter is in the PostgREST query.
+   The SPA sends `user_id` automatically for non-admin users — a normal user's
+   "collect all" only collects their own items (Sprint 9); admins and the cron stay
+   global.
+3. Nothing set → **full** run over every item with `monitorando = true` (daily cron /
+   admin global button).
 
-1. Query Supabase `itens` where `monitorando = true` (or `id = ITEM_ID` in pointwise mode).
+Values flow frontend → `/api/trigger-coleta` (POST body) → `workflow_dispatch` inputs
+(`.github/workflows/coletar.yml`) → the env vars read here.
+
+1. Query Supabase `itens` (scoped per the mode above).
 2. For each item, pick a scraper from the `SCRAPERS` dict keyed by the store name
    (`lojas.nome` lowercased + spaces stripped — e.g. `"terabyteshop"`).
 3. `Scraper().coletar(url)` returns a `DadosProduto` dataclass `(nome, preco, disponivel, url)`.
@@ -74,12 +86,21 @@ frontend → `/api/trigger-coleta` (`item_id` in the POST body) → `workflow_di
 5. Call the Supabase RPC `verificar_alertas(p_item_id, p_preco_atual)`; for each returned
    alert dispatch email + telegram and record it in the `alertas` table.
 
-Alert types handled in `_montar_mensagem`: `abaixo_meta` (below target) and price-drop.
+Alert types (`notificacoes/formato.py`): `abaixo_meta` (below target) and `queda_preco`
+(dropped vs. previous reading).
+
+**Alert routing (Sprint 9)**: notifications go to the item's **owner** — email to
+`usuarios.email` of `itens.user_id` (`enviar_email(alerta, destinatario=...)`;
+`EMAIL_DESTINATARIO` is only the ownerless fallback). Telegram is a single personal
+bot/chat: it fires only for owners with `usuarios.notificar_telegram = true`
+(migration `sprint9_alertas_por_usuario.sql`; if the column doesn't exist yet,
+`_carregar_usuarios` falls back to admin-only).
 
 The Supabase tables (`itens`, `lojas`, `produtos`, `historico_precos`, `alertas`,
-`usuarios`) and the `verificar_alertas` RPC live in Supabase. Schema changes are
-recorded as SQL files under `project/migrations/` (run manually in the Supabase SQL
-Editor — the service key can't execute DDL).
+`usuarios`) and the `verificar_alertas` RPC live in Supabase — full schema, RLS, and
+data-flow documentation in `project/banco.md`. Schema changes are recorded as SQL
+files under `project/migrations/` (run manually in the Supabase SQL Editor — the
+service key can't execute DDL).
 
 **Multiuser model (Sprint 5):** `usuarios.nivel` (1 = normal, 2 = admin) mirrors
 `auth.users` via a signup trigger; `itens.user_id` (default `auth.uid()`) marks the
@@ -111,6 +132,12 @@ flags required in the Linux container (`--no-sandbox`, `--disable-dev-shm-usage`
 `--single-process`, …), and always dumps page diagnostics. To register a new store,
 add a `ScraperBase` subclass and an entry to the `SCRAPERS` dict in `main.py`.
 
+**Known limitation — Pichau in CI**: Pichau blocks datacenter IPs by serving a fake
+"Site em Manutenção" page, so it only collects reliably when run **locally**
+(recorded decision — no HTTP fallback, it always 403s from datacenters). The scraper
+retries up to 3× in CI, but CI coverage is effectively Kabum + Terabyte. Don't treat
+a Pichau failure in Actions logs as a scraper regression.
+
 ## Commands
 
 ### Collector (Python, repo root)
@@ -118,6 +145,8 @@ add a `ScraperBase` subclass and an entry to the `SCRAPERS` dict in `main.py`.
 pip install -r requirements.txt
 playwright install chromium          # one-time; --with-deps in CI
 python main.py                       # runs the full collection once
+ITEM_ID=<uuid> python main.py        # pointwise (one item, even if paused)
+CATEGORIA=GPU LOJA=kabum python main.py   # segmented (either or both)
 ```
 There is no test suite. To debug a single store, run a scraper directly:
 ```bash
@@ -159,11 +188,13 @@ as GitHub Actions Secrets in `.github/workflows/coletar.yml`.
 ## CI
 
 `.github/workflows/coletar.yml` runs the collector daily at 12:00 UTC (09:00 BRT) and on
-manual `workflow_dispatch` (with an optional `item_id` input for pointwise runs).
-Python 3.11, installs Playwright Chromium, runs `python main.py`.
+manual `workflow_dispatch` with optional inputs `item_id` (pointwise), `categoria`, and
+`loja` (segmented). Python 3.11, installs Playwright Chromium, runs `python main.py`.
 
 ## Project planning
 
 The `todo` file at the repo root is the source of truth for planned work (statuses:
-`OK-` done, `Pending-` started, `-` to do). The `sprint-planner` skill reads it and
-(re)generates the sprint report at `project/sprints.md`. Edit `todo`, not `sprints.md`.
+`OK-` done, `Pending-` started, `-` to do). It is split into version sections marked
+`-----------------V<N>------------------`; each section gets its own report. The
+`sprint-planner` skill reads the `todo` and (re)generates `project/sprint_v<N>.md`
+(V1 is finished/frozen; V2 is the active plan). Edit `todo`, not the reports.

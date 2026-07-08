@@ -183,30 +183,35 @@ def _selecionar_itens(sb) -> list:
 
     1. ITEM_ID definido (coleta PONTUAL, botão "Coletar Agora" de um produto):
        coleta apenas aquele item — mesmo com monitoramento pausado, pois é
-       um pedido manual explícito. Ignora CATEGORIA/LOJA.
-    2. CATEGORIA e/ou LOJA definidas (coleta SEGMENTADA): coleta os itens
-       monitorados daquela categoria (ex.: GPU) e/ou loja (ex.: kabum).
-       As duas são combináveis — ex.: só as GPUs da Kabum.
-    3. Nenhuma env definida (cron diário ou botão global): coleta COMPLETA,
-       todos os itens com monitorando = true.
+       um pedido manual explícito. Ignora CATEGORIA/LOJA/USER_ID.
+    2. CATEGORIA e/ou LOJA e/ou USER_ID definidos (coleta SEGMENTADA): coleta
+       os itens monitorados daquela categoria (ex.: GPU), loja (ex.: kabum)
+       e/ou dono (usuário normal que clicou "Coletar" vê só os itens dele).
+       Todos combináveis — ex.: só as GPUs da Kabum de um usuário.
+    3. Nenhuma env definida (cron diário ou botão global do admin): coleta
+       COMPLETA, todos os itens com monitorando = true.
     """
     item_id_alvo = os.environ.get("ITEM_ID", "").strip()
     categoria    = os.environ.get("CATEGORIA", "").strip().upper()
     loja         = _slug_loja(os.environ.get("LOJA", "").strip())
+    user_id      = os.environ.get("USER_ID", "").strip()
 
     query = sb.table("itens").select(
-        "id, url, nome_na_loja, preco_meta, lojas(nome), produtos(categoria)"
+        "id, url, nome_na_loja, preco_meta, user_id, lojas(nome), produtos(categoria)"
     )
     if item_id_alvo:
         logger.info("Modo PONTUAL — coletando apenas item_id=%s", item_id_alvo)
         query = query.eq("id", item_id_alvo)
-    elif categoria or loja:
+    elif categoria or loja or user_id:
         escopo = " + ".join(filter(None, (
             f"categoria={categoria}" if categoria else "",
             f"loja={loja}" if loja else "",
+            f"user_id={user_id[:8]}…" if user_id else "",
         )))
         logger.info("Modo SEGMENTADO — coletando itens monitorados de %s", escopo)
         query = query.eq("monitorando", True)
+        if user_id:
+            query = query.eq("user_id", user_id)
     else:
         logger.info("Modo COMPLETO — coletando todos os itens monitorados")
         query = query.eq("monitorando", True)
@@ -225,6 +230,31 @@ def _selecionar_itens(sb) -> list:
                      if _slug_loja((i.get("lojas") or {}).get("nome")) == loja]
 
     return itens
+
+
+def _carregar_usuarios(sb) -> dict:
+    """
+    Mapa user_id → {email, telegram} para rotear notificações por DONO do
+    item (Sprint 9):
+      • Email    → sempre para o email cadastrado do dono do item;
+      • Telegram → só para quem tem usuarios.notificar_telegram = true
+        (o bot/chat é pessoal — coluna criada em sprint9_alertas_por_usuario.sql).
+    Fallback: se a coluna ainda não existir (migração não aplicada), o
+    Telegram fica habilitado apenas para o admin pedrosacanhadas@gmail.com.
+    """
+    try:
+        rows = sb.table("usuarios").select("id, email, notificar_telegram").execute().data
+        return {r["id"]: {"email": r.get("email"),
+                          "telegram": bool(r.get("notificar_telegram"))} for r in rows}
+    except Exception:
+        logger.warning(
+            "Coluna usuarios.notificar_telegram ausente (aplicar migração sprint9) — "
+            "Telegram restrito ao admin por fallback"
+        )
+        rows = sb.table("usuarios").select("id, email").execute().data
+        return {r["id"]: {"email": r.get("email"),
+                          "telegram": r.get("email") == "pedrosacanhadas@gmail.com"}
+                for r in rows}
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -249,6 +279,9 @@ def main() -> None:
     itens = _selecionar_itens(sb)
     logger.info("Itens a monitorar: %d", len(itens))
     print()
+
+    # Donos dos itens (roteamento de email/telegram por usuário — Sprint 9)
+    usuarios = _carregar_usuarios(sb)
 
     # Contadores para resumo final
     total_ok      = 0
@@ -358,18 +391,28 @@ def main() -> None:
                 "meta":           item.get("preco_meta"),
             }
 
-            ok_email    = enviar_email(alerta_info)
-            ok_telegram = enviar_telegram(alerta_info)
+            # ── Roteamento por dono (Sprint 9) ───────────────────────
+            # Email vai para o email cadastrado do dono do item; Telegram
+            # só para quem está habilitado (bot/chat é pessoal).
+            dono       = usuarios.get(item.get("user_id")) or {}
+            email_dono = dono.get("email")
 
+            ok_email = enviar_email(alerta_info, destinatario=email_dono)
             if ok_email:
-                logger.info("📧 Email enviado com sucesso")
+                logger.info("📧 Email enviado para %s", email_dono or "destinatário padrão")
             else:
-                logger.error("📧 Falha ao enviar email")
+                logger.error("📧 Falha ao enviar email para %s", email_dono or "destinatário padrão")
 
-            if ok_telegram:
-                logger.info("📱 Telegram enviado com sucesso")
+            if dono.get("telegram"):
+                ok_telegram = enviar_telegram(alerta_info)
+                if ok_telegram:
+                    logger.info("📱 Telegram enviado com sucesso")
+                else:
+                    logger.error("📱 Falha ao enviar Telegram")
             else:
-                logger.error("📱 Falha ao enviar Telegram")
+                ok_telegram = False
+                logger.info("📱 Telegram desabilitado para o dono (%s) — não enviado",
+                            email_dono or "sem dono")
 
             try:
                 sb.table("alertas").insert({

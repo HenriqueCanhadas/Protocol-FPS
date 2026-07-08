@@ -171,13 +171,15 @@ def api_trigger_coleta():
     )
 
     # Escopo opcional no corpo (mesma semântica do main.py):
-    #   item_id          → coleta pontual (só aquele produto; tem precedência)
-    #   categoria / loja → coleta segmentada (combináveis: ex. GPUs da Kabum)
-    #   nada             → coleta completa (todos os monitorados)
+    #   item_id                    → coleta pontual (só aquele produto; tem precedência)
+    #   categoria / loja / user_id → coleta segmentada (combináveis: ex. GPUs
+    #                                da Kabum, ou só os itens do usuário logado)
+    #   nada                       → coleta completa (todos os monitorados)
     payload   = request.get_json(silent=True) or {}
     item_id   = payload.get("item_id")
     categoria = payload.get("categoria")
     loja      = payload.get("loja")
+    user_id   = payload.get("user_id")
     dispatch  = {"ref": _GITHUB_BRANCH}
     inputs = {}
     if item_id:
@@ -185,6 +187,7 @@ def api_trigger_coleta():
     else:
         if categoria: inputs["categoria"] = str(categoria)
         if loja:      inputs["loja"]      = str(loja)
+        if user_id:   inputs["user_id"]   = str(user_id)
     if inputs:
         dispatch["inputs"] = inputs
     body = json.dumps(dispatch).encode()

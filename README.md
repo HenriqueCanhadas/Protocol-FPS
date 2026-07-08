@@ -14,9 +14,12 @@ por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
 
 - **Coleta diária automática** (cron do GitHub Actions às 09:00 de Brasília) e
   **coleta sob demanda** pelo botão do site
-- **Escopo de coleta**: tudo, por **categoria** (GPU/CPU/RAM/PSU/MOBO/STORAGE),
-  por **loja**, ou **um único produto** ("Coletar agora" no menu do item)
-- **Alertas** em dois canais (Email HTML + Telegram) e dois gatilhos:
+- **Escopo de coleta**: tudo, por **categoria** (GPU/CPU/RAM/PSU/MOBO/STORAGE/DIVERSOS),
+  por **loja**, por **usuário** (o "Coletar" de um usuário normal coleta só os itens
+  dele), ou **um único produto** ("Coletar agora" no menu do item)
+- **Alertas** em dois canais e dois gatilhos:
+  - Email HTML vai para o **email cadastrado do dono do item**; Telegram é um
+    bot pessoal, disparado só para quem está habilitado (`notificar_telegram`)
   - `abaixo_meta` — o preço ficou **abaixo do preço-alvo** definido para o item
   - `queda_preco` — o preço **caiu** em relação à leitura anterior
 - **Dashboard** com busca, filtros combináveis (categoria × loja × produto da loja),
@@ -194,7 +197,8 @@ O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 │       └── src/                # components/ hooks/ pages/ services/ styles/ utils/
 ├── project/
 │   ├── banco.md                # documentação do banco (tabelas, RLS, RPCs)
-│   ├── sprints.md              # planejamento e histórico de sprints
+│   ├── sprint_v1.md            # sprints da V1 (concluída)
+│   ├── sprint_v2.md            # sprints da V2 (em andamento)
 │   └── migrations/             # migrações SQL (aplicar no SQL Editor do Supabase)
 └── .github/workflows/coletar.yml
 ```
@@ -203,8 +207,10 @@ O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 
 - [`project/banco.md`](project/banco.md) — esquema do banco, relacionamentos, RLS,
   funções e fluxos de dados
-- [`project/sprints.md`](project/sprints.md) — relatório de sprints
+- [`project/sprint_v1.md`](project/sprint_v1.md) — relatório de sprints da V1, concluída
   (`SPRINT | TEST | STATUS | RESULTS`) com todo o histórico de decisões
+- [`project/sprint_v2.md`](project/sprint_v2.md) — planejamento das sprints da V2
+  (atualizações e correções em andamento)
 - [`CLAUDE.md`](CLAUDE.md) — guia de arquitetura para desenvolvimento assistido
 
 ## ✦ Licença
