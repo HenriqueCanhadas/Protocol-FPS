@@ -1,20 +1,23 @@
 /**
- * pages/NovoUsuario.jsx — PROTOCOL FPS
+ * pages/Usuarios.jsx — PROTOCOL FPS
  * Gestão de usuários — SOMENTE ADMIN (usuarios.nivel >= 2).
  *
- * Criação de usuário (email + senha + papel Normal/Admin) e troca de senha
- * de qualquer usuário. As operações rodam server-side em /api/usuarios
- * (Flask em dev, Vercel Function em produção) com a SERVICE_KEY; o browser
- * só envia o access_token da sessão do admin para autorização.
+ * Página única de gestão (Sprint 11): listagem de todos os usuários
+ * (último acesso, papel, status, nº de itens, Telegram por usuário e
+ * exclusão em cascata), criação de usuário (email + senha + papel) e
+ * troca de senha de qualquer usuário. As operações rodam server-side
+ * em /api/usuarios (Flask em dev, Vercel Function em produção) com a
+ * SERVICE_KEY; o browser só envia o access_token da sessão do admin.
  */
 import { useState, useEffect, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { getSupabase } from "@/services/supabase";
+import { dataHoraBRT } from "@/utils/datas";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
 .nu-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
-.page-wrap { width:min(800px,100%); display:flex; flex-direction:column; gap:2rem; }
+.page-wrap { width:min(960px,100%); display:flex; flex-direction:column; gap:2rem; }
 .breadcrumb { display:flex; align-items:center; gap:.6rem; font-size:var(--fs-sm); letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; }
 .breadcrumb a { color:var(--text-dim); text-decoration:none; transition:color .15s; }
 .breadcrumb a:hover { color:var(--green); }
@@ -45,7 +48,30 @@ const css = `
 }
 .user-select:hover,.user-select:focus { border-color:var(--amber); }
 .user-select option { background:var(--bg2); color:var(--text); }
-.nivel-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.25rem .6rem; border:1px solid var(--border2); color:var(--text-dim); }
+
+/* ── Listagem de usuários ─────────────────────────────────── */
+.users-scroll { overflow-x:auto; }
+.users-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:var(--fs-sm); }
+.users-table th { text-align:left; padding:.7rem .9rem; color:var(--text-dim); font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; border-bottom:1px solid var(--border2); white-space:nowrap; }
+.users-table td { padding:.8rem .9rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:middle; white-space:nowrap; }
+.users-table tr:last-child td { border-bottom:none; }
+.users-table tr:hover td { background:var(--bg3); }
+.u-email { display:flex; flex-direction:column; gap:.15rem; }
+.u-email .ue-nome { font-size:var(--fs-xs); color:var(--text-muted); }
+.u-voce { color:var(--green); font-size:var(--fs-xs); letter-spacing:.15em; }
+.badge { display:inline-block; font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.25rem .6rem; border:1px solid var(--border2); color:var(--text-dim); }
+.badge.b-admin  { border-color:var(--amber); color:var(--amber); background:rgba(255,184,0,.08); }
+.badge.b-normal { border-color:var(--border2); color:var(--text-dim); }
+.badge.b-ativo  { border-color:var(--green-dim); color:var(--green); }
+.badge.b-pend   { border-color:var(--amber); color:var(--amber); }
+.tg-toggle { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.15em; padding:.35rem .7rem; cursor:pointer; transition:all .15s; text-transform:uppercase; }
+.tg-toggle:hover { border-color:var(--green-dim); }
+.tg-toggle.on { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.tg-toggle:disabled { opacity:.4; cursor:not-allowed; }
+.btn-excluir { background:transparent; border:1px solid var(--border2); color:var(--red); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.15em; padding:.35rem .8rem; cursor:pointer; transition:all .15s; text-transform:uppercase; }
+.btn-excluir:hover:not(:disabled) { border-color:var(--red); background:rgba(255,60,60,.08); }
+.btn-excluir:disabled { opacity:.35; cursor:not-allowed; }
+.users-empty { padding:1.5rem; color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.08em; }
 
 @media (max-width:640px) {
   .nu-main { padding:1.25rem 1rem; }
@@ -71,8 +97,14 @@ async function chamarApiUsuarios(body) {
   return data;
 }
 
-export default function NovoUsuario({ showToast, isAdmin }) {
+export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
   const [confirm, setConfirm] = useState(null);
+
+  // ── Listagem ───────────────────────────────────────────────
+  const [usuarios,    setUsuarios]    = useState([]);
+  const [telegramOk,  setTelegramOk]  = useState(true);
+  const [carregando,  setCarregando]  = useState(true);
+  const [ocupadoId,   setOcupadoId]   = useState(null); // linha com ação em andamento
 
   // ── Criar usuário ──────────────────────────────────────────
   const [email,     setEmail]     = useState("");
@@ -83,7 +115,6 @@ export default function NovoUsuario({ showToast, isAdmin }) {
   const [criando,   setCriando]   = useState(false);
 
   // ── Trocar senha ───────────────────────────────────────────
-  const [usuarios,   setUsuarios]   = useState([]);
   const [alvoId,     setAlvoId]     = useState("");
   const [novaSenha,  setNovaSenha]  = useState("");
   const [confNova,   setConfNova]   = useState("");
@@ -91,24 +122,78 @@ export default function NovoUsuario({ showToast, isAdmin }) {
   const [trocando,   setTrocando]   = useState(false);
 
   const carregarUsuarios = useCallback(async () => {
-    // Admin lê todos os perfis via RLS (usuarios_select libera para nivel >= 2)
-    const sb = await getSupabase();
-    const { data } = await sb
-      .from("usuarios")
-      .select("id, email, nome, nivel")
-      .order("email", { ascending: true });
-    setUsuarios(data || []);
-  }, []);
+    // Listagem server-side (/api/usuarios acao=listar): junta os perfis
+    // (usuarios) com auth.users (último acesso, confirmação) — campos que
+    // só a admin API enxerga — e a contagem de itens por dono.
+    setCarregando(true);
+    try {
+      const data = await chamarApiUsuarios({ acao: "listar" });
+      setUsuarios(data.usuarios || []);
+      setTelegramOk(Boolean(data.telegram_disponivel));
+    } catch (err) {
+      showToast("Erro ao listar usuários: " + err.message, "error");
+    }
+    setCarregando(false);
+  }, [showToast]);
 
   useEffect(() => { if (isAdmin) carregarUsuarios(); }, [isAdmin, carregarUsuarios]);
 
-  // Não-admin não tem o que fazer aqui (o item nem aparece no menu)
-  if (!isAdmin) return <Navigate to="/" replace />;
+  // Não-admin não tem o que fazer aqui (o item nem aparece no menu).
+  // Num deep-link direto o perfil ainda pode estar carregando — espera
+  // antes de redirecionar, senão o próprio admin é expulso da página.
+  if (!isAdmin) {
+    if (perfilLoading) {
+      return (
+        <main className="nu-main">
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flex: 1 }}>
+            <div className="spinner" />
+          </div>
+        </main>
+      );
+    }
+    return <Navigate to="/" replace />;
+  }
 
   const validarSenha = (s, conf) => {
     if (s.length < 8) return "Senha deve ter pelo menos 8 caracteres";
     if (s !== conf)   return "As senhas não coincidem";
     return null;
+  };
+
+  const alternarTelegram = async (u) => {
+    setOcupadoId(u.id);
+    try {
+      const data = await chamarApiUsuarios({ acao: "telegram", user_id: u.id, ativo: !u.notificar_telegram });
+      setUsuarios((lista) => lista.map((x) =>
+        x.id === u.id ? { ...x, notificar_telegram: data.notificar_telegram } : x));
+      showToast(`✓ Telegram ${data.notificar_telegram ? "ativado" : "desativado"} para ${u.email}.`, "ok");
+    } catch (err) {
+      showToast("Erro ao alterar Telegram: " + err.message, "error");
+    }
+    setOcupadoId(null);
+  };
+
+  const excluirUsuario = (u) => {
+    setConfirm({
+      titulo: "EXCLUIR USUÁRIO",
+      corpo: `Excluir <strong>${u.email}</strong> definitivamente?<br><br>` +
+        `<span style='color:var(--red)'>⚠ Ação irreversível:</span> a conta, ` +
+        `<strong>${u.itens}</strong> item(ns) monitorado(s) e TODO o histórico ` +
+        `de preços e alertas dele serão apagados em cascata.`,
+      icone: "✕", isDanger: true,
+      cb: async () => {
+        setOcupadoId(u.id);
+        try {
+          const data = await chamarApiUsuarios({ acao: "excluir", user_id: u.id });
+          const r = data.removed || {};
+          showToast(`✓ ${u.email} excluído (${r.itens || 0} itens, ${r.leituras || 0} leituras, ${r.alertas || 0} alertas).`, "ok");
+          carregarUsuarios();
+        } catch (err) {
+          showToast("Erro ao excluir usuário: " + err.message, "error");
+        }
+        setOcupadoId(null);
+      },
+    });
   };
 
   const criar = () => {
@@ -176,12 +261,86 @@ export default function NovoUsuario({ showToast, isAdmin }) {
         <div className="page-wrap">
           <nav className="breadcrumb">
             <Link to="/">Dashboard</Link>
-            <span>›</span><span>Novo Usuário</span>
+            <span>›</span><span>Usuários</span>
           </nav>
 
           <div>
-            <div className="page-title">NOVO<br />USUÁRIO</div>
+            <div className="page-title">USUÁRIOS</div>
             <div className="page-subtitle">Gestão de acesso — visível apenas para administradores</div>
+          </div>
+
+          {/* LISTAGEM */}
+          <div className="form-card" data-label="USUÁRIOS CADASTRADOS">
+            {carregando ? (
+              <div className="users-empty">Carregando usuários…</div>
+            ) : !usuarios.length ? (
+              <div className="users-empty">Nenhum usuário encontrado.</div>
+            ) : (
+              <div className="users-scroll">
+                <table className="users-table">
+                  <thead>
+                    <tr>
+                      <th>Usuário</th>
+                      <th>Papel</th>
+                      <th>Último acesso</th>
+                      <th>Status</th>
+                      <th>Itens</th>
+                      {telegramOk && <th>Telegram</th>}
+                      <th>Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usuarios.map((u) => {
+                      const souEu = u.id === user?.id;
+                      return (
+                        <tr key={u.id}>
+                          <td>
+                            <div className="u-email">
+                              <span>{u.email} {souEu && <span className="u-voce">· VOCÊ</span>}</span>
+                              {u.nome && <span className="ue-nome">{u.nome}</span>}
+                            </div>
+                          </td>
+                          <td>
+                            <span className={`badge ${u.nivel >= 2 ? "b-admin" : "b-normal"}`}>
+                              {u.nivel >= 2 ? "Admin" : "Normal"}
+                            </span>
+                          </td>
+                          <td>{u.ultimo_acesso ? dataHoraBRT(u.ultimo_acesso, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "nunca"}</td>
+                          <td>
+                            <span className={`badge ${u.confirmado ? "b-ativo" : "b-pend"}`}>
+                              {u.confirmado ? "Ativo" : "Não confirmado"}
+                            </span>
+                          </td>
+                          <td>{u.itens}</td>
+                          {telegramOk && (
+                            <td>
+                              <button
+                                className={`tg-toggle${u.notificar_telegram ? " on" : ""}`}
+                                disabled={ocupadoId === u.id}
+                                title="Ativar/desativar o bot do Telegram para os alertas deste usuário"
+                                onClick={() => alternarTelegram(u)}
+                              >
+                                {u.notificar_telegram ? "✓ ON" : "OFF"}
+                              </button>
+                            </td>
+                          )}
+                          <td>
+                            <button
+                              className="btn-excluir"
+                              disabled={souEu || ocupadoId === u.id}
+                              title={souEu ? "Não é possível excluir a própria conta" : "Excluir usuário e todos os dados dele"}
+                              onClick={() => excluirUsuario(u)}
+                            >
+                              Excluir
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* CRIAR USUÁRIO */}

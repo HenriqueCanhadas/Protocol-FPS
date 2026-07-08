@@ -15,11 +15,11 @@ import Toast       from "@/components/Toast";
 
 import Dashboard   from "@/pages/Dashboard";
 import NovoProduto from "@/pages/NovoProduto";
-import NovoUsuario from "@/pages/NovoUsuario";
+import Usuarios    from "@/pages/Usuarios";
 import Conta       from "@/pages/Conta";
 
 export default function App() {
-  const { user, perfil, isAdmin, loading, signIn, signOut, updatePassword } = useAuth();
+  const { user, perfil, isAdmin, loading, perfilLoading, signIn, signOut, updatePassword } = useAuth();
   const { toast, showToast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -62,7 +62,7 @@ export default function App() {
         <Routes>
           <Route path="/"             element={<Dashboard   showToast={showToast} isAdmin={isAdmin} user={user} />} />
           <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} />} />
-          <Route path="/novo-usuario" element={<NovoUsuario showToast={showToast} isAdmin={isAdmin} />} />
+          <Route path="/usuarios"     element={<Usuarios showToast={showToast} isAdmin={isAdmin} perfilLoading={perfilLoading} user={user} />} />
           <Route path="/conta"        element={
             <Conta
               user={user}
@@ -72,8 +72,9 @@ export default function App() {
               showToast={showToast}
             />
           } />
-          {/* Rotas legadas do HTML puro → redireciona */}
+          {/* Rotas legadas → redireciona */}
           <Route path="/novo_produto" element={<Navigate to="/novo-produto" replace />} />
+          <Route path="/novo-usuario" element={<Navigate to="/usuarios"     replace />} />
           <Route path="/usuario"      element={<Navigate to="/conta"        replace />} />
           <Route path="*"             element={<Navigate to="/"             replace />} />
         </Routes>

@@ -291,6 +291,9 @@ def api_usuarios():
     Body JSON:
       { "acao": "criar",        "email": ..., "senha": ..., "nivel": 1|2 }
       { "acao": "trocar_senha", "user_id": ..., "senha": ... }
+      { "acao": "listar" }
+      { "acao": "telegram",     "user_id": ..., "ativo": true|false }
+      { "acao": "excluir",      "user_id": ... }
     """
     if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
         return jsonify({"error": "SUPABASE_URL / SUPABASE_SERVICE_KEY não configuradas no .env"}), 500
@@ -301,7 +304,7 @@ def api_usuarios():
     if not token:
         return jsonify({"error": "Não autenticado — faça login para gerenciar usuários."}), 401
     try:
-        _, is_admin = _usuario_do_token(token)
+        uid, is_admin = _usuario_do_token(token)
     except PermissionError as exc:
         return jsonify({"error": str(exc)}), 401
     if not is_admin:
@@ -311,15 +314,15 @@ def api_usuarios():
     acao  = payload.get("acao")
     senha = payload.get("senha") or ""
 
-    if acao not in ("criar", "trocar_senha"):
-        return jsonify({"error": "acao inválida (use 'criar' ou 'trocar_senha')"}), 400
-    if len(senha) < 8:
+    if acao not in ("criar", "trocar_senha", "listar", "telegram", "excluir"):
+        return jsonify({"error": "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram' ou 'excluir')"}), 400
+    if acao in ("criar", "trocar_senha") and len(senha) < 8:
         return jsonify({"error": "A senha deve ter pelo menos 8 caracteres."}), 400
 
-    def _admin_api(path, data, method="POST"):
+    def _admin_api(path, data=None, method="POST"):
         req = urllib.request.Request(
             f"{_SUPABASE_URL}/auth/v1{path}",
-            data=json.dumps(data).encode(),
+            data=json.dumps(data).encode() if data is not None else None,
             headers={
                 "apikey":        _SUPABASE_SERVICE_KEY,
                 "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
@@ -330,7 +333,116 @@ def api_usuarios():
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode() or "{}")
 
+    def _supabase_patch(path, data):
+        req = urllib.request.Request(
+            f"{_SUPABASE_URL}/rest/v1/{path}",
+            data=json.dumps(data).encode(),
+            headers={
+                "apikey":        _SUPABASE_SERVICE_KEY,
+                "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
+                "Content-Type":  "application/json",
+            },
+            method="PATCH",
+        )
+        urllib.request.urlopen(req, timeout=15).close()
+
     try:
+        if acao == "listar":
+            # Perfis (usuarios) — com fallback caso a migração sprint9
+            # (coluna notificar_telegram) ainda não tenha rodado no banco.
+            telegram_ok = True
+            try:
+                perfis = _supabase_get(
+                    "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc")
+            except urllib.error.HTTPError:
+                telegram_ok = False
+                perfis = _supabase_get("usuarios?select=id,email,nome,nivel&order=email.asc")
+
+            # Contagem de itens por dono — paginada (teto de 1000 do PostgREST)
+            contagem, de = {}, 0
+            while True:
+                pagina = _supabase_get(f"itens?select=user_id&limit=1000&offset={de}")
+                for linha in pagina:
+                    dono = linha.get("user_id")
+                    contagem[dono] = contagem.get(dono, 0) + 1
+                if len(pagina) < 1000:
+                    break
+                de += 1000
+
+            # auth.users (último acesso, confirmação) — admin API paginada
+            auth_map, page = {}, 1
+            while True:
+                resp = _admin_api(f"/admin/users?page={page}&per_page=100", method="GET")
+                users = resp.get("users") or []
+                for u in users:
+                    auth_map[u.get("id")] = u
+                if len(users) < 100:
+                    break
+                page += 1
+
+            usuarios = []
+            for p in perfis:
+                au = auth_map.get(p["id"], {})
+                usuarios.append({
+                    "id":                 p["id"],
+                    "email":              p.get("email"),
+                    "nome":               p.get("nome"),
+                    "nivel":              p.get("nivel", 1),
+                    "notificar_telegram": p.get("notificar_telegram") if telegram_ok else None,
+                    "itens":              contagem.get(p["id"], 0),
+                    "criado_em":          au.get("created_at"),
+                    "ultimo_acesso":      au.get("last_sign_in_at"),
+                    "confirmado":         bool(au.get("email_confirmed_at")),
+                })
+            return jsonify({"ok": True, "usuarios": usuarios,
+                            "telegram_disponivel": telegram_ok}), 200
+
+        if acao == "telegram":
+            user_id = str(payload.get("user_id") or "").strip()
+            if not user_id:
+                return jsonify({"error": "user_id não informado."}), 400
+            ativo = bool(payload.get("ativo"))
+            try:
+                _supabase_patch(f"usuarios?id=eq.{user_id}", {"notificar_telegram": ativo})
+            except urllib.error.HTTPError as exc:
+                if exc.code == 400:
+                    return jsonify({"error": "Coluna notificar_telegram ausente — rode a "
+                                             "migração sprint9_alertas_por_usuario.sql no "
+                                             "SQL Editor do Supabase."}), 400
+                raise
+            return jsonify({"ok": True, "notificar_telegram": ativo}), 200
+
+        if acao == "excluir":
+            user_id = str(payload.get("user_id") or "").strip()
+            if not user_id:
+                return jsonify({"error": "user_id não informado."}), 400
+            if user_id == uid:
+                return jsonify({"error": "Não é possível excluir a própria conta."}), 400
+            alvo = _supabase_get(f"usuarios?id=eq.{user_id}&select=id,email")
+            if not alvo:
+                return jsonify({"error": "Usuário não encontrado."}), 404
+
+            # Cascata manual (não há ON DELETE CASCADE em itens/histórico/alertas):
+            # alertas → historico_precos → itens → conta auth (esta cascateia p/ usuarios)
+            item_ids, de = [], 0
+            while True:
+                pagina = _supabase_get(
+                    f"itens?user_id=eq.{user_id}&select=id&limit=1000&offset={de}")
+                item_ids += [linha["id"] for linha in pagina]
+                if len(pagina) < 1000:
+                    break
+                de += 1000
+
+            removidos = {"itens": 0, "leituras": 0, "alertas": 0}
+            if item_ids:
+                removidos["alertas"]  = _supabase_delete("alertas", "item_id", item_ids)
+                removidos["leituras"] = _supabase_delete("historico_precos", "item_id", item_ids)
+                removidos["itens"]    = _supabase_delete("itens", "id", item_ids)
+            _admin_api(f"/admin/users/{user_id}", method="DELETE")
+
+            return jsonify({"ok": True, "email": alvo[0].get("email"),
+                            "removed": removidos}), 200
+
         if acao == "criar":
             email = (payload.get("email") or "").strip().lower()
             nivel = int(payload.get("nivel") or 1)

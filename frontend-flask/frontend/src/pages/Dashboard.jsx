@@ -1128,7 +1128,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               </button>
             </div>
 
-            {/* Linha admin: filtro por usuário (visão consolidada por dono) */}
+            {/* Linha admin: filtro por usuário — Todos · Eu · dropdown (Sprint 11) */}
             {isAdmin && donos.length > 0 && (
               <div className="toolbar-row">
                 <div className="filters">
@@ -1139,16 +1139,30 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                   >
                     Todos ({dados.length})
                   </button>
-                  {donos.map((d) => (
-                    <button
-                      key={d.id}
-                      className={`filter-btn filter-btn-user${filtroUsuario === d.id ? " active" : ""}`}
-                      onClick={() => setFiltroUsuario(d.id)}
-                      title={d.id}
+                  <button
+                    className={`filter-btn filter-btn-user${filtroUsuario === user?.id ? " active" : ""}`}
+                    title={user?.id}
+                    onClick={() => setFiltroUsuario(user?.id)}
+                  >
+                    Eu ({dados.filter((x) => x.dono_id === user?.id).length})
+                  </button>
+                  {/* Dropdown com os demais donos: escala melhor que uma fileira
+                      de chips quando há muitos usuários com itens */}
+                  {donos.some((d) => d.id !== user?.id) && (
+                    <select
+                      className="produto-select"
+                      value={donos.some((d) => d.id === filtroUsuario && d.id !== user?.id) ? filtroUsuario : ""}
+                      onChange={(e) => setFiltroUsuario(e.target.value || "all")}
+                      title="Filtrar por um usuário específico"
                     >
-                      {d.id === user?.id ? "Você" : d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
-                    </button>
-                  ))}
+                      <option value="">— usuário específico —</option>
+                      {donos.filter((d) => d.id !== user?.id).map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             )}

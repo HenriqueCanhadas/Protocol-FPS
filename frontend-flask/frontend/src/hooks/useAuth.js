@@ -15,6 +15,9 @@ export function useAuth() {
   const [user, setUser]       = useState(null);
   const [perfil, setPerfil]   = useState(PERFIL_PADRAO);
   const [loading, setLoading] = useState(true);
+  // uid dono do perfil já carregado — perfilLoading é DERIVADO disso no
+  // render (nunca fica obsoleto entre a sessão chegar e o efeito rodar)
+  const [perfilDe, setPerfilDe] = useState(null);
   const [sb, setSb]           = useState(null);
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export function useAuth() {
 
   // Carrega o perfil (nivel/nome) quando o usuário loga
   useEffect(() => {
-    if (!user) { setPerfil(PERFIL_PADRAO); return; }
+    if (!user) { setPerfil(PERFIL_PADRAO); setPerfilDe(null); return; }
     let ativo = true;
     getSupabase().then((client) =>
       client.from("usuarios")
@@ -47,7 +50,10 @@ export function useAuth() {
         .single()
         .then(({ data, error }) => {
           // Falha (ex.: migração ainda não aplicada) → trata como normal
-          if (ativo) setPerfil(!error && data ? data : PERFIL_PADRAO);
+          if (ativo) {
+            setPerfil(!error && data ? data : PERFIL_PADRAO);
+            setPerfilDe(user.id);
+          }
         })
     );
     return () => { ativo = false; };
@@ -69,6 +75,9 @@ export function useAuth() {
   };
 
   const isAdmin = (perfil?.nivel ?? 1) >= 2;
+  // true enquanto há sessão mas o perfil dela ainda não chegou — páginas
+  // que dependem de isAdmin devem esperar antes de redirecionar "não-admin"
+  const perfilLoading = Boolean(user) && perfilDe !== user.id;
 
-  return { user, perfil, isAdmin, loading, sb, signIn, signOut, updatePassword };
+  return { user, perfil, isAdmin, loading, perfilLoading, sb, signIn, signOut, updatePassword };
 }
