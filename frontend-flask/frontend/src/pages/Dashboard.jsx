@@ -461,7 +461,7 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
     });
   };
 
-  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit" });
+  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit", year: "2-digit" });
   const fmtHora = (iso) => horaBRT(iso, { hour: "2-digit", minute: "2-digit" });
 
   const toggleSel = (id) =>
