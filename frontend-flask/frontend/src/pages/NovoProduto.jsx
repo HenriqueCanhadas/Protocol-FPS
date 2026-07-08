@@ -80,7 +80,7 @@ const LOJAS_DETECTADAS = {
 };
 // Deve refletir as categorias existentes na tabela `produtos` do Supabase
 // (o cadastro faz lookup por categoria; valor sem linha correspondente falha ao salvar).
-const CATEGORIAS = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
+const CATEGORIAS = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 const LOJAS_LABEL = { kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau" };
 
 function detectarLoja(url) {
@@ -107,7 +107,6 @@ export default function NovoProduto({ showToast, user }) {
   const [categoria, setCategoria] = useState("");
   const [loja,      setLoja]      = useState("");
   const [precoMeta, setPrecoMeta] = useState("");
-  const [pctQueda,  setPctQueda]  = useState("");
   const [metaAtivo, setMetaAtivo] = useState(false);
   const [monitorando,setMonitorando] = useState(true);
   const [urlPreview, setUrlPreview] = useState(null); // { slug, valid }
@@ -135,7 +134,7 @@ export default function NovoProduto({ showToast, user }) {
 
   const limpar = () => {
     setUrl(""); setNome(""); setCategoria(""); setLoja("");
-    setPrecoMeta(""); setPctQueda(""); setMetaAtivo(false);
+    setPrecoMeta(""); setMetaAtivo(false);
     setUrlPreview(null); setErros({});
   };
 
@@ -151,7 +150,6 @@ export default function NovoProduto({ showToast, user }) {
     setFila((f) => [...f, {
       id_temp: Date.now(), url, nome_na_loja: nome, categoria, loja_slug: loja,
       preco_meta: metaAtivo && precoMeta ? Number(precoMeta) : null,
-      pct_queda: metaAtivo && pctQueda ? Number(pctQueda) : null,
       monitorando,
     }]);
     showToast(`"${nome}" adicionado à fila`);
@@ -252,7 +250,7 @@ export default function NovoProduto({ showToast, user }) {
                     {CATEGORIAS.map((c) => (
                       <div key={c} className={`cat-chip${categoria === c ? " selected" : ""}`}
                         onClick={() => { setCategoria(c); setErros((e) => ({ ...e, categoria: false })); }}>
-                        {c === "PSU" ? "Fonte" : c === "MOBO" ? "Placa Mãe" : c === "STORAGE" ? "Armazenamento" : c}
+                        {c === "PSU" ? "Fonte" : c === "MOBO" ? "Placa Mãe" : c === "STORAGE" ? "Armazenamento" : c === "DIVERSOS" ? "Diversos" : c}
                       </div>
                     ))}
                   </div>
@@ -281,17 +279,15 @@ export default function NovoProduto({ showToast, user }) {
                   <div className="toggle-label">Definir preço-meta para alertas</div>
                   <div className="toggle-sublabel">opcional</div>
                 </div>
+                {/* Campo "% de queda" removido na Sprint 9 (todo:108): nunca era
+                    persistido nem usado — a RPC verificar_alertas dispara
+                    queda_preco em QUALQUER queda vs. a última leitura. */}
                 <div className={`preco-meta-fields${metaAtivo ? " visible" : ""}`}>
                   <div className="field-group" style={{ marginTop: ".9rem" }}>
                     <div className="field-label">Preço-meta (R$)</div>
                     <input className="field-input" type="number" placeholder="2999.99" min="0" step="0.01" value={precoMeta} onChange={(e) => setPrecoMeta(e.target.value)} />
                     <div className="field-hint">Alerta quando cair abaixo desse valor</div>
                     {erros.precoMeta && <div className="field-error">Valor inválido</div>}
-                  </div>
-                  <div className="field-group" style={{ marginTop: ".9rem" }}>
-                    <div className="field-label">% de queda para alertar</div>
-                    <input className="field-input" type="number" placeholder="5" min="1" max="99" step="1" value={pctQueda} onChange={(e) => setPctQueda(e.target.value)} />
-                    <div className="field-hint">Alerta ao cair X% do último preço</div>
                   </div>
                 </div>
               </div>

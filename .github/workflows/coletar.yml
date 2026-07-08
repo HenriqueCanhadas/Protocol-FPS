@@ -10,11 +10,15 @@ on:
         required: false
         default: ""
       categoria:
-        description: "Categoria para coleta segmentada — GPU/CPU/RAM/PSU/MOBO/STORAGE (vazio = todas)"
+        description: "Categoria para coleta segmentada — GPU/CPU/RAM/PSU/MOBO/STORAGE/DIVERSOS (vazio = todas)"
         required: false
         default: ""
       loja:
         description: "Loja para coleta segmentada — kabum/terabyteshop/pichau (vazio = todas)"
+        required: false
+        default: ""
+      user_id:
+        description: "UUID do usuário para coletar só os itens dele (vazio = todos os usuários)"
         required: false
         default: ""
 
@@ -58,7 +62,9 @@ jobs:
           #   ITEM_ID   → coleta pontual de um produto (tem precedência)
           #   CATEGORIA → coleta segmentada por categoria (GPU/CPU/...)
           #   LOJA      → coleta segmentada por loja (kabum/terabyteshop/pichau)
+          #   USER_ID   → coleta só os itens de um usuário (combinável c/ os acima)
           ITEM_ID:               ${{ github.event.inputs.item_id }}
           CATEGORIA:             ${{ github.event.inputs.categoria }}
           LOJA:                  ${{ github.event.inputs.loja }}
+          USER_ID:               ${{ github.event.inputs.user_id }}
         run: python main.py

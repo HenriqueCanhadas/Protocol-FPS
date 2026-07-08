@@ -159,10 +159,15 @@ def _texto_puro(a: dict) -> str:
     return "\n".join(linhas)
 
 
-def enviar_email(alerta: dict) -> bool:
+def enviar_email(alerta: dict, destinatario: str | None = None) -> bool:
+    """
+    Envia o alerta por email. `destinatario` (Sprint 9) direciona ao email
+    cadastrado do DONO do item; sem ele, cai no EMAIL_DESTINATARIO do .env
+    (compatibilidade com itens sem dono ou chamadas antigas).
+    """
     remetente    = os.environ.get("EMAIL_REMETENTE")
     senha        = os.environ.get("EMAIL_SENHA_APP")
-    destinatario = os.environ.get("EMAIL_DESTINATARIO")
+    destinatario = destinatario or os.environ.get("EMAIL_DESTINATARIO")
 
     if not all([remetente, senha, destinatario]):
         logger.error("Variáveis de email não configuradas")

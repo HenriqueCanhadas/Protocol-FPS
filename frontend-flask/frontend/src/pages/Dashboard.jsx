@@ -2,7 +2,7 @@
  * pages/Dashboard.jsx — PROTOCOL FPS
  * Página principal: stats, tabela de preços, alertas, botão coletar.
  */
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "@/services/supabase";
 import ConfirmModal from "@/components/ConfirmModal";
 import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
@@ -150,6 +150,11 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.45rem; letter-spacing:.03em; color:var(--green); }
 .price-meta      { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.15rem; }
+.price-menor     { font-size:var(--fs-xs); color:var(--amber); margin-top:.15rem; opacity:.9; }
+.catm-grid { display:flex; flex-wrap:wrap; gap:.6rem; }
+.catm-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; }
+.catm-chip:hover { border-color:var(--green-dim); color:var(--text); }
+.catm-chip.sel { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .price-timestamp { font-size:var(--fs-xs); color:var(--text-muted); margin-top:.2rem; letter-spacing:.04em; opacity:.75; }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
 .status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
@@ -198,6 +203,17 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 .hist-check:hover { border-color:var(--green-dim); }
 .hist-check.on { background:var(--green-soft); border-color:var(--green); }
 
+/* gráfico tempo × preço do histórico (Sprint 10) */
+.hist-grafico { background:var(--bg3); border:1px solid var(--border2); margin-bottom:1.25rem; }
+.hg-plot { position:relative; }
+.hg-plot svg { display:block; width:100%; height:auto; cursor:crosshair; }
+.hg-tooltip { position:absolute; pointer-events:none; background:var(--bg2); border:1px solid var(--green-dim); padding:.45rem .65rem; font-size:var(--fs-xs); color:var(--text-dim); line-height:1.55; white-space:nowrap; z-index:5; box-shadow:0 4px 14px rgba(0,0,0,.55); }
+.hg-tooltip .hg-preco { color:var(--green); font-size:var(--fs-sm); }
+.hg-tooltip .hg-esg { color:var(--amber); }
+.hg-hint { font-size:var(--fs-xs); color:var(--text-muted); letter-spacing:.12em; padding:.4rem .75rem .55rem; border-top:1px solid var(--border); }
+.chart-row.destaque { background:var(--green-soft); outline:1px solid var(--green-dim); animation:hgFlash 1.4s ease; }
+@keyframes hgFlash { 0% { background:rgba(57,255,20,.3); } 100% { background:var(--green-soft); } }
+
 /* toolbar de seleção do histórico */
 .hist-toolbar { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:1rem; flex-wrap:wrap; }
 .hist-sel-all { display:flex; align-items:center; gap:.55rem; background:none; border:none; color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.12em; text-transform:uppercase; cursor:pointer; transition:color .15s; padding:0; }
@@ -219,7 +235,7 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 /* modal meta */
 .meta-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:250; animation:fadeIn .2s ease; }
 .meta-modal { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--amber); width:min(460px,94vw); display:flex; flex-direction:column; position:relative; }
-.meta-modal::before { content:'EDITAR META DE PREÇO'; position:absolute; top:-1px; left:1.5rem; background:var(--bg2); color:var(--amber); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
+.meta-modal::before { content:attr(data-label); position:absolute; top:-1px; left:1.5rem; background:var(--bg2); color:var(--amber); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
 .meta-modal-header { display:flex; align-items:flex-start; justify-content:space-between; padding:1.5rem 1.5rem 0; gap:1rem; }
 .meta-modal-produto { font-size:var(--fs-sm); color:var(--text); line-height:1.5; flex:1; }
 .meta-modal-produto .mm-label { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:.3rem; }
@@ -295,6 +311,114 @@ td { padding:.9rem 1.1rem; vertical-align:middle; }
 }
 `;
 
+// ── Gráfico tempo × preço do histórico (Sprint 10) ─────────────
+// Série única → linha; hover = crosshair + tooltip (dia · valor);
+// clique no ponto → onPontoClick(id) leva à leitura na lista abaixo.
+function GraficoHistorico({ dados, onPontoClick }) {
+  const [hover, setHover] = useState(null); // índice do ponto sob o mouse
+
+  // pontos em ordem cronológica (a lista chega do mais novo p/ o mais antigo)
+  const pontos = useMemo(
+    () => [...(dados || [])]
+      .filter((d) => d.preco != null)
+      .reverse()
+      .map((d) => ({ ...d, t: new Date(d.coletado_em).getTime(), preco: Number(d.preco) })),
+    [dados]
+  );
+
+  const W = 640, H = 220, PAD = { top: 14, right: 16, bottom: 26, left: 62 };
+  if (pontos.length < 2) return null; // com 0–1 leituras a linha não informa nada
+
+  const t0 = pontos[0].t;
+  const t1 = pontos[pontos.length - 1].t;
+  const precos = pontos.map((p) => p.preco);
+  const precoMinReal = Math.min(...precos);
+  let pMin = precoMinReal, pMax = Math.max(...precos);
+  if (pMin === pMax) { pMin -= 1; pMax += 1; }       // série constante
+  const folga = (pMax - pMin) * 0.08;
+  pMin -= folga; pMax += folga;
+
+  const X = (t) => PAD.left + ((t - t0) / (t1 - t0 || 1)) * (W - PAD.left - PAD.right);
+  const Y = (v) => H - PAD.bottom - ((v - pMin) / (pMax - pMin)) * (H - PAD.top - PAD.bottom);
+
+  const path = pontos.map((p, i) => `${i ? "L" : "M"}${X(p.t).toFixed(1)},${Y(p.preco).toFixed(1)}`).join(" ");
+  const fmtBRL = (v) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const yTicks = [0, 0.5, 1].map((f) => pMin + f * (pMax - pMin));
+  const xTicks = t1 > t0 ? [0, 1 / 3, 2 / 3, 1].map((f) => t0 + f * (t1 - t0)) : [t0];
+  const iMin   = precos.indexOf(precoMinReal);
+
+  // ponto mais próximo do mouse no eixo X (o SVG escala com o container)
+  const localizar = (evt) => {
+    const rect = evt.currentTarget.getBoundingClientRect();
+    const mx = ((evt.clientX - rect.left) / rect.width) * W;
+    let melhor = 0, dist = Infinity;
+    pontos.forEach((p, i) => {
+      const d = Math.abs(X(p.t) - mx);
+      if (d < dist) { dist = d; melhor = i; }
+    });
+    return melhor;
+  };
+
+  const alvo = hover != null ? pontos[hover] : null;
+
+  return (
+    <div className="hist-grafico">
+      <div className="hg-plot">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          role="img"
+          aria-label="Gráfico do preço ao longo do tempo"
+          onMouseMove={(e) => setHover(localizar(e))}
+          onMouseLeave={() => setHover(null)}
+          onClick={(e) => onPontoClick?.(pontos[localizar(e)].id)}
+        >
+          {/* grade recessiva + rótulos do eixo Y */}
+          {yTicks.map((v, i) => (
+            <g key={i}>
+              <line x1={PAD.left} x2={W - PAD.right} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeWidth="1" />
+              <text x={PAD.left - 8} y={Y(v) + 3} textAnchor="end" fontSize="9" fill="var(--text-muted)" fontFamily="var(--mono)">
+                {fmtBRL(v)}
+              </text>
+            </g>
+          ))}
+          {/* rótulos do eixo X (datas) */}
+          {xTicks.map((t, i) => (
+            <text key={i} x={X(t)} y={H - 8} fontSize="9" fill="var(--text-muted)" fontFamily="var(--mono)"
+              textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}>
+              {dataBRT(new Date(t).toISOString(), { day: "2-digit", month: "2-digit", year: "2-digit" })}
+            </text>
+          ))}
+          {/* série */}
+          <path d={path} fill="none" stroke="var(--green)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+          {/* marcador fixo do menor preço (âmbar, como o ★ da lista) */}
+          <circle cx={X(pontos[iMin].t)} cy={Y(pontos[iMin].preco)} r="3.5" fill="var(--bg3)" stroke="var(--amber)" strokeWidth="2" />
+          {/* crosshair + marcador do hover */}
+          {alvo && (
+            <g pointerEvents="none">
+              <line x1={X(alvo.t)} x2={X(alvo.t)} y1={PAD.top} y2={H - PAD.bottom} stroke="var(--green-dim)" strokeWidth="1" strokeDasharray="3 3" />
+              <circle cx={X(alvo.t)} cy={Y(alvo.preco)} r="4.5" fill="var(--bg3)" stroke="var(--green)" strokeWidth="2" />
+            </g>
+          )}
+        </svg>
+        {alvo && (
+          <div
+            className="hg-tooltip"
+            style={{
+              left: `${(X(alvo.t) / W) * 100}%`,
+              top:  `${(Y(alvo.preco) / H) * 100}%`,
+              transform: `translate(${X(alvo.t) > W * 0.68 ? "calc(-100% - 12px)" : "12px"}, -120%)`,
+            }}
+          >
+            <div>{dataBRT(alvo.coletado_em, { day: "2-digit", month: "2-digit", year: "numeric" })} · {horaBRT(alvo.coletado_em, { hour: "2-digit", minute: "2-digit" })}</div>
+            <div className="hg-preco">{fmtBRL(alvo.preco)}{alvo.disponivel === false && <span className="hg-esg"> · esgotado</span>}</div>
+          </div>
+        )}
+      </div>
+      <div className="hg-hint">◇ passe o mouse para inspecionar · clique em um ponto para ir à leitura na lista</div>
+    </div>
+  );
+}
+
 // ── Componente Modal Histórico ─────────────────────────────────
 function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
   const [dados, setDados]           = useState(null);
@@ -302,25 +426,47 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
   const [selecionados, setSelecionados] = useState([]);   // ids marcados
   const [confirmando, setConfirmando]   = useState(false); // confirmar remoção em massa
   const [removendo, setRemovendo]       = useState(false);
+  const [destaque, setDestaque]         = useState(null);  // leitura destacada via clique no gráfico
 
   useEffect(() => {
     if (!itemId) return;
     setDados(null);
     setSelecionados([]);
     setConfirmando(false);
-    getSupabase().then((sb) =>
-      sb.from("historico_precos")
-        .select("id, preco, disponivel, coletado_em")
-        .eq("item_id", itemId)
-        .order("coletado_em", { ascending: false })
-        .limit(30)
-        .then(({ data }) => setDados(data || []))
-    );
+    setDestaque(null);
+    getSupabase().then(async (sb) => {
+      // Busca o histórico COMPLETO, paginado — o PostgREST corta qualquer
+      // resposta em 1000 linhas (Sprint 10, todo:132; antes era limit(30)).
+      const PAGINA = 1000;
+      let todas = [], de = 0;
+      for (;;) {
+        const { data, error } = await sb
+          .from("historico_precos")
+          .select("id, preco, disponivel, coletado_em")
+          .eq("item_id", itemId)
+          .order("coletado_em", { ascending: false })
+          .range(de, de + PAGINA - 1);
+        if (error || !data) break;
+        todas = todas.concat(data);
+        if (data.length < PAGINA) break;
+        de += PAGINA;
+      }
+      setDados(todas);
+    });
   }, [itemId, reloadKey]);
 
   if (!itemId) return null;
 
-  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit" });
+  // Clique num ponto do gráfico → rola até a leitura na lista e a destaca
+  const irParaLeitura = (id) => {
+    setDestaque(null); // re-dispara a animação mesmo clicando no mesmo ponto
+    requestAnimationFrame(() => {
+      setDestaque(id);
+      document.getElementById(`hist-row-${id}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
+  const fmtData = (iso) => dataBRT(iso, { day: "2-digit", month: "2-digit", year: "2-digit" });
   const fmtHora = (iso) => horaBRT(iso, { hour: "2-digit", minute: "2-digit" });
 
   const toggleSel = (id) =>
@@ -399,14 +545,17 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
 
               <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginBottom: "1.25rem", letterSpacing: ".15em" }}>
                 ★ MENOR PREÇO: <span className="green">R$ {minPreco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>
+                <span style={{ marginLeft: "1.5rem", color: "var(--text-muted)" }}>{dados.length} leitura(s)</span>
               </div>
+              <GraficoHistorico dados={dados} onPontoClick={irParaLeitura} />
               <div className="chart-wrap">
                 {dados.map((d) => {
                   const pct = d.preco ? ((d.preco - minPreco) / amplitude) * 70 + 10 : 0;
                   const isMin = d.preco === minPreco;
                   const isSel = selecionados.includes(d.id);
                   return (
-                    <div key={d.id} className={`chart-row${isSel ? " sel" : ""}`}>
+                    <div key={d.id} id={`hist-row-${d.id}`}
+                      className={`chart-row${isSel ? " sel" : ""}${destaque === d.id ? " destaque" : ""}`}>
                       <div className="chart-date dim">
                         <div>{fmtData(d.coletado_em)}</div>
                         <div className="chart-hora">{fmtHora(d.coletado_em)}</div>
@@ -435,7 +584,7 @@ function HistoricoModal({ itemId, nome, onClose, showToast, onChange }) {
 }
 
 // ── Componente Modal de Opções (menu de ações do produto) ──────
-function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
+function OpcoesModal({ item, onMeta, onRenomear, onCategoria, onColetar, onToggle, onClose }) {
   if (!item) return null;
   const monitorando = item.monitorando !== false;
   const metaSub = item.preco_meta
@@ -456,6 +605,16 @@ function OpcoesModal({ item, onMeta, onColetar, onToggle, onClose }) {
           <button className="opcao-btn meta" onClick={() => onMeta(item)}>
             <span className="op-ic">◎</span>
             <span className="op-tx"><span className="op-tt">Editar meta</span><span className="op-sub">{metaSub}</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className="opcao-btn" onClick={() => onRenomear(item)}>
+            <span className="op-ic">✎</span>
+            <span className="op-tx"><span className="op-tt">Alterar nome</span><span className="op-sub">Renomeia o produto na tabela e nos alertas</span></span>
+            <span className="op-arr">→</span>
+          </button>
+          <button className="opcao-btn" onClick={() => onCategoria(item)}>
+            <span className="op-ic">▤</span>
+            <span className="op-tx"><span className="op-tt">Alterar categoria</span><span className="op-sub">{`Categoria atual: ${item.categoria || "—"}`}</span></span>
             <span className="op-arr">→</span>
           </button>
           <button className="opcao-btn coletar" onClick={() => onColetar(item)}>
@@ -499,7 +658,7 @@ function MetaModal({ item, onClose, onSave }) {
 
   return (
     <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="meta-modal">
+      <div className="meta-modal" data-label="EDITAR META DE PREÇO">
         <div className="meta-modal-header">
           <div className="meta-modal-produto">
             <div className="mm-label">Produto</div>
@@ -554,15 +713,109 @@ function MetaModal({ item, onClose, onSave }) {
   );
 }
 
+// ── Componente Modal Renomear (Sprint 12) ──────────────────────
+function RenomearModal({ item, onClose, onSave }) {
+  const [nome, setNome] = useState(item?.nome_na_loja || "");
+  const [erro, setErro] = useState(false);
+
+  if (!item) return null;
+
+  const salvar = () => {
+    const v = nome.trim();
+    if (!v) { setErro(true); return; }
+    if (v === item.nome_na_loja) { onClose(); return; } // nada mudou
+    onSave(item.item_id, v);
+  };
+
+  return (
+    <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="meta-modal" data-label="ALTERAR NOME">
+        <div className="meta-modal-header">
+          <div className="meta-modal-produto">
+            <div className="mm-label">Produto</div>
+            <div>{item.nome_na_loja}</div>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="meta-modal-body">
+          <div>
+            <div className="field-label">Novo nome</div>
+            <input
+              className="field-input" type="text" maxLength={120} autoFocus
+              value={nome}
+              onChange={(e) => { setNome(e.target.value); setErro(false); }}
+              onKeyDown={(e) => e.key === "Enter" && salvar()}
+            />
+            <div className="field-hint">Como o produto aparece na tabela, no histórico e nos alertas</div>
+            {erro && <div className="field-error">Informe um nome não vazio</div>}
+          </div>
+        </div>
+        <div className="meta-modal-footer">
+          <button className="btn-secondary" onClick={onClose}>CANCELAR</button>
+          <button className="btn-primary" onClick={salvar}>SALVAR NOME</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Componente Modal Categoria (Sprint 12) ─────────────────────
+function CategoriaModal({ item, onClose, onSave }) {
+  const [cat, setCat] = useState(item?.categoria || "");
+
+  if (!item) return null;
+  const cats = FILTROS_CAT.filter((c) => c !== "all");
+
+  const salvar = () => {
+    if (!cat) return;
+    if (cat === item.categoria) { onClose(); return; } // nada mudou
+    onSave(item.item_id, cat);
+  };
+
+  return (
+    <div className="meta-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="meta-modal" data-label="ALTERAR CATEGORIA">
+        <div className="meta-modal-header">
+          <div className="meta-modal-produto">
+            <div className="mm-label">Produto</div>
+            <div>{item.nome_na_loja}</div>
+          </div>
+          <button className="btn-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="meta-modal-body">
+          <div>
+            <div className="field-label" style={{ marginBottom: ".6rem" }}>Nova categoria</div>
+            <div className="catm-grid">
+              {cats.map((c) => (
+                <div key={c} className={`catm-chip${cat === c ? " sel" : ""}`} onClick={() => setCat(c)}>
+                  {CAT_LABEL[c] || c}
+                </div>
+              ))}
+            </div>
+            <div className="field-hint" style={{ marginTop: ".6rem" }}>
+              Reclassifica o produto nos filtros do Dashboard e na coleta por categoria
+            </div>
+          </div>
+        </div>
+        <div className="meta-modal-footer">
+          <button className="btn-secondary" onClick={onClose}>CANCELAR</button>
+          <button className="btn-primary" onClick={salvar}>SALVAR CATEGORIA</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Dashboard principal ────────────────────────────────────────
-const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE"];
+const FILTROS_CAT = ["all", "GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 
 // Rótulos amigáveis para as siglas de categoria salvas em produtos.categoria
 const CAT_LABEL = {
-  all:     "Todos",
-  PSU:     "Fonte",
-  MOBO:    "Placa Mãe",
-  STORAGE: "Armazenamento",
+  all:      "Todos",
+  PSU:      "Fonte",
+  MOBO:     "Placa Mãe",
+  STORAGE:  "Armazenamento",
+  DIVERSOS: "Diversos",
 };
 
 // `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
@@ -588,6 +841,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
   const [metaItem,     setMetaItem]     = useState(null);
+  const [nomeItem,     setNomeItem]     = useState(null); // modal Alterar Nome (Sprint 12)
+  const [catItem,      setCatItem]      = useState(null); // modal Alterar Categoria (Sprint 12)
   const [opcoesItem,   setOpcoesItem]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
 
@@ -595,42 +850,48 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const carregarPrecos = useCallback(async () => {
     const sb = await getSupabase();
     // Inclui o dono (usuarios via FK itens.user_id) para a visão de admin.
+    // A última leitura vem EMBUTIDA com order+limit por item (referencedTable):
+    // buscar historico_precos inteiro estoura o teto de 1000 linhas do PostgREST
+    // desde a migração dos dados legados (Sprint 8, ~5,4k leituras).
+    // Dois embeds da MESMA tabela com alias (Sprint 12): "ultima" = leitura
+    // mais recente; "minimo" = menor preço já registrado (preco > 0 exclui
+    // sentinelas de esgotado). Cada alias tem seu próprio order+limit — o
+    // mínimo vem do banco, sem buscar o histórico inteiro (teto de 1000).
     let { data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome)")
-      .order("nome_na_loja", { ascending: true });
+      .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), ultima:historico_precos(preco, disponivel, coletado_em), minimo:historico_precos(preco, coletado_em)")
+      .order("nome_na_loja", { ascending: true })
+      .order("coletado_em", { referencedTable: "ultima", ascending: false })
+      .limit(1, { referencedTable: "ultima" })
+      .gt("minimo.preco", 0)
+      .order("preco", { referencedTable: "minimo", ascending: true })
+      .limit(1, { referencedTable: "minimo" });
 
     if (error) {
       // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
       ({ data: itens, error } = await sb
         .from("itens")
-        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria)")
-        .order("nome_na_loja", { ascending: true }));
+        .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria), historico_precos(preco, disponivel, coletado_em)")
+        .order("nome_na_loja", { ascending: true })
+        .order("coletado_em", { referencedTable: "historico_precos", ascending: false })
+        .limit(1, { referencedTable: "historico_precos" }));
     }
 
     if (error) { showToast("Erro ao carregar dados", "error"); return; }
     if (!itens?.length) { setDados([]); return; }
 
-    const ids = itens.map((i) => i.id);
-    const { data: precos } = await sb
-      .from("historico_precos")
-      .select("item_id, preco, disponivel, coletado_em")
-      .in("item_id", ids)
-      .order("coletado_em", { ascending: false });
-
-    const ultimoPreco = {};
-    for (const p of precos || []) {
-      if (!ultimoPreco[p.item_id]) ultimoPreco[p.item_id] = p;
-    }
-
     setDados(itens.map((item) => {
-      const ult = ultimoPreco[item.id] || {};
+      const ult = (item.ultima || item.historico_precos)?.[0] || {};
+      const min = item.minimo?.[0] || {};
       return {
         item_id: item.id, nome_na_loja: item.nome_na_loja, url: item.url || null,
         loja: item.lojas?.nome || "—", categoria: item.produtos?.categoria || "—",
         monitorando: item.monitorando, preco_meta: item.preco_meta,
         preco: ult.preco ?? null, disponivel: ult.disponivel ?? false,
         coletado_em: ult.coletado_em ?? null,
+        // Menor preço já obtido (Sprint 12) — convive com a meta, não a substitui
+        menor:    min.preco       ?? null,
+        menor_em: min.coletado_em ?? null,
         // Dono do item (visão de admin; usuário normal só recebe os seus via RLS)
         dono_id:    item.user_id || null,
         dono_email: item.usuarios?.email || null,
@@ -693,8 +954,16 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
         return sortDir === "asc" ? cmp : -cmp;
       }
-      const pa = a.preco ?? (sortDir === "asc" ? Infinity : -Infinity);
-      const pb = b.preco ?? (sortDir === "asc" ? Infinity : -Infinity);
+      // Campos numéricos (Sprint 12): preco · menor (menor valor obtido) ·
+      // data (timestamp da última coleta). Itens sem valor vão para o fim.
+      const valor = (x) => {
+        if (sortCampo === "data") return x.coletado_em ? new Date(x.coletado_em).getTime() : null;
+        if (sortCampo === "menor") return x.menor;
+        return x.preco;
+      };
+      const semValor = sortDir === "asc" ? Infinity : -Infinity;
+      const pa = valor(a) ?? semValor;
+      const pb = valor(b) ?? semValor;
       return sortDir === "asc" ? pa - pb : pb - pa;
     });
     return d;
@@ -708,7 +977,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
-  const escopado  = filtro !== "all" || filtroLoja !== "all";
+  const escopado  = filtro !== "all" || filtroLoja !== "all" || (isAdmin && filtroUsuario !== "all");
 
   // Admin: donos distintos dos itens carregados (usuário normal só recebe os seus)
   const donos = isAdmin
@@ -726,17 +995,41 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
    * Resolve o escopo da coleta a partir dos filtros ativos na toolbar:
    *   produto selecionado → pontual (item_id)
    *   categoria/loja      → segmentada (inputs combináveis)
+   *   ◈ USUÁRIOS (admin)  → segmentada por dono (user_id)
    *   sem filtros         → completa
+   * Usuário NORMAL sempre coleta só os próprios itens (user_id — Sprint 9);
+   * o admin coleta global, exceto quando filtra por um dono.
+   * `total` = quantos itens o coletor vai pegar (mesma semântica do main.py).
    */
   const escopoColeta = () => {
     if (filtroLoja !== "all" && filtroProduto !== "all") {
       const prod = dados.find((x) => x.item_id === filtroProduto);
-      return { item_id: filtroProduto, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
+      // pontual coleta mesmo com monitoramento pausado
+      return { item_id: filtroProduto, total: 1, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
     }
     const esc    = {};
     const partes = [];
     if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
     if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
+    if (isAdmin) {
+      if (filtroUsuario !== "all") {
+        esc.user_id = filtroUsuario;
+        const dono  = donos.find((d) => d.id === filtroUsuario);
+        partes.push(filtroUsuario === user?.id ? "apenas os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
+      }
+    } else if (user?.id) {
+      esc.user_id = user.id;
+      partes.push("apenas os seus produtos");
+    }
+    // Contagem com os mesmos critérios do coletor: monitorando=true +
+    // categoria + loja (comparada pelo slug, como no dict SCRAPERS) + dono
+    const slugLoja = (nome) => (nome || "").toLowerCase().replace(/ /g, "");
+    esc.total = dados.filter((x) =>
+      x.monitorando &&
+      (!esc.categoria || x.categoria === esc.categoria) &&
+      (!esc.loja      || slugLoja(x.loja) === esc.loja) &&
+      (!esc.user_id   || x.dono_id === esc.user_id)
+    ).length;
     esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
     return esc;
   };
@@ -775,6 +1068,33 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     carregarPrecos();
   };
 
+  // Sprint 12: renomear e reclassificar direto em itens (RLS dono/admin,
+  // mesmo caminho do Editar Meta)
+  const salvarNome = async (itemId, nome) => {
+    const sb = await getSupabase();
+    const { error } = await sb.from("itens").update({ nome_na_loja: nome }).eq("id", itemId);
+    if (error) { showToast("Erro ao renomear: " + error.message, "error"); return; }
+    setNomeItem(null);
+    showToast(`✓ Produto renomeado para "${nome}".`, "ok");
+    carregarPrecos();
+  };
+
+  const salvarCategoria = async (itemId, categoria) => {
+    const sb = await getSupabase();
+    // categoria → produtos.id (mesmo lookup do cadastro no NovoProduto)
+    const { data: prods, error: e1 } = await sb
+      .from("produtos").select("id").eq("categoria", categoria).limit(1);
+    if (e1 || !prods?.length) {
+      showToast(`Categoria "${categoria}" não encontrada no banco.`, "error");
+      return;
+    }
+    const { error } = await sb.from("itens").update({ produto_id: prods[0].id }).eq("id", itemId);
+    if (error) { showToast("Erro ao alterar categoria: " + error.message, "error"); return; }
+    setCatItem(null);
+    showToast(`✓ Categoria alterada para ${CAT_LABEL[categoria] || categoria}.`, "ok");
+    carregarPrecos();
+  };
+
   const iniciarColeta = async (escopo = {}) => {
     setColetando(true);
     const descricao = escopo.descricao || "todos os produtos";
@@ -784,13 +1104,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
       // Corpo do dispatch (mesma semântica do main.py):
-      //   item_id → pontual; categoria/loja → segmentada; vazio → completa
+      //   item_id → pontual; categoria/loja/user_id → segmentada; vazio → completa
       const body = {};
       if (escopo.item_id) {
         body.item_id = escopo.item_id;
       } else {
         if (escopo.categoria) body.categoria = escopo.categoria;
         if (escopo.loja)      body.loja      = escopo.loja;
+        if (escopo.user_id)   body.user_id   = escopo.user_id;
       }
 
       const resp = await fetch("/api/trigger-coleta", {
@@ -874,10 +1195,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
         showToast={showToast} onChange={carregarPrecos}
       />
       <MetaModal item={metaItem} onClose={() => setMetaItem(null)} onSave={salvarMeta} />
+      <RenomearModal item={nomeItem} onClose={() => setNomeItem(null)} onSave={salvarNome} />
+      <CategoriaModal item={catItem} onClose={() => setCatItem(null)} onSave={salvarCategoria} />
       <OpcoesModal
         item={opcoesItem}
         onClose={() => setOpcoesItem(null)}
         onMeta={opcMeta}
+        onRenomear={(item) => { setOpcoesItem(null); setNomeItem(item); }}
+        onCategoria={(item) => { setOpcoesItem(null); setCatItem(item); }}
         onColetar={opcColetar}
         onToggle={opcToggle}
       />
@@ -944,12 +1269,15 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               </div>
               <button className="btn-coletar" disabled={coletando} onClick={() => {
                 const esc = escopoColeta();
-                const segmentada = esc.item_id || esc.categoria || esc.loja;
+                const segmentada = esc.item_id || esc.categoria || esc.loja || (isAdmin && esc.user_id);
+                const qtd = esc.total > 0
+                  ? `⚡ <strong>${esc.total} ${esc.total === 1 ? "item será coletado" : "itens serão coletados"}</strong>`
+                  : `<span style="color:var(--amber)">⚠ Nenhum item monitorado nesse escopo — nada será coletado</span>`;
                 confirmar(
                   "COLETAR AGORA",
                   segmentada
-                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>Somente os itens desse escopo serão coletados. O processo pode levar alguns minutos.`
-                    : "Isso irá disparar uma coleta imediata de preços de <strong>todos os produtos monitorados</strong>.<br><br>O processo pode levar alguns minutos.",
+                    ? `Isso irá disparar uma coleta imediata <strong>segmentada pelos filtros ativos</strong>:<br><br><strong>${esc.descricao}</strong><br><br>${qtd}<br><br>O processo pode levar alguns minutos.`
+                    : `Isso irá disparar uma coleta imediata de preços de <strong>todos os ${isAdmin ? "produtos monitorados" : "seus produtos monitorados"}</strong>.<br><br>${qtd}<br><br>O processo pode levar alguns minutos.`,
                   "⚡",
                   () => iniciarColeta(esc),
                   false,
@@ -960,7 +1288,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               </button>
             </div>
 
-            {/* Linha admin: filtro por usuário (visão consolidada por dono) */}
+            {/* Linha admin: filtro por usuário — Todos · Eu · dropdown (Sprint 11) */}
             {isAdmin && donos.length > 0 && (
               <div className="toolbar-row">
                 <div className="filters">
@@ -971,16 +1299,30 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                   >
                     Todos ({dados.length})
                   </button>
-                  {donos.map((d) => (
-                    <button
-                      key={d.id}
-                      className={`filter-btn filter-btn-user${filtroUsuario === d.id ? " active" : ""}`}
-                      onClick={() => setFiltroUsuario(d.id)}
-                      title={d.id}
+                  <button
+                    className={`filter-btn filter-btn-user${filtroUsuario === user?.id ? " active" : ""}`}
+                    title={user?.id}
+                    onClick={() => setFiltroUsuario(user?.id)}
+                  >
+                    Eu ({dados.filter((x) => x.dono_id === user?.id).length})
+                  </button>
+                  {/* Dropdown com os demais donos: escala melhor que uma fileira
+                      de chips quando há muitos usuários com itens */}
+                  {donos.some((d) => d.id !== user?.id) && (
+                    <select
+                      className="produto-select"
+                      value={donos.some((d) => d.id === filtroUsuario && d.id !== user?.id) ? filtroUsuario : ""}
+                      onChange={(e) => setFiltroUsuario(e.target.value || "all")}
+                      title="Filtrar por um usuário específico"
                     >
-                      {d.id === user?.id ? "Você" : d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
-                    </button>
-                  ))}
+                      <option value="">— usuário específico —</option>
+                      {donos.filter((d) => d.id !== user?.id).map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})
+                        </option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               </div>
             )}
@@ -1030,7 +1372,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                 )}
               </div>
               <div className="sort-controls sort-controls-right">
-                {[["nome", "Nome"], ["preco", "Preço"]].map(([campo, label]) => (
+                {[["nome", "Nome"], ["preco", "Preço"], ["menor", "Menor"], ["data", "Coleta"]].map(([campo, label]) => (
                   <button key={campo} className={`sort-btn${sortCampo === campo ? " active" : ""}`} onClick={() => toggleSort(campo)}>
                     <span>{label}</span>
                     <span style={{ fontSize: ".7rem", opacity: .7 }}>
@@ -1109,6 +1451,12 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                                 {item.preco_meta && (
                                   <div className="price-meta">
                                     meta: R$ {Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+                                  </div>
+                                )}
+                                {item.menor != null && (
+                                  <div className="price-menor"
+                                    title={item.menor_em ? `Menor preço registrado em ${dataHoraBRT(item.menor_em, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}` : "Menor preço já registrado"}>
+                                    ★ menor: R$ {Number(item.menor).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
                                   </div>
                                 )}
                                 {item.coletado_em && (

@@ -10,7 +10,7 @@ const ITEMS = [
 
 // Visível apenas para admins (usuarios.nivel >= 2)
 const ITEMS_ADMIN = [
-  { href: "/novo-usuario", icon: "◈", label: "Novo Usuário" },
+  { href: "/usuarios", icon: "◈", label: "Usuários" },
 ];
 
 const ITEMS_CONTA = [

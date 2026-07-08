@@ -1,17 +1,20 @@
 ---
 name: sprint-planner
-description: Lê o arquivo `todo` (raiz do repo PROTOCOL FPS), classifica cada item por status (OK- concluído, Pending- iniciado, - a fazer), agrupa em sprints por dias e (re)gera o relatório `project/sprints.md` com a tabela SPRINT | TEST | STATUS | RESULTS e a seção "Skills Futuras". Use quando o usuário pedir para criar/atualizar sprints, planner, roadmap, ou regenerar o relatório de sprints a partir do todo.
+description: Lê o arquivo `todo` (raiz do repo PROTOCOL FPS), dividido em seções de versão (-----------------V<N>------------------), classifica cada item por status (OK- concluído, Pending- iniciado, - a fazer), agrupa em sprints por dias e (re)gera o relatório `project/sprint_v<N>.md` da versão correspondente com a tabela SPRINT | TEST | STATUS | RESULTS e a seção "Skills Futuras". Use quando o usuário pedir para criar/atualizar sprints, planner, roadmap, ou regenerar o relatório de sprints a partir do todo.
 ---
 
 # Sprint Planner — PROTOCOL FPS
 
-Gera e mantém sincronizado o relatório de planejamento em `project/sprints.md` a partir
-do arquivo `todo` na raiz do repositório. Todo o texto do relatório é em **português**
-(padrão bilíngue do projeto — ver `CLAUDE.md`).
+Gera e mantém sincronizados os relatórios de planejamento em `project/sprint_v<N>.md`
+a partir do arquivo `todo` na raiz do repositório. O `todo` é dividido em seções de
+versão marcadas por `-----------------V<N>------------------`; cada seção gera o seu
+próprio relatório (`sprint_v1.md`, `sprint_v2.md`, …). Relatórios de versões já
+concluídas (ex.: V1) são **históricos congelados** — só regenere o da versão ativa.
+Todo o texto do relatório é em **português** (padrão bilíngue do projeto — ver `CLAUDE.md`).
 
 ## Quando usar
 
-- "crie/atualize a sprint", "gere o planner", "regenerar sprints.md"
+- "crie/atualize a sprint", "gere o planner", "regenerar sprint_v<N>.md"
 - Depois de editar o `todo` (marcar item como `OK-`, `Pending-` ou adicionar novo `-`)
 - Para produzir o relatório `SPRINT | TEST | STATUS | RESULTS` + "Skills Futuras"
 
@@ -30,8 +33,10 @@ use para preencher a coluna **RESULTS**.
 
 ## Passo a passo
 
-1. **Ler o `todo`** (raiz do repo) com a tool Read. Preservar o número da linha de cada
-   item — a referência `todo:<linha>` vai na coluna SPRINT para rastreabilidade.
+1. **Ler o `todo`** (raiz do repo) com a tool Read. Identificar as seções de versão
+   (`-----------------V<N>------------------`) e trabalhar na seção pedida (por padrão,
+   a última = versão ativa). Preservar o número da linha de cada item — a referência
+   `todo:<linha>` vai na coluna SPRINT para rastreabilidade.
 2. **Classificar** cada linha não vazia pelo prefixo (`OK-`, `Pending-`, `-`).
    Ignorar linhas em branco e blocos que sejam só descrição de meta-tarefa (ex.: o próprio
    pedido de "ajustar planner e skills").
@@ -48,8 +53,9 @@ use para preencher a coluna **RESULTS**.
    - **TEST**: critério de aceite objetivo / como validar (o que provar que ficou pronto)
    - **STATUS**: ✅ Done / 🟡 Pending / ⬜ Todo
    - **RESULTS**: estado atual (para Done/Pending) ou resultado esperado (para Todo)
-5. **Escrever o arquivo** `project/sprints.md` (criar a pasta `project/` se não existir),
-   com esta ordem de seções:
+5. **Escrever o arquivo** `project/sprint_v<N>.md` da versão trabalhada (criar a pasta
+   `project/` se não existir). A numeração das sprints é **contínua entre versões**
+   (a V1 terminou na Sprint 7, então a V2 começa na Sprint 8). Ordem de seções:
    1. Cabeçalho + legenda + explicação das colunas
    2. **Visão geral do cronograma** (tabela Sprint | Tema | Período | Dias | Itens)
    3. Uma seção por sprint, cada uma com sua tabela `SPRINT | TEST | STATUS | RESULTS`
@@ -83,4 +89,6 @@ O cabeçalho da tabela de cada sprint deve ser **exatamente**:
 ## Manutenção do ciclo
 
 Quando uma tarefa for concluída: o usuário atualiza o prefixo no `todo`
-(`-` → `Pending-` → `OK-`) e roda esta skill de novo para regenerar `project/sprints.md`.
+(`-` → `Pending-` → `OK-`) e roda esta skill de novo para regenerar o
+`project/sprint_v<N>.md` da versão ativa. Quando uma versão fechar e uma nova seção
+`V<N+1>` surgir no `todo`, congele o relatório antigo e crie o da nova versão.

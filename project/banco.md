@@ -67,15 +67,19 @@ Espelho leve de `auth.users`, criado pela migração `sprint5_multiusuario.sql`.
 | Coluna | Tipo | Null | Default | Descrição |
 |---|---|---|---|---|
 | `id` | `uuid` | não | — | **PK**; FK → `auth.users.id` `ON DELETE CASCADE` |
-| `email` | `text` | sim | — | cópia do email do auth (preenchida pelo trigger) |
+| `email` | `text` | sim | — | cópia do email do auth (preenchida pelo trigger); **destino dos alertas por email** do dono (Sprint 9) |
 | `nome` | `text` | sim | — | nome de exibição (opcional; UI usa email como fallback) |
 | `nivel` | `integer` | não | `1` | **papel**: `1` = normal · `2` = admin |
+| `notificar_telegram` | `boolean` | não | `false` | Sprint 9: recebe alertas no Telegram (bot/chat pessoal); toggle por usuário na página **Usuários** (Sprint 11, `/api/usuarios` `acao=telegram`) |
 | `criado_em` | `timestamptz` | não | `now()` | — |
 
 - Preenchida automaticamente pelo trigger `trg_criar_perfil` a cada signup.
 - Promoção a admin: manual (`update usuarios set nivel = 2 ...`) ou pela página
-  **Novo Usuário** (endpoint `/api/usuarios`, Sprint 7).
+  **Usuários** (endpoint `/api/usuarios`, Sprint 7; página unificada na Sprint 11).
 - Admin atual: `pedrosacanhadas@gmail.com` (decisão registrada em 05/07/2026).
+- **Exclusão de usuário (Sprint 11):** `/api/usuarios` `acao=excluir` faz a cascata
+  manual `alertas → historico_precos → itens` e então remove a conta em
+  `auth.users` — só esta última cascateia para `usuarios`. Auto-exclusão → 400.
 
 ### 3.2 `lojas` — lojas suportadas
 
@@ -131,9 +135,15 @@ form de cadastro e na coleta segmentada (`CATEGORIA` do `main.py`):
 | `criado_em` | `timestamptz` | não | `now()` | — |
 | `user_id` | `uuid` | não | `auth.uid()` | **dono** (Sprint 5); FK → `usuarios.id`; índice `idx_itens_user_id` |
 
-- Escrita: frontend (INSERT no cadastro, UPDATE de meta/monitorando — RLS exige ser
-  dono ou admin); DELETE apenas via `/api/remover` (SERVICE_KEY, sem política de DELETE).
+- Escrita: frontend (INSERT no cadastro; UPDATE de meta/monitorando e, desde a
+  Sprint 12, de `nome_na_loja` e `produto_id` pelos modais "Alterar nome"/"Alterar
+  categoria" — RLS exige ser dono ou admin); DELETE apenas via `/api/remover`
+  (SERVICE_KEY, sem política de DELETE).
 - Leitura: frontend (RLS filtra por dono/admin) e coletor (SERVICE_KEY, vê tudo).
+- **Unicidade** (Sprint 8): `unique (url, user_id)` — constraint `itens_url_user_key`.
+  Substituiu a `itens_url_key` original (URL única **global**, resquício
+  pré-multiusuário descoberto na migração dos dados legados): usuários diferentes
+  podem monitorar a mesma URL; o mesmo usuário, não.
 
 ### 3.5 `historico_precos` — leituras de preço
 
@@ -261,28 +271,32 @@ COLETA (diária 12:00 UTC ou manual):
 FRONTEND (sessão autenticada, RLS ativo):
   Dashboard ─▶ SELECT itens (+lojas/produtos/usuarios) + historico_precos + alertas
   NovoProduto ─▶ INSERT itens (user_id = usuário logado)
-  Ações ─▶ UPDATE itens (meta/monitorando) · POST /api/remover · POST /api/trigger-coleta
+  Ações ─▶ UPDATE itens (meta/monitorando/nome/categoria) · POST /api/remover · POST /api/trigger-coleta
 
 SERVER-SIDE (SERVICE_KEY + autorização por token de sessão):
   /api/remover  ─▶ valida dono/admin ─▶ DELETE alertas → historico_precos → itens
-  /api/usuarios ─▶ exige admin ─▶ GoTrue admin API (criar usuário / trocar senha)
+  /api/usuarios ─▶ exige admin ─▶ GoTrue admin API + PostgREST:
+                    criar · trocar_senha · listar (perfis + auth.users + nº itens)
+                    telegram (notificar_telegram) · excluir (cascata + conta)
 ```
 
 ---
 
-## 8. Estruturas legadas (não usadas pelo código atual)
+## 8. Estruturas legadas
 
-A introspecção revelou tabelas de fases antigas do projeto, **fora do fluxo atual**
-(nenhum código deste repo as referencia). Ficam registradas como candidatas a limpeza:
+Tabelas de fases antigas do projeto, fora do fluxo atual. **Situação em 08/07/2026:**
 
-| Tabela | Observação |
+| Tabela | Situação |
 |---|---|
-| `Menores Preços Kabum` | protótipo antigo (PK `bigint`, `product_key`) |
+| `Menores Preços Kabum` | **dropada pelo usuário** (08/07/2026), após a migração da Sprint 8 |
 | `Monitoramento Kabum` | idem |
-| `produtos_kabum` / `historico_precos_kabum` | fase 2 (uuid, timestamps em hora local) |
-| `produtos_funko` / `historico_precos_funko` | experimento de monitorar Funko Pop |
+| `produtos_kabum` / `historico_precos_kabum` | idem — o drop também **desativou o coletor legado** que ainda gravava nelas |
+| `produtos_funko` / `historico_precos_funko` | **mantidas e intactas** (9 / 675 linhas — restrição do todo:104; nenhum código deste repo as toca) |
 
-> ⚠️ Antes de dropar, confirmar que nenhum outro projeto/consulta externa as usa.
+> Os dados Kabum legados vivem agora em `itens`/`historico_precos` (categoria
+> `DIVERSOS`, dono pedrosacanhadas) — migrados pela `sprint8_diversos_migracao.sql`.
+> A migração referenciava as tabelas dropadas, então ela **não é re-executável**;
+> permanece versionada como registro histórico.
 
 ---
 
@@ -297,6 +311,8 @@ A introspecção revelou tabelas de fases antigas do projeto, **fora do fluxo at
 | Arquivo | Sprint | Conteúdo |
 |---|---|---|
 | `sprint5_multiusuario.sql` | S5 (05/07/2026) | `usuarios`, trigger de perfil, `itens.user_id` + backfill, `is_admin()`, políticas RLS |
+| `sprint8_diversos_migracao.sql` | S8 (07/07/2026) | categoria `DIVERSOS`, troca `itens_url_key` → `unique (url, user_id)`, migração dos dados legados Kabum (itens + histórico) p/ pedrosacanhadas |
+| `sprint9_alertas_por_usuario.sql` | S9 (07/07/2026) | `usuarios.notificar_telegram` (flag do bot pessoal; `true` só p/ pedrosacanhadas) — email do alerta passa a ir ao dono do item |
 
 O que **não** está versionado (criado antes da convenção): `lojas`, `produtos`,
 `itens` (colunas originais), `historico_precos`, `alertas`, a view `ultimo_preco`

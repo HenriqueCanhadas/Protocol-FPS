@@ -14,9 +14,12 @@ por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
 
 - **Coleta diária automática** (cron do GitHub Actions às 09:00 de Brasília) e
   **coleta sob demanda** pelo botão do site
-- **Escopo de coleta**: tudo, por **categoria** (GPU/CPU/RAM/PSU/MOBO/STORAGE),
-  por **loja**, ou **um único produto** ("Coletar agora" no menu do item)
-- **Alertas** em dois canais (Email HTML + Telegram) e dois gatilhos:
+- **Escopo de coleta**: tudo, por **categoria** (GPU/CPU/RAM/PSU/MOBO/STORAGE/DIVERSOS),
+  por **loja**, por **usuário** (o "Coletar" de um usuário normal coleta só os itens
+  dele), ou **um único produto** ("Coletar agora" no menu do item)
+- **Alertas** em dois canais e dois gatilhos:
+  - Email HTML vai para o **email cadastrado do dono do item**; Telegram é um
+    bot pessoal, disparado só para quem está habilitado (`notificar_telegram`)
   - `abaixo_meta` — o preço ficou **abaixo do preço-alvo** definido para o item
   - `queda_preco` — o preço **caiu** em relação à leitura anterior
 - **Dashboard** com busca, filtros combináveis (categoria × loja × produto da loja),
@@ -48,7 +51,7 @@ Duas metades independentes que só se encontram no Supabase e no `workflow_dispa
 │  GitHub Actions · cron diário │        │  Vercel (prod) · Vite (dev)     │
 │                               │        │                                 │
 │  main.py                      │        │  Dashboard · Novo Produto ·     │
-│   ├─ scrapers/ (Playwright)   │        │  Novo Usuário (admin) · Conta   │
+│   ├─ scrapers/ (Playwright)   │        │  Usuários (admin) · Conta       │
 │   ├─ notificacoes/ (📧 + 📱)  │        │        │                        │
 │   └─ SUPABASE_SERVICE_KEY     │        │  ANON_KEY + sessão (RLS)        │
 └──────────────┬────────────────┘        └───────┬─────────────────────────┘
@@ -173,7 +176,7 @@ Secrets necessários no repositório: os mesmos do grupo Supabase/Email/Telegram
 | Papel | `usuarios.nivel` | Pode |
 |---|---|---|
 | Usuário padrão | `1` | ver/gerenciar **apenas os próprios** itens, histórico e alertas |
-| Admin | `2` | ver os itens **de todos** (filtro por usuário no Dashboard), criar usuários e trocar senhas pela página **Novo Usuário** |
+| Admin | `2` | ver os itens **de todos** (filtro por usuário no Dashboard: Todos · Eu · dropdown) e, pela página **Usuários**: listar todos (último acesso, papel, status, nº de itens), criar usuários, trocar senhas, ligar/desligar o Telegram por usuário e **excluir usuário** (em cascata, com os dados dele) |
 
 O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 `SERVICE_KEY` e continua coletando os itens de todos os usuários.
@@ -194,7 +197,8 @@ O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 │       └── src/                # components/ hooks/ pages/ services/ styles/ utils/
 ├── project/
 │   ├── banco.md                # documentação do banco (tabelas, RLS, RPCs)
-│   ├── sprints.md              # planejamento e histórico de sprints
+│   ├── sprint_v1.md            # sprints da V1 (concluída)
+│   ├── sprint_v2.md            # sprints da V2 (em andamento)
 │   └── migrations/             # migrações SQL (aplicar no SQL Editor do Supabase)
 └── .github/workflows/coletar.yml
 ```
@@ -203,8 +207,10 @@ O isolamento é imposto no banco (**RLS**), não só na UI. O coletor usa a
 
 - [`project/banco.md`](project/banco.md) — esquema do banco, relacionamentos, RLS,
   funções e fluxos de dados
-- [`project/sprints.md`](project/sprints.md) — relatório de sprints
+- [`project/sprint_v1.md`](project/sprint_v1.md) — relatório de sprints da V1, concluída
   (`SPRINT | TEST | STATUS | RESULTS`) com todo o histórico de decisões
+- [`project/sprint_v2.md`](project/sprint_v2.md) — planejamento das sprints da V2
+  (atualizações e correções em andamento)
 - [`CLAUDE.md`](CLAUDE.md) — guia de arquitetura para desenvolvimento assistido
 
 ## ✦ Licença
