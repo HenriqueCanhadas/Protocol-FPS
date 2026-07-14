@@ -183,15 +183,22 @@ def _selecionar_itens(sb) -> list:
 
     1. ITEM_ID definido (coleta PONTUAL, botão "Coletar Agora" de um produto):
        coleta apenas aquele item — mesmo com monitoramento pausado, pois é
-       um pedido manual explícito. Ignora CATEGORIA/LOJA/USER_ID.
-    2. CATEGORIA e/ou LOJA e/ou USER_ID definidos (coleta SEGMENTADA): coleta
+       um pedido manual explícito. Ignora ITEM_IDS/CATEGORIA/LOJA/USER_ID.
+    2. ITEM_IDS definido (coleta em LISTA, Sprint 14: o "Coletar Filtrados"
+       envia exatamente os itens visíveis na lista do Dashboard — filtros que
+       o coletor não sabe expressar, como busca por texto e dia da última
+       coleta, viram uma lista explícita de IDs separados por vírgula).
+       Coleta exatamente esses itens; o frontend já exclui os pausados.
+       Ignora CATEGORIA/LOJA/USER_ID.
+    3. CATEGORIA e/ou LOJA e/ou USER_ID definidos (coleta SEGMENTADA): coleta
        os itens monitorados daquela categoria (ex.: GPU), loja (ex.: kabum)
        e/ou dono (usuário normal que clicou "Coletar" vê só os itens dele).
        Todos combináveis — ex.: só as GPUs da Kabum de um usuário.
-    3. Nenhuma env definida (cron diário ou botão global do admin): coleta
+    4. Nenhuma env definida (cron diário ou botão global do admin): coleta
        COMPLETA, todos os itens com monitorando = true.
     """
     item_id_alvo = os.environ.get("ITEM_ID", "").strip()
+    item_ids     = [i.strip() for i in os.environ.get("ITEM_IDS", "").split(",") if i.strip()]
     categoria    = os.environ.get("CATEGORIA", "").strip().upper()
     loja         = _slug_loja(os.environ.get("LOJA", "").strip())
     user_id      = os.environ.get("USER_ID", "").strip()
@@ -202,6 +209,9 @@ def _selecionar_itens(sb) -> list:
     if item_id_alvo:
         logger.info("Modo PONTUAL — coletando apenas item_id=%s", item_id_alvo)
         query = query.eq("id", item_id_alvo)
+    elif item_ids:
+        logger.info("Modo LISTA — coletando %d item(ns) explícitos do dispatch", len(item_ids))
+        query = query.in_("id", item_ids)
     elif categoria or loja or user_id:
         escopo = " + ".join(filter(None, (
             f"categoria={categoria}" if categoria else "",
@@ -221,7 +231,8 @@ def _selecionar_itens(sb) -> list:
     # Filtro do escopo segmentado em Python: evita depender do hint !inner
     # do PostgREST e permite normalizar o nome da loja do mesmo jeito que
     # o dict SCRAPERS (poucos itens — custo desprezível).
-    if not item_id_alvo:
+    # Nos modos PONTUAL e LISTA os IDs são explícitos — nada a refinar.
+    if not item_id_alvo and not item_ids:
         if categoria:
             itens = [i for i in itens
                      if (i.get("produtos") or {}).get("categoria", "").upper() == categoria]

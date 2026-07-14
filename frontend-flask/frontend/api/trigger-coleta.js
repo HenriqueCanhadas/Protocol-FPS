@@ -40,6 +40,9 @@ export default async function handler(req, res) {
 
   // Escopo opcional no corpo (mesma semântica do main.py):
   //   item_id                    → coleta pontual (só aquele produto; tem precedência)
+  //   item_ids                   → coleta em LISTA (Sprint 14): os itens visíveis
+  //                                na lista filtrada do Dashboard — array JSON ou
+  //                                string com IDs separados por vírgula
   //   categoria / loja / user_id → coleta segmentada (combináveis: ex. GPUs
   //                                da Kabum, ou só os itens do usuário logado)
   //   nada                       → coleta completa (todos os monitorados)
@@ -48,13 +51,19 @@ export default async function handler(req, res) {
     try { reqBody = JSON.parse(reqBody); } catch { reqBody = {}; }
   }
   const itemId    = reqBody?.item_id;
+  let   itemIds   = reqBody?.item_ids;
   const categoria = reqBody?.categoria;
   const loja      = reqBody?.loja;
   const userId    = reqBody?.user_id;
+  if (Array.isArray(itemIds)) {
+    itemIds = itemIds.map((i) => String(i).trim()).filter(Boolean).join(",");
+  }
   const dispatch  = { ref: branch };
   const inputs = {};
   if (itemId) {
     inputs.item_id = String(itemId);
+  } else if (itemIds) {
+    inputs.item_ids = String(itemIds);
   } else {
     if (categoria) inputs.categoria = String(categoria);
     if (loja)      inputs.loja      = String(loja);

@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { getSupabase } from "@/services/supabase";
 import ConfirmModal from "@/components/ConfirmModal";
-import { dataBRT, horaBRT, dataHoraBRT, inicioDoDiaBRT } from "@/utils/datas";
+import { dataBRT, horaBRT, dataHoraBRT, diaBRT, inicioDoDiaBRT } from "@/utils/datas";
 
 /**
  * Remove produtos/coletas via endpoint server-side (/api/remover),
@@ -118,6 +118,19 @@ const css = `
 }
 .sort-btn:hover { border-color:var(--green-dim); color:var(--text); }
 .sort-btn.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+
+/* filtro por dia de coleta (Sprint 14) — acoplado à barra de ordenação */
+.dia-coleta-wrap { display:flex; align-items:center; gap:.35rem; }
+.dia-coleta-input {
+  background:var(--bg2); border:1px solid var(--border2);
+  color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs);
+  letter-spacing:.08em; padding:.45rem .6rem; cursor:pointer; outline:none;
+  color-scheme:dark; transition:border-color .15s,box-shadow .15s,color .15s;
+}
+.dia-coleta-input:hover,.dia-coleta-input:focus { border-color:var(--green-dim); color:var(--text); }
+.dia-coleta-input.on { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.dia-coleta-clear { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:.85rem; padding:.2rem .3rem; transition:color .15s; }
+.dia-coleta-clear:hover { color:var(--red); }
 .result-count { font-size:var(--fs-xs); color:var(--text-muted); letter-spacing:.15em; margin-left:auto; white-space:nowrap; }
 
 /* progresso */
@@ -837,6 +850,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [filtroLoja,    setFiltroLoja]    = useState("all");
   const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
   const [filtroUsuario, setFiltroUsuario] = useState("all"); // admin: dono dos itens
+  const [filtroDia,     setFiltroDia]     = useState("");    // dia da última coleta (YYYY-MM-DD em BRT; "" = todos)
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
@@ -949,16 +963,23 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     if (filtroProduto !== "all") {
       d = d.filter(x => x.item_id === filtroProduto);
     }
+    // Sprint 14: recorte por dia da última coleta (dia civil de Brasília,
+    // mesmo formato YYYY-MM-DD do <input type="date">)
+    if (filtroDia) {
+      d = d.filter((x) => x.coletado_em && diaBRT(x.coletado_em) === filtroDia);
+    }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
         const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
         return sortDir === "asc" ? cmp : -cmp;
       }
-      // Campos numéricos (Sprint 12): preco · menor (menor valor obtido) ·
-      // data (timestamp da última coleta). Itens sem valor vão para o fim.
+      // Campos numéricos (Sprints 12/14): preco (atual) · menor (menor valor
+      // obtido) · meta (preço-alvo) · data (timestamp da última coleta).
+      // Itens sem valor vão para o fim.
       const valor = (x) => {
         if (sortCampo === "data") return x.coletado_em ? new Date(x.coletado_em).getTime() : null;
         if (sortCampo === "menor") return x.menor;
+        if (sortCampo === "meta")  return x.preco_meta != null ? Number(x.preco_meta) : null;
         return x.preco;
       };
       const semValor = sortDir === "asc" ? Infinity : -Infinity;
@@ -977,7 +998,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
-  const escopado  = filtro !== "all" || filtroLoja !== "all" || (isAdmin && filtroUsuario !== "all");
+  const escopado  = filtro !== "all" || filtroLoja !== "all" || (isAdmin && filtroUsuario !== "all")
+    || !!termoBusca.trim() || !!filtroDia;
 
   // Admin: donos distintos dos itens carregados (usuário normal só recebe os seus)
   const donos = isAdmin
@@ -993,12 +1015,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
 
   /**
    * Resolve o escopo da coleta a partir dos filtros ativos na toolbar:
-   *   produto selecionado → pontual (item_id)
-   *   categoria/loja      → segmentada (inputs combináveis)
-   *   ◈ USUÁRIOS (admin)  → segmentada por dono (user_id)
-   *   sem filtros         → completa
+   *   produto selecionado  → pontual (item_id — coleta mesmo pausado)
+   *   qualquer outro filtro → LISTA (item_ids — Sprint 14): exatamente os
+   *     itens visíveis na lista filtrada (categoria/loja/usuário/busca/dia),
+   *     apenas os monitorados — pausado não coleta em lote, mesma regra da
+   *     coleta completa/segmentada do main.py
+   *   sem filtros          → completa
    * Usuário NORMAL sempre coleta só os próprios itens (user_id — Sprint 9);
-   * o admin coleta global, exceto quando filtra por um dono.
+   * o admin coleta global, exceto quando filtra.
    * `total` = quantos itens o coletor vai pegar (mesma semântica do main.py).
    */
   const escopoColeta = () => {
@@ -1007,30 +1031,29 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       // pontual coleta mesmo com monitoramento pausado
       return { item_id: filtroProduto, total: 1, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
     }
-    const esc    = {};
     const partes = [];
-    if (filtro !== "all")     { esc.categoria = filtro;         partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`); }
-    if (filtroLoja !== "all") { esc.loja = lojaAtiva?.slug;     partes.push(`loja ${lojaAtiva?.label}`); }
-    if (isAdmin) {
-      if (filtroUsuario !== "all") {
-        esc.user_id = filtroUsuario;
-        const dono  = donos.find((d) => d.id === filtroUsuario);
-        partes.push(filtroUsuario === user?.id ? "apenas os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
-      }
-    } else if (user?.id) {
-      esc.user_id = user.id;
-      partes.push("apenas os seus produtos");
+    if (filtro !== "all")     partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`);
+    if (filtroLoja !== "all") partes.push(`loja ${lojaAtiva?.label}`);
+    if (isAdmin && filtroUsuario !== "all") {
+      const dono = donos.find((d) => d.id === filtroUsuario);
+      partes.push(filtroUsuario === user?.id ? "somente os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
     }
-    // Contagem com os mesmos critérios do coletor: monitorando=true +
-    // categoria + loja (comparada pelo slug, como no dict SCRAPERS) + dono
-    const slugLoja = (nome) => (nome || "").toLowerCase().replace(/ /g, "");
+    if (termoBusca.trim()) partes.push(`busca "${termoBusca.trim()}"`);
+    if (filtroDia)         partes.push(`última coleta em ${dataBRT(`${filtroDia}T12:00:00-03:00`)}`);
+
+    // Filtro ativo → coleta em LISTA: os IDs monitorados visíveis na tabela
+    if (partes.length) {
+      const ids = dadosFiltrados.filter((x) => x.monitorando).map((x) => x.item_id);
+      return { item_ids: ids, total: ids.length, descricao: `os itens da lista filtrada (${partes.join(" + ")})` };
+    }
+
+    // Sem filtros: completa (admin/cron) ou só os itens do dono (Sprint 9)
+    const esc = {};
+    if (!isAdmin && user?.id) esc.user_id = user.id;
     esc.total = dados.filter((x) =>
-      x.monitorando &&
-      (!esc.categoria || x.categoria === esc.categoria) &&
-      (!esc.loja      || slugLoja(x.loja) === esc.loja) &&
-      (!esc.user_id   || x.dono_id === esc.user_id)
+      x.monitorando && (!esc.user_id || x.dono_id === esc.user_id)
     ).length;
-    esc.descricao = partes.length ? partes.join(" + ") : "todos os produtos monitorados";
+    esc.descricao = esc.user_id ? "apenas os seus produtos" : "todos os produtos monitorados";
     return esc;
   };
 
@@ -1096,6 +1119,12 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   };
 
   const iniciarColeta = async (escopo = {}) => {
+    // Lista filtrada sem nenhum item monitorado: não dispara nada — um corpo
+    // sem escopo viraria coleta COMPLETA no coletor, o oposto do filtro
+    if (escopo.item_ids && escopo.item_ids.length === 0) {
+      showToast("Nenhum item monitorado na lista filtrada — nada para coletar.", "error");
+      return;
+    }
     setColetando(true);
     const descricao = escopo.descricao || "todos os produtos";
     setProgresso({ visible: true, txt: "Conectando ao servidor...", pct: 15 });
@@ -1103,11 +1132,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     try {
       setProgresso({ visible: true, txt: "Disparando workflow...", pct: 40 });
 
-      // Corpo do dispatch (mesma semântica do main.py):
-      //   item_id → pontual; categoria/loja/user_id → segmentada; vazio → completa
+      // Corpo do dispatch (mesma semântica do main.py): item_id → pontual;
+      // item_ids → lista filtrada (Sprint 14); categoria/loja/user_id →
+      // segmentada; vazio → completa
       const body = {};
       if (escopo.item_id) {
         body.item_id = escopo.item_id;
+      } else if (escopo.item_ids) {
+        body.item_ids = escopo.item_ids;
       } else {
         if (escopo.categoria) body.categoria = escopo.categoria;
         if (escopo.loja)      body.loja      = escopo.loja;
@@ -1269,7 +1301,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               </div>
               <button className="btn-coletar" disabled={coletando} onClick={() => {
                 const esc = escopoColeta();
-                const segmentada = esc.item_id || esc.categoria || esc.loja || (isAdmin && esc.user_id);
+                const segmentada = esc.item_id || !!esc.item_ids;
                 const qtd = esc.total > 0
                   ? `⚡ <strong>${esc.total} ${esc.total === 1 ? "item será coletado" : "itens serão coletados"}</strong>`
                   : `<span style="color:var(--amber)">⚠ Nenhum item monitorado nesse escopo — nada será coletado</span>`;
@@ -1372,7 +1404,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                 )}
               </div>
               <div className="sort-controls sort-controls-right">
-                {[["nome", "Nome"], ["preco", "Preço"], ["menor", "Menor"], ["data", "Coleta"]].map(([campo, label]) => (
+                {[["nome", "Nome"], ["preco", "Preço Atual"], ["menor", "Menor Preço"], ["meta", "Meta"], ["data", "Coleta"]].map(([campo, label]) => (
                   <button key={campo} className={`sort-btn${sortCampo === campo ? " active" : ""}`} onClick={() => toggleSort(campo)}>
                     <span>{label}</span>
                     <span style={{ fontSize: ".7rem", opacity: .7 }}>
@@ -1380,6 +1412,20 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                     </span>
                   </button>
                 ))}
+                {/* Sprint 14: só itens com última coleta neste dia (BRT);
+                    combina com busca/categoria/loja/usuário e qualquer ordenação */}
+                <div className="dia-coleta-wrap" title="Mostrar só itens cuja última coleta foi neste dia (horário de Brasília)">
+                  <input
+                    className={`dia-coleta-input${filtroDia ? " on" : ""}`}
+                    type="date"
+                    value={filtroDia}
+                    onChange={(e) => setFiltroDia(e.target.value)}
+                    onClick={(e) => { try { e.currentTarget.showPicker?.(); } catch { /* precisa de gesto do usuário */ } }}
+                  />
+                  {filtroDia && (
+                    <button className="dia-coleta-clear" title="Limpar o dia de coleta" onClick={() => setFiltroDia("")}>✕</button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1403,6 +1449,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
               <div className="empty">
                 {termoBusca
                   ? <>Nenhum resultado para "<span className="green">{termoBusca}</span>".</>
+                  : filtroDia
+                  ? <>Nenhum item com última coleta em <span className="green">{dataBRT(`${filtroDia}T12:00:00-03:00`)}</span>.</>
                   : <>Nenhum item nesta categoria.<br /><a href="/novo-produto" style={{ color: "var(--green)", fontSize: "var(--fs-sm)" }}>+ Adicionar produto</a></>}
               </div>
             ) : (

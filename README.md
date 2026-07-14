@@ -16,7 +16,9 @@ por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
   **coleta sob demanda** pelo botão do site
 - **Escopo de coleta**: tudo, por **categoria** (GPU/CPU/RAM/PSU/MOBO/STORAGE/DIVERSOS),
   por **loja**, por **usuário** (o "Coletar" de um usuário normal coleta só os itens
-  dele), ou **um único produto** ("Coletar agora" no menu do item)
+  dele), **um único produto** ("Coletar agora" no menu do item) ou **a lista filtrada**
+  — com qualquer filtro ativo (inclusive busca e dia de coleta), o COLETAR FILTRADOS
+  coleta exatamente os itens visíveis na lista
 - **Alertas** em dois canais e dois gatilhos:
   - Email HTML vai para o **email cadastrado do dono do item**; Telegram é um
     bot pessoal, disparado só para quem está habilitado (`notificar_telegram`)
@@ -157,7 +159,8 @@ sessão do usuário e autorizam por **dono/admin**.
 
 - **Cron**: todo dia às `12:00 UTC` (09:00 de Brasília)
 - **Manual** (`workflow_dispatch`), com inputs opcionais:
-  `item_id` (coleta pontual) · `categoria` · `loja` (coleta segmentada)
+  `item_id` (coleta pontual) · `item_ids` (lista filtrada do Dashboard) ·
+  `categoria` · `loja` · `user_id` (coleta segmentada)
 
 Secrets necessários no repositório: os mesmos do grupo Supabase/Email/Telegram acima.
 
