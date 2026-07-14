@@ -24,7 +24,8 @@ through the Supabase database and the GitHub `workflow_dispatch` API.
 A React (Vite) SPA. Flask (`app.py`) only serves it in local dev and provides the API
 routes; **Flask is not used in production**. In production the SPA is deployed to Vercel,
 talks directly to Supabase via `VITE_*` env vars, and reaches the server-only routes
-through Vercel serverless functions under `frontend-flask/frontend/api/`.
+through Vercel serverless functions under `frontend-flask/frontend/api/`. Deploy
+walkthrough (Vercel setup, env vars): `frontend-flask/DEPLOY_VERCEL.md`.
 
 **SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
 Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
@@ -54,8 +55,9 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
   (Flask only; in prod Vite inlines these at build time).
 - `/api/trigger-coleta` (Vercel: `api/trigger-coleta.js`) — fires the GitHub
   `workflow_dispatch`; holds `GITHUB_TOKEN` server-side. Optional POST-body fields become
-  workflow inputs: `item_id` (pointwise single-product run, takes precedence) or
-  `categoria`/`loja` (segmented run, combinable).
+  workflow inputs, by precedence: `item_id` (pointwise single-product run), `item_ids`
+  (JSON array or comma-separated string — the Dashboard's filtered-list collection), or
+  `categoria`/`loja`/`user_id` (segmented run, combinable).
 - `/api/remover` (Vercel: `api/remover.js`) — deletes a product or a history row using
   `SUPABASE_SERVICE_KEY` (bypasses RLS, server-side only). It manually clears FK
   references first: `alertas` → then `historico_precos`/`itens`, since there are no
@@ -78,18 +80,22 @@ it exists to mirror the Vercel rewrite in dev.
 
 ## Collector flow (`main.py`)
 
-**Three collection modes** (`_selecionar_itens`), by precedence:
+**Four collection modes** (`_selecionar_itens`), by precedence:
 1. `ITEM_ID` env var set → **pointwise**: collects *only* that item even if
    `monitorando = false` (a per-product "Coletar Agora" is an explicit manual request).
-   Ignores `CATEGORIA`/`LOJA`.
-2. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
+   Ignores every other scope env.
+2. `ITEM_IDS` set (comma-separated UUIDs) → **list**: collects exactly those items
+   (Sprint 14). This is how the SPA's "Coletar Filtrados" works — *any* active filter
+   (category, store, owner, text search, collection-day) sends the visible list's
+   monitored item IDs, so filters the collector can't express server-side still
+   collect exactly what the user sees. Ignores `CATEGORIA`/`LOJA`/`USER_ID`.
+3. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
    that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
    (`kabum`/`terabyteshop`/`pichau`) and/or owner (`itens.user_id`). Combinable. The
    category/store filters run in Python; the user filter is in the PostgREST query.
-   The SPA sends `user_id` automatically for non-admin users — a normal user's
-   "collect all" only collects their own items (Sprint 9); admins and the cron stay
-   global.
-3. Nothing set → **full** run over every item with `monitorando = true` (daily cron /
+   The SPA sends `user_id` automatically for a non-admin "collect all" with no filters
+   (Sprint 9); admins and the cron stay global.
+4. Nothing set → **full** run over every item with `monitorando = true` (daily cron /
    admin global button).
 
 Values flow frontend → `/api/trigger-coleta` (POST body) → `workflow_dispatch` inputs
@@ -205,8 +211,9 @@ as GitHub Actions Secrets in `.github/workflows/coletar.yml`.
 ## CI
 
 `.github/workflows/coletar.yml` runs the collector daily at 12:00 UTC (09:00 BRT) and on
-manual `workflow_dispatch` with optional inputs `item_id` (pointwise), `categoria`, and
-`loja` (segmented). Python 3.11, installs Playwright Chromium, runs `python main.py`.
+manual `workflow_dispatch` with optional inputs `item_id` (pointwise), `item_ids`
+(filtered-list), `categoria`, `loja`, and `user_id` (segmented). Python 3.11, installs
+Playwright Chromium, runs `python main.py`.
 
 ## Project planning
 

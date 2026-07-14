@@ -1,13 +1,16 @@
 # PROTOCOL FPS — Planejamento de Sprints — V2
 
 > Relatório gerado a partir da seção **V2** do arquivo `todo` (raiz do repositório).
-> Data de geração: **08/07/2026** (atualizado após a conclusão da Sprint 13 —
-> sessão & conta). **Correção de auditoria (geração anterior, mantida):** o
-> plano anterior tinha 18 tarefas, mas a seção V2 do `todo` tem **20** — os itens
-> das linhas 134 (ordenação por data/menor valor) e 136 (informar esgotado/não
-> localizado) estavam fora do plano e as referências `todo:134`/`todo:136` de
-> Sprint 12/14 apontavam na verdade para as linhas 138 e 140. Referências
-> corrigidas; o 134 foi entregue na Sprint 12 e o 136 entrou na Sprint 14.
+> Data de geração: **14/07/2026** (atualizado após a conclusão da Sprint 14 —
+> ordenação avançada & filtro por dia de coleta, entregue no mesmo dia em que as
+> 2 tarefas entraram no `todo`: linhas 140 e 142). Com a inserção delas, o refino
+> final desceu da linha 140 para a **144**; referências atualizadas. A V2 tem
+> **22 tarefas**. O antigo plano da Sprint 14 (esgotado + refino juntos) foi
+> redistribuído em três sprints: 14 (ordenação/filtro — ✅), 15 (esgotado × não
+> localizado) e 16 (refino final — por último, como pede o `todo`).
+> **Correção de auditoria (geração de 08/07, mantida):** os itens das linhas 134
+> e 136 estavam fora do plano original por referência de linha trocada — o 134
+> foi entregue na Sprint 12 e o 136 segue planejado (hoje na Sprint 15).
 > Início do planejamento: **08/07/2026**.
 > A V1 (Sprints 0–7, concluída em 05/07/2026) está em [`sprint_v1.md`](sprint_v1.md);
 > a numeração aqui **continua de onde a V1 parou** (Sprint 8 em diante).
@@ -35,11 +38,15 @@
 | Sprint 11 | Gestão & filtro de usuários (admin) | 08/07 (concluída) | 1 | 3 ✅ |
 | Sprint 12 | Edição de produto & menor preço | 08/07 (concluída) | 1 | 4 ✅ |
 | Sprint 13 | Sessão & conta | 08/07 (concluída) | 1 | 2 ✅ |
-| Sprint 14 | Esgotado/não localizado & refino final | 30/07 – 31/07 | 2 | 2 ⬜ |
+| Sprint 14 | Ordenação avançada & filtro por data de coleta | 14/07 (concluída) | 1 | 2 ✅ |
+| Sprint 15 | Esgotado × não localizado | 15/07 – 17/07 | 3 | 1 ⬜ |
+| Sprint 16 | Refino final: cards do topo & alertas recentes | 20/07 – 21/07 | 2 | 1 ⬜ |
 
-**Total da V2:** 20 tarefas · **18 concluídas** (Sprints 8, 9 e 10 em 07/07;
-Sprints 11, 12 e 13 em 08/07) · **2 a fazer** · 0 pendentes. A Sprint 14 fecha
-com o refino por último, por exigência do `todo` ("apenas no final").
+**Total da V2:** 22 tarefas · **20 concluídas** (Sprints 8, 9 e 10 em 07/07;
+Sprints 11, 12 e 13 em 08/07; Sprint 14 em 14/07) · **2 a fazer** · 0 pendentes.
+Com a Sprint 14 fechada em 1 dia (contra 2 planejados), as Sprints 15 e 16
+adiantam: a 15 fecha na sexta 17/07 e a 16 (refino por último, por exigência do
+`todo` — "apenas no final") fica para 20–21/07, após o fim de semana.
 
 ---
 
@@ -135,15 +142,43 @@ Foco: endurecer a sessão e alinhar a troca de senha ao modelo "admin gerencia".
 
 ---
 
-## Sprint 14 — Esgotado/não localizado & refino final (30/07 – 31/07)
+## Sprint 14 — Ordenação avançada & filtro por data de coleta ✅ (concluída em 14/07)
 
-Foco: fechar a lógica de disponibilidade (item que estava fora do plano anterior) e
-o acabamento visual — o refino executa **somente após as demais sprints**, como pede o `todo`.
+Foco: evoluir a barra de ordenação entregue na Sprint 12 — novos rótulos/critérios
+(inclusive por **Meta**) e um recorte por **dia específico de coleta** que continua
+combinável com as demais ordenações. Trabalho 100% frontend (`Dashboard.jsx` +
+novo helper `diaBRT` em `utils/datas.js`), sobre dados que a query aliased já traz.
+**Executada e validada em 14/07/2026** — lógica 17/17 em Node + E2E real 12/12 na
+SPA com Playwright (usuário e2e admin temporário, removido no fim).
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S14 · Informar esgotado × não localizado (todo:136) | Um produto com página fora do ar / não localizado é informado como tal, distinto de "realmente esgotado" na loja | ⬜ Todo | Hoje o scraper devolve `disponivel=false` sem separar "esgotado de fato" de "não localizado/erro de página" (e sem preço nada é salvo). Definir a distinção no `DadosProduto`/scrapers e refletir no status da UI ("ESGOTADO" × "NÃO LOCALIZADO") |
-| S14 · Ajustar cards do topo e alertas recentes (todo:140) | Revisar a faixa superior (Itens monitorados · Abaixo da meta · Menor preço hoje · Última coleta) e a seção inferior (Alertas recentes / "Nenhum alerta disparado hoje") com o visual aprovado pelo usuário | ⬜ Todo | Cards e seção de alertas refinados por último, já refletindo tudo que a V2 mudou (novos usuários, categoria Diversos, alertas por dono, menor preço histórico); detalhes do ajuste a definir com o usuário no início da sprint |
+| S14 · Ordenação: Nome · Preço Atual · Menor Preço · Meta · Coleta (todo:140) | A barra de ordenação da tabela exibe os cinco critérios — "Preço" renomeado para **Preço Atual**, "Menor" para **Menor Preço**, e **Meta** (novo, por `preco_meta`) — cada um alternando asc/desc como hoje | ✅ Done | **Implementado (14/07/2026):** rótulos renomeados e critério META novo — ordena por `itens.preco_meta` como **número** (asc/desc no mesmo toggle; sem meta vai para o fim, padrão dos demais); nenhuma busca nova no banco. **E2E real:** 5 rótulos conferidos e ordem da tela **idêntica à verdade do banco** em asc e desc com 28 itens reais — inclusive item "indisponível" que oculta a linha `meta:` na tabela mas ordena pela meta do banco |
+| S14 · Filtro Coleta por dia específico + ordenação combinada (todo:142) | Escolher um dia específico no filtro de Coleta e ver apenas os itens cuja última coleta é daquele dia, podendo dentro do recorte ordenar por nome, preço etc. | ✅ Done | **Implementado (14/07/2026):** seletor de data junto à barra de ordenação filtra pela última coleta no **dia civil de Brasília** (novo `diaBRT` — leitura de 01:00 UTC conta no dia anterior em BRT, comprovado nas fronteiras de fuso 17/17); combina com busca/categoria/loja/usuário e qualquer ordenação; ✕ limpa e volta tudo; estado vazio próprio ("Nenhum item com última coleta em dd/mm/aaaa"). **E2E real 12/12:** recorte cheio (12 itens de 14/07) e parcial (2 de 09/07) batendo com o banco, contagem "X de Y", ordem alfabética dentro do recorte, screenshots |
+
+---
+
+## Sprint 15 — Esgotado × não localizado (15/07 – 17/07)
+
+Foco: fechar a lógica de disponibilidade (item herdado da auditoria do plano) —
+distinguir "esgotado de fato na loja" de "página fora do ar / produto não localizado".
+Mexe no contrato `DadosProduto` + 3 scrapers + coletor e reflete na UI; 3 dias úteis
+(quarta a sexta).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S15 · Informar esgotado × não localizado (todo:136) | Um produto com página fora do ar / não localizado é informado como tal, distinto de "realmente esgotado" na loja | ⬜ Todo | Hoje o scraper devolve `disponivel=false` sem separar "esgotado de fato" de "não localizado/erro de página" (e sem preço nada é salvo). Definir a distinção no `DadosProduto`/scrapers (o out-of-stock já é decidido antes do preço; challenge/manutenção detectados em `_detectar_challenge`) e refletir no status da UI ("ESGOTADO" × "NÃO LOCALIZADO"); se precisar de coluna nova em `historico_precos`, migração versionada em `project/migrations/` |
+
+---
+
+## Sprint 16 — Refino final: cards do topo & alertas recentes (20/07 – 21/07)
+
+Foco: o acabamento visual — executa **somente após as demais sprints**, como pede o
+`todo` ("apenas no final").
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S16 · Ajustar cards do topo e alertas recentes (todo:144) | Revisar a faixa superior (Itens monitorados · Abaixo da meta · Menor preço hoje · Última coleta) e a seção inferior (Alertas recentes / "Nenhum alerta disparado hoje") com o visual aprovado pelo usuário | ⬜ Todo | Cards e seção de alertas refinados por último, já refletindo tudo que a V2 mudou (novos usuários, categoria Diversos, alertas por dono, menor preço histórico, status esgotado/não localizado); detalhes do ajuste a definir com o usuário no início da sprint |
 
 ---
 
@@ -151,9 +186,9 @@ o acabamento visual — o refino executa **somente após as demais sprints**, co
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 18 | 102,104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,138 |
+| ✅ Done | 20 | 102,104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,138,140,142 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 2 | 136,140 |
+| ⬜ Todo | 2 | 136,144 |
 
 > **Sprint 8 concluída em 07/07/2026** (1 dia, contra 5 planejados): categoria
 > DIVERSOS + migração dos dados legados Kabum (23 itens, 2.691 leituras reais) com
@@ -203,8 +238,8 @@ o acabamento visual — o refino executa **somente após as demais sprints**, co
 > RLS (item alheio intocável, snapshot íntegro) + fluxo completo da UI 7/7 com
 > Playwright (renomear e reclassificar de ponta a ponta, com screenshots).
 > Auditoria do plano: itens das linhas 134 e 136 do `todo` estavam fora do
-> relatório (referências trocadas) — 134 entregue nesta sprint; 136 movido para
-> a Sprint 14.
+> relatório (referências trocadas) — 134 entregue nesta sprint; 136 replanejado
+> (hoje na Sprint 15).
 >
 > **Sprint 13 concluída em 08/07/2026** (todo:120/122 ✅, 1 dia contra 2
 > planejados): Conta sem troca de senha própria (aviso azul neutro, `--blue`
@@ -216,6 +251,37 @@ o acabamento visual — o refino executa **somente após as demais sprints**, co
 > envelhecido + reload → login) e o timer derrubando a aba parada sem reload.
 > O E2E pegou um bug real de mount (chave limpa com `user null` anulava a
 > expiração) — corrigido antes do fechamento.
+>
+> **Sprint 14 concluída em 14/07/2026** (todo:140/142 ✅, 1 dia contra 2
+> planejados): barra de ordenação com os cinco critérios **Nome · Preço Atual ·
+> Menor Preço · Meta · Coleta** (META novo, por `preco_meta` numérico; sem meta
+> vai ao fim) e **filtro por dia de coleta** — `<input type="date">` junto à
+> ordenação que recorta pela última coleta no dia civil de Brasília (novo helper
+> `diaBRT` em `utils/datas.js`), combinável com todos os filtros e ordenações,
+> com ✕ para limpar e estado vazio próprio. Validação em dupla camada: lógica
+> 17/17 em Node (fronteiras de fuso UTC-3: leitura de 01:00 UTC conta no dia
+> anterior em BRT) + **E2E real 12/12** na SPA servida pelo Flask com Playwright
+> (usuário e2e admin temporário criado via admin API e removido no fim; ordem por
+> Meta idêntica à verdade do banco em asc/desc com 28 itens; recortes de dia
+> cheio/parcial batendo com o banco; screenshots). Nenhum item criado — teste
+> somente leitura; build Vite sem erros.
+>
+> **Extra pós-Sprint 14 (pedido do usuário, 14/07/2026):** (1) o campo de dia
+> abre o **calendário nativo** ao clicar em qualquer ponto (`showPicker()`);
+> (2) o COLETAR passou a respeitar **a lista filtrada**: com qualquer filtro
+> ativo (categoria/loja/usuário/**busca**/**dia**), o "COLETAR FILTRADOS"
+> envia exatamente os itens visíveis — novo modo **LISTA** na pipeline
+> (`item_ids`: Dashboard → endpoints Flask × Vercel em paridade → input
+> `item_ids` no `coletar.yml` → env `ITEM_IDS` → `main.py`, precedência
+> ITEM_ID > ITEM_IDS > segmentada > completa; pausados ficam fora da lista,
+> como na coleta em lote; lista vazia não dispara — viraria coleta completa).
+> Validação: paridade mockada 8/8 cenários com dispatch idêntico + 9 checagens
+> de semântica, scoping read-only 4/4 no banco real e **E2E de UI 11/11** com
+> o `/api/trigger-coleta` interceptado no navegador (dia com 12 itens →
+> `item_ids` com exatamente os 12; busca com 1 visível → só ele; sem filtros
+> o admin segue global). **Atenção deploy:** o dispatch com `item_ids` só é
+> aceito depois que o workflow com o input novo estiver na branch alvo do
+> `GITHUB_BRANCH` (GitHub responde 422 até lá — mesmo caso da Sprint 9).
 >
 > Regras herdadas da V1: banco primeiro (migração versionada em
 > `project/migrations/`), endpoints sempre em **paridade Flask × Vercel**, validação

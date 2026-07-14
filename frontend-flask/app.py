@@ -172,18 +172,26 @@ def api_trigger_coleta():
 
     # Escopo opcional no corpo (mesma semântica do main.py):
     #   item_id                    → coleta pontual (só aquele produto; tem precedência)
+    #   item_ids                   → coleta em LISTA (Sprint 14): os itens visíveis
+    #                                na lista filtrada do Dashboard — lista JSON ou
+    #                                string com IDs separados por vírgula
     #   categoria / loja / user_id → coleta segmentada (combináveis: ex. GPUs
     #                                da Kabum, ou só os itens do usuário logado)
     #   nada                       → coleta completa (todos os monitorados)
     payload   = request.get_json(silent=True) or {}
     item_id   = payload.get("item_id")
+    item_ids  = payload.get("item_ids")
     categoria = payload.get("categoria")
     loja      = payload.get("loja")
     user_id   = payload.get("user_id")
+    if isinstance(item_ids, (list, tuple)):
+        item_ids = ",".join(str(i).strip() for i in item_ids if str(i).strip())
     dispatch  = {"ref": _GITHUB_BRANCH}
     inputs = {}
     if item_id:
         inputs["item_id"] = str(item_id)
+    elif item_ids:
+        inputs["item_ids"] = str(item_ids)
     else:
         if categoria: inputs["categoria"] = str(categoria)
         if loja:      inputs["loja"]      = str(loja)

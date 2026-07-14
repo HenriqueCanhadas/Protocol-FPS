@@ -21,6 +21,14 @@ export const dataHoraBRT = (valor, opcoes = {}) =>
   new Date(valor).toLocaleString("pt-BR", { timeZone: TZ_BRT, ...opcoes });
 
 /**
+ * Dia civil de Brasília no formato YYYY-MM-DD (ex.: 2026-07-15).
+ * Mesmo formato do <input type="date"> — usar para comparar "mesmo dia"
+ * no fuso de Brasília (ex.: filtro por dia de coleta do Dashboard).
+ */
+export const diaBRT = (valor) =>
+  new Date(valor).toLocaleDateString("en-CA", { timeZone: TZ_BRT });
+
+/**
  * Meia-noite de HOJE em Brasília, como ISO com offset (-03:00).
  * Usar em filtros .gte("criado_em", ...) do Supabase — "hoje" passa a
  * significar o dia civil de Brasília, não o do fuso do navegador.

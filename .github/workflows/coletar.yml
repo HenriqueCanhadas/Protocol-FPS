@@ -9,6 +9,10 @@ on:
         description: "ID do item para coleta pontual (vazio = coleta todos os monitorados)"
         required: false
         default: ""
+      item_ids:
+        description: "IDs separados por vírgula — coleta a lista filtrada do Dashboard (vazio = usa os demais escopos)"
+        required: false
+        default: ""
       categoria:
         description: "Categoria para coleta segmentada — GPU/CPU/RAM/PSU/MOBO/STORAGE/DIVERSOS (vazio = todas)"
         required: false
@@ -60,10 +64,13 @@ jobs:
           GITHUB_ACTIONS:        "true"
           # Escopo da coleta (vazios no cron/dispatch global = coleta todos):
           #   ITEM_ID   → coleta pontual de um produto (tem precedência)
+          #   ITEM_IDS  → coleta em lista: os itens visíveis na lista filtrada
+          #               do Dashboard, IDs separados por vírgula (Sprint 14)
           #   CATEGORIA → coleta segmentada por categoria (GPU/CPU/...)
           #   LOJA      → coleta segmentada por loja (kabum/terabyteshop/pichau)
           #   USER_ID   → coleta só os itens de um usuário (combinável c/ os acima)
           ITEM_ID:               ${{ github.event.inputs.item_id }}
+          ITEM_IDS:              ${{ github.event.inputs.item_ids }}
           CATEGORIA:             ${{ github.event.inputs.categoria }}
           LOJA:                  ${{ github.event.inputs.loja }}
           USER_ID:               ${{ github.event.inputs.user_id }}
