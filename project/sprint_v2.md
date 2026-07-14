@@ -282,6 +282,13 @@ Foco: o acabamento visual — executa **somente após as demais sprints**, como 
 > o admin segue global). **Atenção deploy:** o dispatch com `item_ids` só é
 > aceito depois que o workflow com o input novo estiver na branch alvo do
 > `GITHUB_BRANCH` (GitHub responde 422 até lá — mesmo caso da Sprint 9).
+> **Correção (reporte do usuário, 14/07):** o recorte por dia contava só a
+> **última** leitura de cada item — um item recoletado depois sumia do dia
+> antigo (11/07 mostrava 0 com 9 itens coletados no dia). Agora conta
+> **qualquer** leitura no dia: os `item_id`s do dia vêm do banco em busca
+> paginada de 1000 (teto do PostgREST), com aproximação pela última leitura
+> enquanto carregam. E2E real 3/3 no próprio caso: 11/07 exibe os 9 itens
+> (8 recoletados depois) e o COLETAR FILTRADOS envia exatamente essa lista.
 >
 > Regras herdadas da V1: banco primeiro (migração versionada em
 > `project/migrations/`), endpoints sempre em **paridade Flask × Vercel**, validação
