@@ -850,7 +850,8 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [filtroLoja,    setFiltroLoja]    = useState("all");
   const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
   const [filtroUsuario, setFiltroUsuario] = useState("all"); // admin: dono dos itens
-  const [filtroDia,     setFiltroDia]     = useState("");    // dia da última coleta (YYYY-MM-DD em BRT; "" = todos)
+  const [filtroDia,     setFiltroDia]     = useState("");    // dia de coleta (YYYY-MM-DD em BRT; "" = todos)
+  const [itensDoDia,    setItensDoDia]    = useState(null);  // Set de item_ids com ALGUMA leitura no dia (null = carregando)
   const [coletando,    setColetando]    = useState(false);
   const [progresso,    setProgresso]    = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem,setHistoricoItem]= useState(null);
@@ -930,6 +931,37 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     carregarAlertas();
   }, [carregarPrecos, carregarAlertas]);
 
+  // Filtro por dia de coleta: um item conta se teve QUALQUER leitura no dia
+  // escolhido — não só se a última leitura é daquele dia (um item coletado em
+  // 11/07 e de novo em 14/07 aparece nos dois dias). Como o Dashboard só
+  // carrega a última leitura por item, os IDs do dia vêm do banco, paginados
+  // em blocos de 1000 (teto do PostgREST — Sprints 8/10).
+  useEffect(() => {
+    if (!filtroDia) { setItensDoDia(null); return; }
+    let ativo = true;
+    setItensDoDia(null);
+    (async () => {
+      const sb  = await getSupabase();
+      const ini = `${filtroDia}T00:00:00-03:00`;   // dia civil de Brasília
+      const fim = new Date(new Date(ini).getTime() + 86400000).toISOString();
+      const PAGINA = 1000;
+      const ids = new Set();
+      for (let de = 0; ; de += PAGINA) {
+        const { data, error } = await sb
+          .from("historico_precos")
+          .select("item_id")
+          .gte("coletado_em", ini)
+          .lt("coletado_em", fim)
+          .range(de, de + PAGINA - 1);
+        if (error || !data) break;
+        data.forEach((r) => ids.add(r.item_id));
+        if (data.length < PAGINA) break;
+      }
+      if (ativo) setItensDoDia(ids);
+    })();
+    return () => { ativo = false; };
+  }, [filtroDia]);
+
   // Stats
   const ativos      = dados.filter((d) => d.monitorando !== false);
   const disponiveis = ativos.filter((d) => d.disponivel && d.preco);
@@ -963,10 +995,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     if (filtroProduto !== "all") {
       d = d.filter(x => x.item_id === filtroProduto);
     }
-    // Sprint 14: recorte por dia da última coleta (dia civil de Brasília,
-    // mesmo formato YYYY-MM-DD do <input type="date">)
+    // Sprint 14: recorte por dia de coleta (dia civil de Brasília, mesmo
+    // formato YYYY-MM-DD do <input type="date">). Usa os IDs vindos do banco
+    // (qualquer leitura no dia); enquanto carregam, aproxima pela última
+    // leitura para a tabela não piscar vazia.
     if (filtroDia) {
-      d = d.filter((x) => x.coletado_em && diaBRT(x.coletado_em) === filtroDia);
+      d = itensDoDia
+        ? d.filter((x) => itensDoDia.has(x.item_id))
+        : d.filter((x) => x.coletado_em && diaBRT(x.coletado_em) === filtroDia);
     }
     d.sort((a, b) => {
       if (sortCampo === "nome") {
@@ -1039,7 +1075,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       partes.push(filtroUsuario === user?.id ? "somente os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
     }
     if (termoBusca.trim()) partes.push(`busca "${termoBusca.trim()}"`);
-    if (filtroDia)         partes.push(`última coleta em ${dataBRT(`${filtroDia}T12:00:00-03:00`)}`);
+    if (filtroDia)         partes.push(`coletados em ${dataBRT(`${filtroDia}T12:00:00-03:00`)}`);
 
     // Filtro ativo → coleta em LISTA: os IDs monitorados visíveis na tabela
     if (partes.length) {
@@ -1412,9 +1448,9 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                     </span>
                   </button>
                 ))}
-                {/* Sprint 14: só itens com última coleta neste dia (BRT);
+                {/* Sprint 14: só itens que tiveram coleta neste dia (BRT);
                     combina com busca/categoria/loja/usuário e qualquer ordenação */}
-                <div className="dia-coleta-wrap" title="Mostrar só itens cuja última coleta foi neste dia (horário de Brasília)">
+                <div className="dia-coleta-wrap" title="Mostrar só itens que tiveram coleta neste dia (horário de Brasília)">
                   <input
                     className={`dia-coleta-input${filtroDia ? " on" : ""}`}
                     type="date"
@@ -1450,7 +1486,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
                 {termoBusca
                   ? <>Nenhum resultado para "<span className="green">{termoBusca}</span>".</>
                   : filtroDia
-                  ? <>Nenhum item com última coleta em <span className="green">{dataBRT(`${filtroDia}T12:00:00-03:00`)}</span>.</>
+                  ? <>Nenhum item com coleta em <span className="green">{dataBRT(`${filtroDia}T12:00:00-03:00`)}</span>.</>
                   : <>Nenhum item nesta categoria.<br /><a href="/novo-produto" style={{ color: "var(--green)", fontSize: "var(--fs-sm)" }}>+ Adicionar produto</a></>}
               </div>
             ) : (
