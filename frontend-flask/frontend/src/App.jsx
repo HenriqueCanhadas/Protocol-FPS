@@ -68,7 +68,7 @@ export default function App() {
 
         <Routes>
           <Route path="/"             element={<Dashboard   showToast={showToast} isAdmin={isAdmin} user={user} />} />
-          <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} />} />
+          <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} isAdmin={isAdmin} />} />
           <Route path="/usuarios"     element={<Usuarios showToast={showToast} isAdmin={isAdmin} perfilLoading={perfilLoading} user={user} />} />
           <Route path="/conta"        element={
             <Conta user={user} perfil={perfil} signOut={signOut} />

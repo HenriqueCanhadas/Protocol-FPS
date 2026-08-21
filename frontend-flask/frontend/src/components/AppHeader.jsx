@@ -1,20 +1,14 @@
 /**
  * components/AppHeader.jsx — PROTOCOL FPS
  */
-import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { horaBRT } from "@/utils/datas";
+import { useClock } from "@/hooks/useClock";
+import { useSessionTimer } from "@/hooks/useSessionTimer";
+import { formatMMSS } from "@/utils/format";
 
 export default function AppHeader({ onMenuClick, menuOpen }) {
-  const [time, setTime] = useState("");
-
-  useEffect(() => {
-    const tick = () =>
-      setTime(horaBRT(new Date(), { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
+  const { time } = useClock();
+  const restanteMs = useSessionTimer();
 
   return (
     <header>
@@ -29,6 +23,12 @@ export default function AppHeader({ onMenuClick, menuOpen }) {
       <div className="header-meta">
         <div className="status-dot" />
         <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-dim)" }}>{time}</div>
+        <div
+          style={{ fontSize: "var(--fs-sm)", color: "var(--amber)" }}
+          title="Tempo até o logout automático por inatividade"
+        >
+          {formatMMSS(restanteMs)}
+        </div>
       </div>
     </header>
   );

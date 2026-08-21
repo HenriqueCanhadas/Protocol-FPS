@@ -11,6 +11,9 @@
 import { useEffect, useRef } from "react";
 
 const CHAVE = "fps_ultima_atividade";
+// Exportada para o useSessionTimer (temporizador do AppHeader) ler a mesma
+// chave sem duplicar a string.
+export const CHAVE_ULTIMA_ATIVIDADE = CHAVE;
 export const LIMITE_INATIVIDADE_MS = 30 * 60 * 1000; // 30 minutos
 const THROTTLE_GRAVACAO_MS = 15 * 1000;              // grava no máx. a cada 15s
 

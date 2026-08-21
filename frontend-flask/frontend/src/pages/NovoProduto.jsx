@@ -31,11 +31,14 @@ const css = `
 .loja-tag { color:var(--green); font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; white-space:nowrap; border:1px solid var(--green-dim); padding:.2rem .55rem; }
 .preview-text { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--fs-xs); }
 
-.loja-chips,.cat-chips { display:flex; gap:.6rem; flex-wrap:wrap; }
-.loja-chip,.cat-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; }
-.loja-chip:hover,.cat-chip:hover { border-color:var(--green-dim); color:var(--text); }
-.loja-chip.selected { border-color:var(--green); color:var(--green); background:var(--green-soft); }
-.cat-chip.selected  { border-color:var(--amber); color:var(--amber); background:rgba(255,184,0,.08); }
+.form-select { width:100%; background:var(--bg); border:1px solid var(--border2); color:var(--text); font-family:var(--mono); font-size:var(--fs-md); padding:.8rem 1rem; outline:none; cursor:pointer; transition:border-color .2s,box-shadow .2s; }
+.form-select:hover { border-color:var(--green-dim); }
+.form-select:focus { border-color:var(--green-dim); box-shadow:0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03); }
+.form-select option { background:var(--bg2); color:var(--text); }
+.link-btn { background:none; border:none; color:var(--green-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; padding:.5rem 0 0; text-align:left; }
+.link-btn:hover { color:var(--green); text-decoration:underline; }
+.cat-new-row { display:flex; gap:.6rem; margin-top:.6rem; }
+.cat-new-row .field-input { flex:1; }
 .form-divider { height:1px; background:var(--border2); margin:.25rem 0; }
 
 .toggle-row { display:flex; align-items:center; gap:1rem; padding:.9rem 1.1rem; background:var(--bg3); border:1px solid var(--border2); cursor:pointer; transition:border-color .15s; }
@@ -53,6 +56,8 @@ const css = `
 .form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 2rem; border-top:1px solid var(--border2); background:var(--bg3); }
 
 .item-row { display:grid; grid-template-columns:1fr auto auto auto; gap:1.1rem; align-items:center; padding:.9rem 1.1rem; background:var(--bg2); border:1px solid var(--border2); border-left:3px solid var(--green-dim); font-size:var(--fs-base); margin-bottom:.6rem; }
+.item-row.editing { border-left-color:var(--amber); box-shadow:inset 3px 0 0 var(--amber); }
+.item-actions { display:flex; gap:.35rem; }
 .item-nome { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .item-cat  { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.1em; text-transform:uppercase; margin-top:.15rem; }
 .item-loja { font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
@@ -78,10 +83,37 @@ const LOJAS_DETECTADAS = {
   "terabyteshop.com.br": "terabyteshop",
   "pichau.com.br":      "pichau",
 };
-// Deve refletir as categorias existentes na tabela `produtos` do Supabase
-// (o cadastro faz lookup por categoria; valor sem linha correspondente falha ao salvar).
-const CATEGORIAS = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
+// Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
+// Categorias novas (todo, criadas por admin — ver criarCategoria) entram
+// depois destas, ordenadas por nome.
+const CATEGORIA_ORDEM_FIXA = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
+const CATEGORIA_LABEL_FIXA = { GPU: "GPU", CPU: "CPU", RAM: "RAM", PSU: "Fonte", MOBO: "Placa Mãe", STORAGE: "Armazenamento", DIVERSOS: "Diversos" };
 const LOJAS_LABEL = { kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau" };
+
+function rotuloCategoria(categoria, nomeDb) {
+  return CATEGORIA_LABEL_FIXA[categoria] || nomeDb || categoria;
+}
+
+// Slug estável para a coluna `produtos.categoria` (sigla usada nos filtros
+// do Dashboard e na coleta segmentada — ver CATEGORIA em main.py).
+function slugCategoria(nome) {
+  return nome
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .toUpperCase().trim()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+function ordenarCategorias(lista) {
+  return [...lista].sort((a, b) => {
+    const ia = CATEGORIA_ORDEM_FIXA.indexOf(a.categoria);
+    const ib = CATEGORIA_ORDEM_FIXA.indexOf(b.categoria);
+    if (ia === -1 && ib === -1) return a.nome.localeCompare(b.nome);
+    if (ia === -1) return 1;
+    if (ib === -1) return -1;
+    return ia - ib;
+  });
+}
 
 function detectarLoja(url) {
   try {
@@ -93,13 +125,20 @@ function detectarLoja(url) {
   return null;
 }
 
-export default function NovoProduto({ showToast, user }) {
+export default function NovoProduto({ showToast, user, isAdmin }) {
   const [lojasDB,   setLojasDB]   = useState({});
   const [produtosDB,setProdutosDB] = useState({});
+  const [categorias,setCategorias] = useState([]); // [{ categoria, nome }], ver ordenarCategorias
   const [fila,      setFila]       = useState([]);
+  const [editandoId,setEditandoId] = useState(null);
   const [confirm,   setConfirm]    = useState(null);
   const [salvando,  setSalvando]   = useState(false);
   const [progresso, setProgresso]  = useState(0);
+
+  // Criação de categoria nova (todo, admin-only — ver migrations/sprint31_categorias_insert.sql)
+  const [criandoCategoria,   setCriandoCategoria]   = useState(false);
+  const [novaCategoriaNome,  setNovaCategoriaNome]  = useState("");
+  const [salvandoCategoria,  setSalvandoCategoria]  = useState(false);
 
   // Form state
   const [url,       setUrl]       = useState("");
@@ -115,13 +154,39 @@ export default function NovoProduto({ showToast, user }) {
   useEffect(() => {
     getSupabase().then(async (sb) => {
       const { data: lojas } = await sb.from("lojas").select("id, nome");
-      const { data: prods } = await sb.from("produtos").select("id, categoria");
+      const { data: prods } = await sb.from("produtos").select("id, categoria, nome");
       const lMap = {}; (lojas || []).forEach((l) => { lMap[l.nome.toLowerCase().replace(/\s/g, "")] = l.id; });
       const pMap = {}; (prods  || []).forEach((p) => { pMap[p.categoria] = p.id; });
       setLojasDB(lMap);
       setProdutosDB(pMap);
+      setCategorias(ordenarCategorias(prods || []));
     });
   }, []);
+
+  // Cria uma categoria nova em `produtos` (todo) — restrito a admin pela
+  // política produtos_insert_admin (migrations/sprint31_categorias_insert.sql);
+  // um usuário comum recebe o erro de RLS do próprio Supabase.
+  const criarCategoria = async () => {
+    const nomeDigitado = novaCategoriaNome.trim();
+    if (!nomeDigitado) return;
+    const slug = slugCategoria(nomeDigitado);
+    if (!slug) { showToast("Nome inválido para categoria", "error"); return; }
+    if (produtosDB[slug]) { showToast(`Categoria "${slug}" já existe`, "error"); return; }
+
+    setSalvandoCategoria(true);
+    const sb = await getSupabase();
+    const { data, error } = await sb.from("produtos").insert({ categoria: slug, nome: nomeDigitado }).select().single();
+    setSalvandoCategoria(false);
+    if (error) { showToast(`Erro ao criar categoria: ${error.message}`, "error"); return; }
+
+    setProdutosDB((m) => ({ ...m, [slug]: data.id }));
+    setCategorias((c) => ordenarCategorias([...c, { categoria: slug, nome: data.nome }]));
+    setCategoria(slug);
+    setErros((e) => ({ ...e, categoria: false }));
+    setCriandoCategoria(false);
+    setNovaCategoriaNome("");
+    showToast(`Categoria "${nomeDigitado}" criada`, "ok");
+  };
 
   const detectar = () => {
     const slug = detectarLoja(url);
@@ -136,6 +201,27 @@ export default function NovoProduto({ showToast, user }) {
     setUrl(""); setNome(""); setCategoria(""); setLoja("");
     setPrecoMeta(""); setMetaAtivo(false);
     setUrlPreview(null); setErros({});
+    setEditandoId(null);
+  };
+
+  // Carrega um item já na fila de volta no formulário para edição (todo:208).
+  // "Adicionar à Fila" vira "Salvar Edição" enquanto editandoId estiver setado.
+  const editarItem = (item) => {
+    setUrl(item.url);
+    setNome(item.nome_na_loja);
+    setCategoria(item.categoria);
+    setLoja(item.loja_slug);
+    setPrecoMeta(item.preco_meta != null ? String(item.preco_meta) : "");
+    setMetaAtivo(item.preco_meta != null);
+    setMonitorando(item.monitorando);
+    setUrlPreview({ valid: true, slug: item.loja_slug });
+    setErros({});
+    setEditandoId(item.id_temp);
+  };
+
+  const removerDaFila = (id_temp) => {
+    setFila((f) => f.filter((i) => i.id_temp !== id_temp));
+    if (id_temp === editandoId) limpar();
   };
 
   const adicionar = () => {
@@ -147,12 +233,19 @@ export default function NovoProduto({ showToast, user }) {
     if (metaAtivo && precoMeta && (isNaN(precoMeta) || Number(precoMeta) <= 0)) e.precoMeta = true;
     if (Object.keys(e).length) { setErros(e); return; }
 
-    setFila((f) => [...f, {
-      id_temp: Date.now(), url, nome_na_loja: nome, categoria, loja_slug: loja,
+    const dadosItem = {
+      url, nome_na_loja: nome, categoria, loja_slug: loja,
       preco_meta: metaAtivo && precoMeta ? Number(precoMeta) : null,
       monitorando,
-    }]);
-    showToast(`"${nome}" adicionado à fila`);
+    };
+
+    if (editandoId != null) {
+      setFila((f) => f.map((i) => (i.id_temp === editandoId ? { ...i, ...dadosItem } : i)));
+      showToast(`"${nome}" atualizado na fila`);
+    } else {
+      setFila((f) => [...f, { id_temp: Date.now(), ...dadosItem }]);
+      showToast(`"${nome}" adicionado à fila`);
+    }
     limpar();
   };
 
@@ -210,7 +303,7 @@ export default function NovoProduto({ showToast, user }) {
           </div>
 
           {/* FORM */}
-          <div className="form-card" data-label="DADOS DO PRODUTO">
+          <div className="form-card" data-label={editandoId != null ? "EDITANDO ITEM DA FILA" : "DADOS DO PRODUTO"}>
             <div className="form-body">
               {/* URL */}
               <div className="field-group">
@@ -246,26 +339,43 @@ export default function NovoProduto({ showToast, user }) {
               <div className="fields-grid cols-2">
                 <div className="field-group">
                   <div className="field-label">Categoria <span className="red">*</span></div>
-                  <div className="cat-chips">
-                    {CATEGORIAS.map((c) => (
-                      <div key={c} className={`cat-chip${categoria === c ? " selected" : ""}`}
-                        onClick={() => { setCategoria(c); setErros((e) => ({ ...e, categoria: false })); }}>
-                        {c === "PSU" ? "Fonte" : c === "MOBO" ? "Placa Mãe" : c === "STORAGE" ? "Armazenamento" : c === "DIVERSOS" ? "Diversos" : c}
-                      </div>
+                  <select className="form-select" value={categoria}
+                    onChange={(e) => { setCategoria(e.target.value); setErros((x) => ({ ...x, categoria: false })); }}>
+                    <option value="">— selecione a categoria —</option>
+                    {categorias.map((c) => (
+                      <option key={c.categoria} value={c.categoria}>{rotuloCategoria(c.categoria, c.nome)}</option>
                     ))}
-                  </div>
+                  </select>
+                  {isAdmin && !criandoCategoria && (
+                    <button type="button" className="link-btn" onClick={() => setCriandoCategoria(true)}>+ Nova categoria</button>
+                  )}
+                  {isAdmin && criandoCategoria && (
+                    <div className="cat-new-row">
+                      <input
+                        className="field-input" type="text" placeholder="Nome da nova categoria (ex.: Cooler)"
+                        autoFocus value={novaCategoriaNome}
+                        onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
+                      />
+                      <button className="btn-secondary" style={{ fontSize: "var(--fs-xs)", padding: "0 .9rem" }}
+                        onClick={() => { setCriandoCategoria(false); setNovaCategoriaNome(""); }}>✕</button>
+                      <button className="btn-primary" style={{ fontSize: "var(--fs-xs)", padding: "0 1.1rem" }}
+                        disabled={!novaCategoriaNome.trim() || salvandoCategoria} onClick={criarCategoria}>
+                        {salvandoCategoria ? "CRIANDO..." : "CRIAR"}
+                      </button>
+                    </div>
+                  )}
                   {erros.categoria && <div className="field-error">Selecione uma categoria</div>}
                 </div>
                 <div className="field-group">
                   <div className="field-label">Loja <span className="red">*</span></div>
-                  <div className="loja-chips">
+                  <select className="form-select" value={loja}
+                    onChange={(e) => { setLoja(e.target.value); setErros((x) => ({ ...x, loja: false })); }}>
+                    <option value="">— selecione a loja —</option>
                     {Object.entries(LOJAS_LABEL).map(([slug, label]) => (
-                      <div key={slug} className={`loja-chip${loja === slug ? " selected" : ""}`}
-                        onClick={() => { setLoja(slug); setErros((e) => ({ ...e, loja: false })); }}>
-                        {label}
-                      </div>
+                      <option key={slug} value={slug}>{label}</option>
                     ))}
-                  </div>
+                  </select>
                   {erros.loja && <div className="field-error">Selecione a loja</div>}
                 </div>
               </div>
@@ -308,8 +418,8 @@ export default function NovoProduto({ showToast, user }) {
             )}
 
             <div className="form-actions">
-              <button className="btn-secondary" onClick={limpar}>LIMPAR</button>
-              <button className="btn-primary"   onClick={adicionar}>ADICIONAR À FILA</button>
+              <button className="btn-secondary" onClick={limpar}>{editandoId != null ? "CANCELAR EDIÇÃO" : "LIMPAR"}</button>
+              <button className="btn-primary"   onClick={adicionar}>{editandoId != null ? "SALVAR EDIÇÃO" : "ADICIONAR À FILA"}</button>
             </div>
           </div>
 
@@ -330,14 +440,17 @@ export default function NovoProduto({ showToast, user }) {
                 <div className="empty-itens">Nenhum produto adicionado.<br />Preencha o formulário acima e clique em "Adicionar à Fila".</div>
               ) : (
                 fila.map((item) => (
-                  <div key={item.id_temp} className="item-row">
+                  <div key={item.id_temp} className={`item-row${item.id_temp === editandoId ? " editing" : ""}`}>
                     <div>
                       <div className="item-nome">{item.nome_na_loja}</div>
                       <div className="item-cat">{item.categoria} · {item.url.substring(0, 45)}…</div>
                     </div>
                     <div className="item-loja">{LOJAS_LABEL[item.loja_slug] || item.loja_slug}</div>
                     <div className="item-meta">{item.preco_meta ? `Meta: R$ ${Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Sem meta"}</div>
-                    <button className="btn-remove-item" onClick={() => setFila((f) => f.filter((i) => i.id_temp !== item.id_temp))}>✕</button>
+                    <div className="item-actions">
+                      <button className="btn-remove-item" title="Editar" onClick={() => editarItem(item)}>✎</button>
+                      <button className="btn-remove-item" title="Remover" onClick={() => removerDaFila(item.id_temp)}>✕</button>
+                    </div>
                   </div>
                 ))
               )}
