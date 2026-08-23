@@ -85,6 +85,7 @@ const LOJAS_DETECTADAS = {
   "logitechstore.com.br":  "logitec",
   "tangleteezer.com.br":   "tangleteezer",
   "amazon.com.br":         "amazon",
+  "shopee.com.br":         "shopee",
 };
 // Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
 // Categorias novas (todo, criadas por admin — ver criarCategoria) entram
@@ -94,7 +95,7 @@ const CATEGORIA_LABEL_FIXA = { GPU: "GPU", CPU: "CPU", RAM: "RAM", PSU: "Fonte",
 const LOJAS_LABEL = {
   kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
   tuyo: "Tuyo", playstation: "Playstation", logitec: "Logitec",
-  tangleteezer: "Tangle Teezer", amazon: "Amazon",
+  tangleteezer: "Tangle Teezer", amazon: "Amazon", shopee: "Shopee",
 };
 
 function rotuloCategoria(categoria, nomeDb) {

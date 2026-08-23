@@ -1,23 +1,25 @@
 /**
  * pages/Dashboard/components/KpiRibbon.jsx — PROTOCOL FPS
- * Painel da sidebar (V4: era a faixa full-width no topo da página, virou mais
- * um painel ao lado do gráfico/detalhe do item): Itens monitorados, Abaixo da
- * meta, Menor preço hoje e Última coleta. Mesmas fórmulas de sempre.
+ * Painel da sidebar: Itens monitorados, Itens não monitorados, Loja mais
+ * monitorada e Última coleta.
+ *
+ * Sprint 36 (todo:229): "Abaixo da meta" e "Menor preço hoje" saíram do
+ * painel — o pedido do usuário nomeava só 3 dos 4 slots (Itens monitorados /
+ * Itens não monitorados / Última coleta) e deixava o 4° livre; escolhido
+ * "Loja mais monitorada" entre as opções levantadas no planejamento.
  */
 import { dataBRT, horaBRT } from "@/utils/datas";
-import { formatBRL } from "@/utils/format";
 
 export default function KpiRibbon({ dados }) {
   const ativos      = dados.filter((d) => d.monitorando !== false);
-  const disponiveis = ativos.filter((d) => d.disponivel && d.preco);
-  const menor       = disponiveis.length ? disponiveis.reduce((a, b) => a.preco < b.preco ? a : b) : null;
+  const pausados    = dados.filter((d) => d.monitorando === false);
   const ultColeta   = [...dados].filter((d) => d.coletado_em).sort((a, b) => new Date(b.coletado_em) - new Date(a.coletado_em))[0];
-  // "Abaixo da meta" (todo:65, decisão 05/07/2026): oportunidades AGORA —
-  // itens ativos cujo preço atual está abaixo do preço-meta definido.
-  // Substitui o antigo "Alertas hoje" (quase sempre 0 com 1 coleta/dia,
-  // zerava à meia-noite e contava em dobro abaixo_meta + queda_preco).
-  const comMeta    = ativos.filter((d) => d.preco_meta);
-  const abaixoMeta = comMeta.filter((d) => d.preco && d.preco < d.preco_meta);
+
+  const contagemPorLoja = ativos.reduce((acc, d) => {
+    if (d.loja) acc[d.loja] = (acc[d.loja] || 0) + 1;
+    return acc;
+  }, {});
+  const lojaTop = Object.entries(contagemPorLoja).sort((a, b) => b[1] - a[1])[0];
 
   return (
     <div className="kpi-panel">
@@ -31,20 +33,16 @@ export default function KpiRibbon({ dados }) {
           <div className="stat-sub">produtos ativos</div>
         </div>
         <div className="kpi-cell">
-          <div className="stat-label">Abaixo da meta</div>
-          <div className="stat-value amber">{abaixoMeta.length}</div>
-          <div className="stat-sub">
-            {comMeta.length
-              ? `de ${comMeta.length} com meta definida`
-              : "nenhum item com meta"}
-          </div>
+          <div className="stat-label">Itens não monitorados</div>
+          <div className="stat-value red">{pausados.length}</div>
+          <div className="stat-sub">produtos pausados</div>
         </div>
         <div className="kpi-cell">
-          <div className="stat-label">Menor preço hoje</div>
-          <div className="stat-value">
-            {menor ? formatBRL(menor.preco) : "—"}
+          <div className="stat-label">Loja mais monitorada</div>
+          <div className="stat-value">{lojaTop ? lojaTop[0] : "—"}</div>
+          <div className="stat-sub">
+            {lojaTop ? `${lojaTop[1]} item(ns) ativo(s)` : "nenhum item ativo"}
           </div>
-          <div className="stat-sub">{menor?.nome_na_loja || "—"}</div>
         </div>
         <div className="kpi-cell">
           <div className="stat-label">Última coleta</div>

@@ -52,8 +52,8 @@ const css = `
 /* ── Listagem de usuários ─────────────────────────────────── */
 .users-scroll { overflow-x:auto; }
 .users-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:var(--fs-sm); }
-.users-table th { text-align:left; padding:.7rem .9rem; color:var(--text-dim); font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; border-bottom:1px solid var(--border2); white-space:nowrap; }
-.users-table td { padding:.8rem .9rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:middle; white-space:nowrap; }
+.users-table th { text-align:left; padding:.7rem .55rem; color:var(--text-dim); font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; border-bottom:1px solid var(--border2); white-space:nowrap; }
+.users-table td { padding:.8rem .55rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:middle; white-space:nowrap; }
 .users-table tr:last-child td { border-bottom:none; }
 .users-table tr:hover td { background:var(--bg3); }
 .u-email { display:flex; flex-direction:column; gap:.15rem; }

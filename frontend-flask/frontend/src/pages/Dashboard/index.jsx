@@ -54,6 +54,7 @@ const css = `
 .stat-value { font-family:var(--display); font-size:1.2rem; letter-spacing:.03em; color:var(--green); line-height:1.1; }
 .stat-sub   { font-size:var(--fs-xs); color:var(--text-muted); line-height:1.2; word-break:break-word; }
 .stat-value.amber { color:var(--amber); }
+.stat-value.red { color:var(--red); }
 
 .dash-main { flex:1; padding:1.75rem 1.5rem; display:flex; flex-direction:column; gap:2rem; }
 
@@ -215,10 +216,10 @@ const css = `
 .price-table-wrap { overflow-x:auto; border:1px solid var(--border2); }
 table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:760px; }
 /* Larguras fixas das colunas (Sprint 19: coluna Ações saiu, virou ActionBar) */
-.col-produto { width:50%; }
+.col-produto { width:45%; }
 .col-loja    { width:17%; }
 .col-preco   { width:20%; }
-.col-status  { width:13%; }
+.col-status  { width:18%; }
 thead { background:var(--bg3); position:sticky; top:0; z-index:2; }
 th { text-align:left; padding:.85rem 1.1rem; font-size:var(--fs-xs); letter-spacing:.25em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border2); white-space:nowrap; }
 tbody tr { border-bottom:1px solid var(--border); transition:background .15s; cursor:pointer; }
@@ -235,7 +236,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .td-produto { min-width:220px; }
 .prod-nome { font-size:var(--fs-base); font-weight:500; line-height:1.35; }
 .prod-cat  { font-size:var(--fs-xs); color:var(--text-dim); margin-top:.15rem; letter-spacing:.1em; text-transform:uppercase; }
-.loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
+.loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .45rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.3rem; letter-spacing:.03em; color:var(--green); }
 /* meta/★ menor/data de coleta saíram da célula e viraram tooltip no hover
    do preço atual (Sprint 25/V4 — antes ficavam sempre visíveis, 3 linhas
@@ -268,7 +269,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .catm-chip:hover { border-color:var(--green-dim); color:var(--text); }
 .catm-chip.sel { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
-.status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
+.status-badge { font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; padding:.3rem .5rem; border:1px solid; white-space:nowrap; }
 .status-badge.ok    { color:var(--green); border-color:var(--green-dim); }
 .status-badge.out   { color:var(--text-muted); border-color:var(--border); }
 .status-badge.alert { color:var(--amber); border-color:var(--amber); }
@@ -411,9 +412,38 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 
 .empty { text-align:center; padding:3rem 1.5rem; color:var(--text-dim); font-size:var(--fs-base); letter-spacing:.1em; line-height:2; }
 
+/* Sprint 39/V5 (todo:235): abaixo do min-width da tabela (760px) a rolagem
+   horizontal contida (.price-table-wrap) escondia Loja/Preço/Status fora da
+   tela sem nenhuma indicação visual de que havia mais conteúdo ao lado —
+   pior ainda, uma tentativa anterior aqui simplesmente escondia a coluna
+   Status via display:none, perdendo informação. Substituído por um layout
+   de cards: cada linha vira um cartão empilhado com todos os dados
+   visíveis, sem esconder nada e sem depender de rolagem lateral. */
 @media (max-width:700px) {
-  th:nth-child(4),td:nth-child(4) { display:none; }
   .dash-main { padding:1.25rem 1rem; }
+  .price-table-wrap table { min-width:0; }
+  .price-table-wrap thead { display:none; }
+  .price-table-wrap table, .price-table-wrap tbody { display:block; }
+  .price-table-wrap tbody tr {
+    display:flex; flex-wrap:wrap; align-items:center;
+    gap:.35rem .7rem; padding:.75rem .9rem;
+  }
+  .price-table-wrap td { display:block; padding:0; }
+  .price-table-wrap .td-produto { flex:1 1 100%; order:1; min-width:0; }
+  .price-table-wrap td:nth-child(2) { order:2; }
+  .price-table-wrap td:nth-child(3) { order:3; margin-left:auto; }
+  .price-table-wrap td:nth-child(4) { order:4; }
+  /* .price-tooltip (nowrap, sem max-width) ficava invisível mas ainda
+     contava no scrollWidth do .price-table-wrap ao extrapolar a largura do
+     card — rolagem horizontal "fantasma" reportada pelo usuário no celular
+     mesmo a página inteira não vazando. Ancorado no <tr> (padding-box vira o
+     containing block) em vez de no preço, com quebra de linha normal: o
+     tooltip fica sempre contido dentro da largura do próprio cartão. */
+  .price-table-wrap tbody tr { position:relative; }
+  .price-hover { position:static; }
+  .price-tooltip {
+    left:.9rem; right:.9rem; white-space:normal; max-width:none;
+  }
 }
 @media (max-width:480px) {
   .kpi-grid { grid-template-columns:1fr; }

@@ -109,7 +109,7 @@ it exists to mirror the Vercel rewrite in dev.
 3. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
    that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
    (`kabum`/`terabyteshop`/`pichau`/`tuyo`/`playstation`/`logitec`/`tangleteezer`/
-   `amazon`) and/or owner (`itens.user_id`). Combinable. The
+   `amazon`/`shopee`) and/or owner (`itens.user_id`). Combinable. The
    category/store filters run in Python; the user filter is in the PostgREST query.
    The SPA sends `user_id` automatically for a non-admin "collect all" with no filters
    (Sprint 9); admins and the cron stay global.
@@ -178,6 +178,16 @@ add a `ScraperBase` subclass and an entry to the `SCRAPERS` dict in `main.py`.
 (recorded decision — no HTTP fallback, it always 403s from datacenters). The scraper
 retries up to 3× in CI, but CI coverage is effectively Kabum + Terabyte. Don't treat
 a Pichau failure in Actions logs as a scraper regression.
+
+**Known limitation — Shopee never collects (Sprint 40)**: unlike Pichau (a rate-limit
+that retry can outrun), Shopee's block is an authentication gate — any anonymous/
+automated visit gets JS-redirected to `shopee.com.br/verify/traffic/error` ("Login
+Necessário"), confirmed 3/3 with the real collector's Playwright (headless and
+non-headless alike, different `tracking_id` each time). Retrying doesn't help without
+a persisted logged-in session, which is out of scope. `scrapers/shopee.py` detects
+this honestly (`_eh_parede_de_login`) and returns `disponivel=False`/no price in a
+few seconds instead of retrying or guessing — treat every Shopee item as expected to
+never populate `historico_precos` until the project supports a persisted session.
 
 ## Commands
 

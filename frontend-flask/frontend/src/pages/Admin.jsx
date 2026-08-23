@@ -19,6 +19,11 @@
  * Sprint 32c (pedido do usuário): medidor de cota de disco (banco inteiro
  * — pg_database_size, não só as 6 tabelas do app — vs. a cota do plano
  * Supabase) e barra proporcional por tabela em vez de tabela de texto.
+ *
+ * Sprint 38 (todo:233): detalhamento por item — dono, loja, categoria e
+ * quantidade de leituras (historico_precos) de cada item cadastrado, um
+ * nível abaixo das contagens agregadas da Sprint 32 (migration
+ * sprint38_admin_detalhe_usuarios.sql, mesma RPC admin_estatisticas()).
  */
 import { useState, useEffect, useCallback } from "react";
 import { Link, Navigate } from "react-router-dom";
@@ -73,6 +78,9 @@ const css = `
 .adm-table tr.total-row td { color:var(--green); border-top:1px solid var(--border2); }
 .adm-empty { padding:1.5rem; color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.08em; }
 .adm-hint { font-size:var(--fs-xs); color:var(--text-muted); padding:0 1.75rem 1.5rem; letter-spacing:.03em; line-height:1.6; }
+.adm-table td.status-ativo   { color:var(--green); }
+.adm-table td.status-pausado { color:var(--text-dim); }
+.adm-scroll { overflow-x:auto; }
 
 /* Medidor de cota — o fill carrega a severidade (verde/âmbar/vermelho); o
    track é um tom apagado da mesma superfície (bg3), não um cinza genérico. */
@@ -114,9 +122,9 @@ export default function Admin({ podeVerBanco, perfilLoading }) {
     // A RPC antiga (pré-sprint32c) responde OK mas sem tamanho.tabelas/
     // banco_completo_bytes — trata como indisponível em vez de quebrar o
     // render, igual ao caso de a RPC não existir.
-    const completo = data && Array.isArray(data?.tamanho?.tabelas) && typeof data?.tamanho?.banco_completo_bytes === "number";
+    const completo = data && Array.isArray(data?.tamanho?.tabelas) && typeof data?.tamanho?.banco_completo_bytes === "number" && Array.isArray(data?.itens_detalhe);
     setStats(completo ? data : null);
-    setErro(completo ? null : "Não foi possível carregar as métricas (rode as migrações sprint32_admin_estatisticas.sql, sprint32b_ver_banco.sql e sprint32c_admin_disco.sql no SQL Editor do Supabase, ou sua conta ainda não tem acesso ao banco liberado).");
+    setErro(completo ? null : "Não foi possível carregar as métricas (rode as migrações sprint32_admin_estatisticas.sql, sprint32b_ver_banco.sql, sprint32c_admin_disco.sql e sprint38_admin_detalhe_usuarios.sql no SQL Editor do Supabase, ou sua conta ainda não tem acesso ao banco liberado).");
     setCarregando(false);
   }, []);
 
@@ -236,23 +244,54 @@ export default function Admin({ podeVerBanco, perfilLoading }) {
               </div>
 
               <div className="form-card" data-label="SAÚDE DA COLETA">
-                <table className="adm-table">
-                  <thead><tr><th>Loja</th><th>Última coleta</th><th>Leituras (24h)</th></tr></thead>
-                  <tbody>
-                    {!col.por_loja.length ? (
-                      <tr><td colSpan={3}>Nenhuma leitura registrada ainda.</td></tr>
-                    ) : col.por_loja.map((l) => (
-                      <tr key={l.loja}>
-                        <td>{l.loja}</td>
-                        <td>{l.ultima_coleta ? dataHoraBRT(l.ultima_coleta, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "nunca"}</td>
-                        <td>{l.leituras_24h}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <div className="adm-scroll">
+                  <table className="adm-table">
+                    <thead><tr><th>Loja</th><th>Última coleta</th><th>Leituras (24h)</th></tr></thead>
+                    <tbody>
+                      {!col.por_loja.length ? (
+                        <tr><td colSpan={3}>Nenhuma leitura registrada ainda.</td></tr>
+                      ) : col.por_loja.map((l) => (
+                        <tr key={l.loja}>
+                          <td>{l.loja}</td>
+                          <td>{l.ultima_coleta ? dataHoraBRT(l.ultima_coleta, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "nunca"}</td>
+                          <td>{l.leituras_24h}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <div className="adm-hint">
                   Última leitura geral: {col.ultima_geral ? dataHoraBRT(col.ultima_geral, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "nunca"}.
                   Proxy observável a partir de historico_precos — não reflete o histórico de execuções do GitHub Actions (sucesso/falha do workflow), que exigiria integração separada com a API do GitHub.
+                </div>
+              </div>
+
+              <div className="form-card" data-label="DETALHE POR USUÁRIO E ITEM">
+                <div className="adm-scroll">
+                  <table className="adm-table">
+                    <thead><tr><th>Usuário</th><th>Item</th><th>Loja</th><th>Categoria</th><th>Leituras</th><th>Status</th></tr></thead>
+                    <tbody>
+                      {!stats.itens_detalhe.length ? (
+                        <tr><td colSpan={6}>Nenhum item cadastrado ainda.</td></tr>
+                      ) : stats.itens_detalhe.map((it, idx) => (
+                        <tr key={`${it.usuario}-${it.item}-${idx}`}>
+                          <td>{it.usuario}</td>
+                          <td>{it.item}</td>
+                          <td>{it.loja}</td>
+                          <td>{it.categoria}</td>
+                          <td>{it.leituras}</td>
+                          <td className={it.monitorando ? "status-ativo" : "status-pausado"}>
+                            {it.monitorando ? "Ativo" : "Pausado"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="adm-hint">
+                  Um item por linha — "Leituras" é a contagem de registros em historico_precos
+                  para aquele item especificamente (quantas vezes ele já foi coletado), não o
+                  total agregado da tabela mostrado em "Tamanho por tabela" acima.
                 </div>
               </div>
             </>
