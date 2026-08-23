@@ -50,6 +50,10 @@ _GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "coletar.yml")
 # (ex.: Duplicate-Main) para testar inputs novos ANTES do merge na main —
 # o GitHub responde 422 se o workflow da branch alvo não conhecer os inputs.
 _GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH",   "main")
+# Único email autorizado a liberar/revogar o acesso a /admin (ver_banco) de
+# outra pessoa (Sprint 32b, pedido do usuário — não é um nível de RLS, é uma
+# checagem própria deste endpoint).
+_DONO_EMAIL = "pedrosacanhadas@gmail.com"
 
 
 def _supabase_get(path):
@@ -301,6 +305,7 @@ def api_usuarios():
       { "acao": "trocar_senha", "user_id": ..., "senha": ... }
       { "acao": "listar" }
       { "acao": "telegram",     "user_id": ..., "ativo": true|false }
+      { "acao": "ver_banco",    "user_id": ..., "ativo": true|false }  (só o dono da conta)
       { "acao": "excluir",      "user_id": ... }
     """
     if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
@@ -322,8 +327,8 @@ def api_usuarios():
     acao  = payload.get("acao")
     senha = payload.get("senha") or ""
 
-    if acao not in ("criar", "trocar_senha", "listar", "telegram", "excluir"):
-        return jsonify({"error": "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram' ou 'excluir')"}), 400
+    if acao not in ("criar", "trocar_senha", "listar", "telegram", "ver_banco", "excluir"):
+        return jsonify({"error": "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram', 'ver_banco' ou 'excluir')"}), 400
     if acao in ("criar", "trocar_senha") and len(senha) < 8:
         return jsonify({"error": "A senha deve ter pelo menos 8 caracteres."}), 400
 
@@ -356,15 +361,21 @@ def api_usuarios():
 
     try:
         if acao == "listar":
-            # Perfis (usuarios) — com fallback caso a migração sprint9
-            # (coluna notificar_telegram) ainda não tenha rodado no banco.
-            telegram_ok = True
+            # Perfis (usuarios) — com fallback caso as migrações sprint9
+            # (notificar_telegram) e/ou sprint32b (ver_banco) ainda não
+            # tenham rodado no banco.
+            telegram_ok = ver_banco_ok = True
             try:
                 perfis = _supabase_get(
-                    "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc")
+                    "usuarios?select=id,email,nome,nivel,notificar_telegram,ver_banco&order=email.asc")
             except urllib.error.HTTPError:
-                telegram_ok = False
-                perfis = _supabase_get("usuarios?select=id,email,nome,nivel&order=email.asc")
+                ver_banco_ok = False
+                try:
+                    perfis = _supabase_get(
+                        "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc")
+                except urllib.error.HTTPError:
+                    telegram_ok = False
+                    perfis = _supabase_get("usuarios?select=id,email,nome,nivel&order=email.asc")
 
             # Contagem de itens por dono — paginada (teto de 1000 do PostgREST)
             contagem, de = {}, 0
@@ -397,13 +408,15 @@ def api_usuarios():
                     "nome":               p.get("nome"),
                     "nivel":              p.get("nivel", 1),
                     "notificar_telegram": p.get("notificar_telegram") if telegram_ok else None,
+                    "ver_banco":          p.get("ver_banco") if ver_banco_ok else None,
                     "itens":              contagem.get(p["id"], 0),
                     "criado_em":          au.get("created_at"),
                     "ultimo_acesso":      au.get("last_sign_in_at"),
                     "confirmado":         bool(au.get("email_confirmed_at")),
                 })
             return jsonify({"ok": True, "usuarios": usuarios,
-                            "telegram_disponivel": telegram_ok}), 200
+                            "telegram_disponivel": telegram_ok,
+                            "ver_banco_disponivel": ver_banco_ok}), 200
 
         if acao == "telegram":
             user_id = str(payload.get("user_id") or "").strip()
@@ -419,6 +432,27 @@ def api_usuarios():
                                              "SQL Editor do Supabase."}), 400
                 raise
             return jsonify({"ok": True, "notificar_telegram": ativo}), 200
+
+        if acao == "ver_banco":
+            # Só o dono da conta libera/revoga o acesso de outra pessoa a
+            # /admin — checagem própria deste endpoint, não é nível de RLS.
+            chamador = _supabase_get(f"usuarios?id=eq.{uid}&select=email")
+            email_chamador = (chamador[0].get("email") or "").lower() if chamador else ""
+            if email_chamador != _DONO_EMAIL:
+                return jsonify({"error": "Permissão negada: só o dono da conta pode liberar o acesso ao banco."}), 403
+            user_id = str(payload.get("user_id") or "").strip()
+            if not user_id:
+                return jsonify({"error": "user_id não informado."}), 400
+            ativo = bool(payload.get("ativo"))
+            try:
+                _supabase_patch(f"usuarios?id=eq.{user_id}", {"ver_banco": ativo})
+            except urllib.error.HTTPError as exc:
+                if exc.code == 400:
+                    return jsonify({"error": "Coluna ver_banco ausente — rode a "
+                                             "migração sprint32b_ver_banco.sql no "
+                                             "SQL Editor do Supabase."}), 400
+                raise
+            return jsonify({"ok": True, "ver_banco": ativo}), 200
 
         if acao == "excluir":
             user_id = str(payload.get("user_id") or "").strip()

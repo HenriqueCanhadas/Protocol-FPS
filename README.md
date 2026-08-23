@@ -1,7 +1,8 @@
 # PROTOCOL FPS
 
-**Monitor de preços de hardware para lojas brasileiras** — coleta diária automatizada
-de preços na **KaBuM**, **Terabyteshop** e **Pichau**, histórico no Supabase e alertas
+**Monitor de preços para lojas brasileiras** — coleta diária automatizada de preços
+na **KaBuM**, **Terabyteshop**, **Pichau**, **Tuyo**, **Playstation Store**,
+**Logitech Store**, **Tangle Teezer** e **Amazon**, histórico no Supabase e alertas
 por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
 
 > Coletor em Python (Playwright + stealth) rodando no GitHub Actions · SPA em React
@@ -40,6 +41,13 @@ por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
 A **Pichau bloqueia IPs de datacenter** (serve uma página falsa "Site em Manutenção")
 — por decisão registrada, ela só coleta em execução **local**; o CI cobre KaBuM e
 Terabyteshop. Alternativas futuras: runner self-hosted ou proxy residencial BR.
+
+Os scrapers de **Tuyo, Playstation Store, Logitech Store, Tangle Teezer e Amazon**
+(Sprint 29) foram validados **localmente** (Playwright + stealth, headless) contra
+as URLs de teste reais — a cobertura deles no CI (GitHub Actions) ainda não foi
+validada com múltiplos runs (mesma metodologia usada para KaBuM/Terabyte/Pichau,
+ver skill `scraper-nova-loja`); a Amazon é a candidata mais provável a precisar do
+mesmo tratamento da Pichau, dado o histórico conhecido de anti-bot agressivo.
 
 ---
 

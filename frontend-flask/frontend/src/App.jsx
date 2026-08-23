@@ -17,10 +17,11 @@ import Toast       from "@/components/Toast";
 import Dashboard   from "@/pages/Dashboard";
 import NovoProduto from "@/pages/NovoProduto";
 import Usuarios    from "@/pages/Usuarios";
+import Admin       from "@/pages/Admin";
 import Conta       from "@/pages/Conta";
 
 export default function App() {
-  const { user, perfil, isAdmin, loading, perfilLoading, signIn, signOut } = useAuth();
+  const { user, perfil, isAdmin, podeVerBanco, loading, perfilLoading, signIn, signOut } = useAuth();
   const { toast, showToast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
 
@@ -58,6 +59,7 @@ export default function App() {
           onClose={() => setDrawerOpen(false)}
           user={user}
           isAdmin={isAdmin}
+          podeVerBanco={podeVerBanco}
           onLogout={() => signOut()}
         />
 
@@ -70,6 +72,7 @@ export default function App() {
           <Route path="/"             element={<Dashboard   showToast={showToast} isAdmin={isAdmin} user={user} />} />
           <Route path="/novo-produto" element={<NovoProduto showToast={showToast} user={user} isAdmin={isAdmin} />} />
           <Route path="/usuarios"     element={<Usuarios showToast={showToast} isAdmin={isAdmin} perfilLoading={perfilLoading} user={user} />} />
+          <Route path="/admin"        element={<Admin podeVerBanco={podeVerBanco} perfilLoading={perfilLoading} />} />
           <Route path="/conta"        element={
             <Conta user={user} perfil={perfil} signOut={signOut} />
           } />

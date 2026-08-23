@@ -18,7 +18,7 @@ on:
         required: false
         default: ""
       loja:
-        description: "Loja para coleta segmentada — kabum/terabyteshop/pichau (vazio = todas)"
+        description: "Loja para coleta segmentada — kabum/terabyteshop/pichau/tuyo/playstation/logitec/tangleteezer/amazon (vazio = todas)"
         required: false
         default: ""
       user_id:
@@ -67,7 +67,8 @@ jobs:
           #   ITEM_IDS  → coleta em lista: os itens visíveis na lista filtrada
           #               do Dashboard, IDs separados por vírgula (Sprint 14)
           #   CATEGORIA → coleta segmentada por categoria (GPU/CPU/...)
-          #   LOJA      → coleta segmentada por loja (kabum/terabyteshop/pichau)
+          #   LOJA      → coleta segmentada por loja (kabum/terabyteshop/pichau/
+          #               tuyo/playstation/logitec/tangleteezer/amazon)
           #   USER_ID   → coleta só os itens de um usuário (combinável c/ os acima)
           ITEM_ID:               ${{ github.event.inputs.item_id }}
           ITEM_IDS:              ${{ github.event.inputs.item_ids }}

@@ -81,6 +81,11 @@ const css = `
 }
 `;
 
+// Único email que pode liberar/revogar o acesso de outra pessoa a /admin
+// (Sprint 32b, pedido do usuário) — a checagem real fica no endpoint
+// /api/usuarios; isto só decide se o botão aparece habilitado aqui.
+const DONO_EMAIL = "pedrosacanhadas@gmail.com";
+
 async function chamarApiUsuarios(body) {
   const sb = await getSupabase();
   const { data: { session } } = await sb.auth.getSession();
@@ -103,8 +108,11 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
   // ── Listagem ───────────────────────────────────────────────
   const [usuarios,    setUsuarios]    = useState([]);
   const [telegramOk,  setTelegramOk]  = useState(true);
+  const [verBancoOk,  setVerBancoOk]  = useState(true);
   const [carregando,  setCarregando]  = useState(true);
   const [ocupadoId,   setOcupadoId]   = useState(null); // linha com ação em andamento
+
+  const souDono = (user?.email || "").toLowerCase() === DONO_EMAIL;
 
   // ── Criar usuário ──────────────────────────────────────────
   const [email,     setEmail]     = useState("");
@@ -130,6 +138,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
       const data = await chamarApiUsuarios({ acao: "listar" });
       setUsuarios(data.usuarios || []);
       setTelegramOk(Boolean(data.telegram_disponivel));
+      setVerBancoOk(Boolean(data.ver_banco_disponivel));
     } catch (err) {
       showToast("Erro ao listar usuários: " + err.message, "error");
     }
@@ -169,6 +178,19 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
       showToast(`✓ Telegram ${data.notificar_telegram ? "ativado" : "desativado"} para ${u.email}.`, "ok");
     } catch (err) {
       showToast("Erro ao alterar Telegram: " + err.message, "error");
+    }
+    setOcupadoId(null);
+  };
+
+  const alternarVerBanco = async (u) => {
+    setOcupadoId(u.id);
+    try {
+      const data = await chamarApiUsuarios({ acao: "ver_banco", user_id: u.id, ativo: !u.ver_banco });
+      setUsuarios((lista) => lista.map((x) =>
+        x.id === u.id ? { ...x, ver_banco: data.ver_banco } : x));
+      showToast(`✓ Acesso ao banco ${data.ver_banco ? "liberado" : "revogado"} para ${u.email}.`, "ok");
+    } catch (err) {
+      showToast("Erro ao alterar acesso ao banco: " + err.message, "error");
     }
     setOcupadoId(null);
   };
@@ -286,6 +308,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                       <th>Status</th>
                       <th>Itens</th>
                       {telegramOk && <th>Telegram</th>}
+                      {verBancoOk && <th>Banco</th>}
                       <th>Ações</th>
                     </tr>
                   </thead>
@@ -321,6 +344,20 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                                 onClick={() => alternarTelegram(u)}
                               >
                                 {u.notificar_telegram ? "✓ ON" : "OFF"}
+                              </button>
+                            </td>
+                          )}
+                          {verBancoOk && (
+                            <td>
+                              <button
+                                className={`tg-toggle${u.ver_banco ? " on" : ""}`}
+                                disabled={!souDono || ocupadoId === u.id}
+                                title={souDono
+                                  ? "Liberar/revogar o acesso deste usuário à página /admin (métricas do banco)"
+                                  : "Só o dono da conta pode liberar o acesso ao banco"}
+                                onClick={() => alternarVerBanco(u)}
+                              >
+                                {u.ver_banco ? "✓ ON" : "OFF"}
                               </button>
                             </td>
                           )}

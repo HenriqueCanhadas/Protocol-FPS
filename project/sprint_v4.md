@@ -1,21 +1,41 @@
 # PROTOCOL FPS — Planejamento de Sprints — V4
 
 > Relatório gerado a partir da seção **V4** do arquivo `todo` (raiz do repositório).
-> Data de geração: **20/08/2026** (atualizado após a Sprint 28 — temporizador de
-> sessão no cabeçalho).
+> Data de geração: **23/08/2026** (atualizado após a Sprint 29 completa — os 5
+> scrapers novos + registro em `lojas`/frontend, a pedido do usuário para "fazer a
+> sprint 29 inteira").
 >
 > A V4 é uma sequência de ajustes de UX pontuais sobre a Dashboard reconstruída na V3
-> (`project/sprint_v3.md`). As **Sprints 23, 24, 25, 26, 27, 28 e 31** foram
-> implementadas em 19–20/08/2026 (numeração não contígua — 29/30 continuam
-> propostas, ver abaixo). Restam **3 itens `⬜ Todo`** no `todo` (linhas 204, 210 e
-> 214) que ainda não viraram sprint executada — ver "Resumo por status". **214**
-> (novas lojas Tuyo/Playstation/Logitec/Tangleteezer/Amazon, proposta de Sprint 29)
+> (`project/sprint_v3.md`). As **Sprints 23, 24, 25, 26, 27, 28, 31, 32, 32b, 32c, 33
+> e 29** foram implementadas em 19–20/08/2026 e 23/08/2026 (numeração não contígua —
+> 30 continua proposta, ver abaixo). A Sprint 29 (5 scrapers + `lojas` + frontend)
 > é a **primeira tarefa de back-end/scraper de toda a V3+V4** — todas as outras
-> sprints executadas dessas duas versões mexeram só no frontend da Dashboard.
+> sprints executadas dessas duas versões mexeram só no frontend da Dashboard (as
+> Sprints 32/32b/32c mexeram em schema/RPC/API, mas não em scraper).
+>
+> ⚠️ **`todo:214` continua `⬜ Todo` no "Resumo por status"**, apesar dos 5 scrapers
+> estarem implementados e validados **localmente**: falta a validação em **CI**
+> (GitHub Actions, 3 runs — mesma barra usada para Kabum/Terabyte/Pichau, skill
+> `scraper-nova-loja`). Isso exige commitar e enviar (push) o trabalho desta sessão
+> para a branch remota primeiro — perguntei ao usuário e a resposta foi **não fazer
+> isso agora** ("só valide localmente por enquanto"); ver a nota completa na Sprint
+> 29 abaixo, incluindo um disparo de coleta real que confirmou exatamente esse
+> problema (rodou contra o código antigo no GitHub, sem nenhum dos 5 scrapers).
 >
 > ✅ **Migração da Sprint 31 rodada pelo usuário e confirmada em produção local**:
 > `project/migrations/sprint31_categorias_insert.sql` já está aplicada — a criação
 > de categorias funciona de fato (não é mais uma pendência).
+>
+> ✅ **Migrações das Sprints 32, 32b e 32c rodadas pelo usuário e confirmadas ao
+> vivo**: `sprint32_admin_estatisticas.sql`, `sprint32b_ver_banco.sql` e
+> `sprint32c_admin_disco.sql` já estão aplicadas — `/admin` mostra dados reais, o
+> acesso é individual por `usuarios.ver_banco` (não mais por `nivel`), e o medidor
+> de cota de disco + barras por tabela funcionam ponta a ponta.
+>
+> ✅ **`todo:220` resolvido com o usuário no início da Sprint 33** (não presumido):
+> a criação de categoria (Sprint 31, link "+ Nova categoria" dentro do campo
+> Categoria) virou uma seção própria e sempre visível — "campo a parte" era mesmo
+> um pedido de layout novo, não uma repetição da Sprint 31.
 >
 > **Legenda de status**
 > - ✅ **Done** — concluído (item `OK-` no `todo`)
@@ -43,14 +63,20 @@
 | 26 | Barra de rolagem temática | 20/08/2026 | 1 | 1 |
 | 27 | Link do produto no hover do nome + editar item na fila de Novo Produto | 20/08/2026 | 1 | 2 |
 | 28 | Temporizador de sessão (contagem regressiva em amarelo no cabeçalho) | 20/08/2026 | 1 | 1 |
-| 29 *(proposta, ainda não iniciada)* | Novas lojas: Tuyo, Playstation, Logitec, Tangleteezer, Amazon | a definir | 5 | 1 (5 lojas) |
+| 29 | Novas lojas: Tuyo, Playstation, Logitec, Tangle Teezer, Amazon — 5 scrapers + `lojas` + frontend, **validados localmente**; CI (3 runs) pendente | 23/08/2026 | 5 | 1 (5 lojas) |
 | 30 *(proposta, ainda não iniciada)* | Disponibilidade real: esgotado × não localizado | a definir | 2 | 1 |
 | 31 | Criar novas categorias pela tela Novo Produto (admin) | 20/08/2026 | 1 | 1 |
+| 32 | Painel admin de banco/monitoramento (tamanho do banco, contagens, saúde da coleta) | 23/08/2026 | 1 | 1 |
+| 32b | Restringe `/admin` a uma permissão própria (`ver_banco`), liberada só pelo dono da conta | 23/08/2026 | 1 | 1 (fora do `todo` — pedido direto do usuário) |
+| 32c | Medidor de cota de disco (usado/disponível vs. plano) + barras proporcionais por tabela | 23/08/2026 | 1 | 1 (fora do `todo` — pedido direto do usuário) |
+| 33 | Campo dedicado de criação de categoria em Novo Produto (revisão da Sprint 31) | 23/08/2026 | 1 | 1 |
 
-**Sprints 23–28 e 31 concluídas** (19–20/08/2026 — numeração não contígua, 29/30
-seguem propostas). Restam **3 itens `⬜ Todo`** na V4 (1 na Sprint 29 proposta, 1 na
-Sprint 30 proposta + 1 já absorvido pela V3, ver "Resumo por status"). A numeração
-de sprints continua de onde a Sprint 23 parou.
+**Sprints 23–28, 29, 31, 32, 32b, 32c e 33 concluídas** (19–20/08/2026 e 23/08/2026 —
+numeração não contígua, 30 segue proposta). A Sprint 29 está **implementada e
+validada localmente**, mas `todo:214` continua `⬜ Todo` até a validação em CI (3
+runs, pendente de push — ver nota no topo). Restam **3 itens `⬜ Todo`** na V4
+(1 na Sprint 29 proposta, 1 na Sprint 30 proposta + 1 já absorvido pela V3, ver
+"Resumo por status"). A numeração de sprints continua de onde a Sprint 33 parou.
 
 ---
 
@@ -178,29 +204,43 @@ de rota). Console sem erros novos (só o warning pré-existente do GoTrueClient)
 
 ---
 
-## Sprint 29 — proposta: Novas lojas — Tuyo, Playstation, Logitec, Tangleteezer, Amazon (ainda não iniciada)
+## Sprint 29 — Novas lojas: Tuyo, Playstation, Logitec, Tangle Teezer, Amazon (23/08/2026)
 
-> Primeira tarefa de back-end/scraper de toda a V3+V4 — todas as sprints 17–27 desta
-> e da versão anterior mexeram só no frontend da Dashboard. Segue o contrato de
-> `scrapers/base.py` (`ScraperBase`): cada loja nova é uma subclasse implementando
-> `_aguardar_preco(page)` e `extrair_dados(page, url)`, mais uma entrada no dict
-> `SCRAPERS` do `main.py` — ver skill `backend-conventions`.
+> Primeira tarefa de back-end/scraper de toda a V3+V4 — todas as sprints 17–28/31–33
+> mexeram só no frontend da Dashboard/schema. Segue o contrato de `scrapers/base.py`
+> (`ScraperBase`) e a metodologia da skill `scraper-nova-loja` (criada nesta mesma
+> sessão): inspecionar a página real ANTES de escrever código, testar local
+> (`headless=True`/`False`), só então registrar. Começou com só a Tuyo (pedido do
+> usuário), depois foi completada inteira ("faça a sprint 29 inteira") com as
+> outras 4 lojas + registro em `lojas` (Supabase) + frontend.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S29 · Scraper + registro da loja Tuyo (todo:214) | `python -c "from scrapers.tuyo import TuyoScraper; print(TuyoScraper(headless=False).coletar('https://tuyo.com.br/products/growler-4l?variant=50773185102140'))"` retorna um `DadosProduto` com nome/preço/disponibilidade corretos | ⬜ Todo | **Esperado:** extração por JSON-LD → meta tags → CSS → JS, na ordem padrão do projeto (ver `kabum.py`); link de teste fornecido pelo usuário |
-| S29 · Scraper + registro da loja Playstation Store (todo:214) | Mesmo teste com `PlaystationScraper` e `https://store.playstation.com/pt-br/product/UP9000-PPSA03671_00-WOLVERINEDELUXE0` | ⬜ Todo | **Esperado:** loja internacional (store.playstation.com) — validar se bloqueia datacenter/CI como a Pichau (risco conhecido do projeto) antes de assumir cobertura no CI |
-| S29 · Scraper + registro da loja Logitec (Logitech Store BR) (todo:214) | Mesmo teste com `LogitecScraper` e `https://www.logitechstore.com.br/mouse-logitech-g-pro-x2-superstrike/?srsltid=...` | ⬜ Todo | **Esperado:** confirmar se a URL de teste (com `srsltid` de tracking) permanece estável o suficiente para monitoramento recorrente, ou se deve ser normalizada ao cadastrar |
-| S29 · Scraper + registro da loja Tangle Teezer BR (todo:214) | Mesmo teste com `TangleteezerScraper` e `https://www.tangleteezer.com.br/the-ultimate-detangler/p?...` (URL com múltiplos parâmetros de campanha `gad_*`/`gclid`) | ⬜ Todo | **Esperado:** mesma ressalva de normalização de URL da Logitec |
-| S29 · Scraper + registro da loja Amazon BR (todo:214) | Mesmo teste com `AmazonScraper` e `https://www.amazon.com.br/Aparador-raspador-OneBlade-pentes-bivolt/dp/B0C2877GJS?ref_=ast_sto_dp` | ⬜ Todo | **Esperado:** Amazon é conhecida por anti-bot agressivo — maior risco de bloqueio em CI (datacenter) do grupo, análogo à limitação já documentada da Pichau; decisão de aceitar coleta só local (como a Pichau) pode ser necessária |
-| S29 · Categoria/UI de cadastro para as 5 lojas novas (todo:214) | `NovoProduto.jsx` e o filtro de loja do Dashboard reconhecem as 5 lojas novas (slug = nome da loja em minúsculas sem espaços, convenção do `SCRAPERS`); um item de cada loja pode ser cadastrado e coletado ponta a ponta | ⬜ Todo | **Esperado:** inserir as 5 lojas em `lojas` (Supabase) + listas de loja em `coletar.yml`/`README.md`/`CLAUDE.md`, seguindo o precedente da categoria STORAGE/DIVERSOS (Sprints 3 e 8, `sprint_v1.md`/`sprint_v2.md`) |
+| S29 · Scraper + registro da loja Tuyo (todo:214) | `TuyoScraper(headless=True).coletar(url)` retorna `DadosProduto` com nome/preço/disponibilidade corretos | ✅ Done — **validado com dados reais** | `scrapers/tuyo.py`. Shopify — o produto é um `ProductGroup` (schema.org) com variantes (cor) em `hasVariant`, cada uma com preço/disponibilidade próprios; a URL identifica a variante por `?variant=<id>`, casado contra `hasVariant[].offers.url`/`@id` (senão pegaria a variante errada). Ordem: JSON-LD → meta `og:price:amount`/`og:title` → CSS (`.product__price--regular`, `h1.product__title`) → JS. **Validado com as duas variantes reais do link de teste:** Navy Blue (esgotada de verdade) → `preco=None, disponivel=False`; Off White (disponível) → `preco=349.0, disponivel=True` — batendo exatamente com o JSON-LD/DOM inspecionados ao vivo antes de escrever o código |
+| S29 · Scraper + registro da loja Playstation Store (todo:214) | `PlaystationScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/playstation.py`. SPA Next.js — JSON-LD `Product` único (sem `availability`, loja digital não tem "esgotado" tradicional); preço também em `[data-qa='mfeCtaMain#offer0#finalPrice']` — **cuidado confirmado na inspeção real**: a página lista preços de OUTRAS edições do mesmo jogo em `[data-qa='mfeUpsell#...']`, nunca usar esses. Esgotamento = ausência do botão `mfeCtaMain#cta#action` ou texto de indisponibilidade. **Validado:** `preco=455.9, disponivel=True`, nome completo, idêntico ao inspecionado ao vivo. CI (bloqueio de datacenter) **não testado** |
+| S29 · Scraper + registro da loja Logitec (Logitech Store BR) (todo:214) | `LogitecScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/logitec.py`. Nome do arquivo/slug como digitado no `todo` ("Logitec", não "Logitech") — decisão de nomenclatura registrada aqui. Magento, **sem JSON-LD** (confirmado 0 scripts `ld+json`) — a extração real é via meta `product:price:amount` (1199.9, bate com o preço exibido) **cuidado**: existe um segundo preço `.in_cash-price-box` (desconto PIX) que não é o de referência. Disponibilidade via `div.stock.available`/`unavailable` (padrão de tema Magento). **Validado:** `preco=1199.9, disponivel=True`, nome idêntico ao `h1.page-title` |
+| S29 · Scraper + registro da loja Tangle Teezer BR (todo:214) | `TangleteezerScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/tangleteezer.py`. VTEX — mesma particularidade da Tuyo (múltiplas variantes com preço/disponibilidade próprios via `AggregateOffer.offers[]`), mas resolvida mais simples: o `Product` raiz já tem o `sku` da variante selecionada, só casar contra `offers.offers[].sku` (sem precisar da query string da URL). **Validado:** `preco=160.0, disponivel=True`, sku casado corretamente, nome "Escova de Cabelo The Ultimate Detangler" |
+| S29 · Scraper + registro da loja Amazon BR (todo:214) | `AmazonScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais; risco de bot-block confirmado, mas não bloqueou o Playwright** | `scrapers/amazon.py`. **Achado importante:** ao inspecionar manualmente a página (navegador comum, não Playwright) para desenhar o scraper, a Amazon respondeu com a interstitial anti-bot "Clique no botão abaixo para continuar comprando" — confirma o risco já esperado no plano. **Não tentamos clicar/contornar essa interstitial** (fora do escopo permitido). Reaberta a página momentos depois, carregou normalmente — não foi bloqueio persistente. **Bug real encontrado e corrigido antes de finalizar:** o primeiro rascunho combinava 3 seletores de preço num único `query_selector("a, b, c")` — a página da Amazon tem DEZENAS de outros preços (produtos relacionados, combos); esse padrão pega o primeiro em ORDEM NO DOM da união, não o mais específico primeiro (confirmado ao vivo: 41 elementos `.a-price .a-offscreen` na página, vários "null" ou de outros produtos). Corrigido para tentar cada seletor **isolado**, do mais específico ao mais amplo, nunca combinado. **Validado com o fix:** `preco=265.17, disponivel=True` (nome completo do produto), conferido manualmente no navegador que R$265,17 é de fato o preço do produto principal, não de um relacionado |
+| S29 · Categoria/UI de cadastro para as 5 lojas novas (todo:214) | `NovoProduto.jsx` e o filtro de loja do Dashboard reconhecem as 5 lojas novas; um item de cada loja pode ser cadastrado ponta a ponta | ✅ Done — **validado ao vivo** | **Implementado:** as 5 lojas inseridas em `lojas` (Supabase, com `url_base` — coluna documentada em `banco.md` que eu não conhecia até o INSERT falhar por `NOT NULL`, corrigido na hora); `LOJAS_DETECTADAS`/`LOJAS_LABEL` em `NovoProduto.jsx` e `LOJAS_FILTER` em `Dashboard.constants.js` atualizados; comentários de `coletar.yml`/`CLAUDE.md`/`README.md`/`banco.md` atualizados com os 5 slugs novos. **Validado ao vivo:** cadastrado 1 item de teste por loja nova (5 no total) — DETECTAR reconheceu corretamente o domínio de cada uma (`tuyo.com.br`→Tuyo, `store.playstation.com`→Playstation, `logitechstore.com.br`→Logitec, `tangleteezer.com.br`→Tangle Teezer, `amazon.com.br`→Amazon), os 8 selects de loja (3 antigas + 5 novas) aparecem corretos, os 5 itens foram salvos e apareceram no Dashboard com a badge de loja certa. Itens de teste removidos ao final (nenhuma leitura chegou a ser gravada, ver nota de CI abaixo) |
 
-**Escopo aberto para o início da sprint:** o `todo` só define os 5 links de teste —
-não há decisão ainda sobre nomes exatos de arquivo/slug (`tuyo`/`logitec` como
-digitado pelo usuário, mesmo que "Logitec" normalmente se escreva "Logitech") nem
-sobre CI (quais das 5 vão bloquear datacenter como a Pichau/possivelmente
-Playstation/Amazon). Recomenda-se validar cada loja isoladamente com
-`headless=False` (ver `CLAUDE.md`, seção Commands) antes de registrar no `SCRAPERS`.
+**🟡 CI (GitHub Actions) — pendente, não validado nesta sessão.** Tentei disparar
+uma coleta real via "COLETAR" (filtro de busca "Sprint29", `ITEM_IDS` com os 5
+itens de teste) para validar no CI de verdade, como a skill `scraper-nova-loja`
+exige (3 runs batendo com a verdade local). **O disparo não validou nada**: o
+workflow do GitHub Actions roda o código já commitado/enviado na branch remota
+(`Duplicate-Main`), e nenhum arquivo desta sessão (5 scrapers, `main.py`,
+migrações, frontend) tinha sido commitado ainda — confirmado via
+`git log origin/Duplicate-Main` (parado no commit da Sprint 31). O run real
+apenas ignorou os 5 itens como "loja desconhecida" (confirmado: 0 leituras
+gravadas em `historico_precos` para os 5 itens de teste — nenhum dado incorreto,
+só nenhuma validação de fato). **Perguntei ao usuário se queria que eu commitasse e
+desse push para viabilizar o teste real de CI — a resposta foi não, "só valide
+localmente por enquanto".** Isso significa: os 5 scrapers estão implementados e
+corretos pelos testes locais (dados reais batendo com a inspeção manual), mas
+**nenhum deles tem cobertura de CI confirmada** — em especial a Amazon, cuja
+inspeção manual já mostrou um sinal de anti-bot, então o comportamento dela a
+partir de um IP de datacenter genuinamente não é conhecido (pode seguir o padrão
+Pichau, pode não seguir). `todo:214` fica `⬜ Todo` até essa validação acontecer.
 
 ---
 
@@ -249,12 +289,109 @@ Playstation/Amazon). Recomenda-se validar cada loja isoladamente com
 
 ---
 
+## Sprint 32 — Painel admin de banco/monitoramento (23/08/2026)
+
+> Segunda tarefa de back-end/schema da V3+V4 (a primeira de scraper é a Sprint 29
+> proposta; esta mexeu em RPC/RLS como a Sprint 31). O `todo:218` não especificava
+> métricas exatas nem onde a seção moraria na navegação — **decisões confirmadas
+> com o usuário antes de implementar** (per a própria skill `autonomous-execution`,
+> que marca "decisão em aberto no plano" como um dos poucos pontos que exigem
+> parar e perguntar): página **nova em `/admin`** (não aba em `/usuarios`), com
+> **as três categorias de métrica propostas** — contagens de linhas, tamanho do
+> banco e saúde do cron/coleta.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S32 · Nova página admin-only `/admin` com métricas operacionais do banco: contagens de linhas, tamanho das tabelas e saúde da coleta (todo:218) | Logado como admin, `/admin` (novo item "▣ Admin" no menu lateral, abaixo de "◈ Usuários") mostra: itens monitorados/total/pausados, leituras e alertas (total + hoje), usuários cadastrados, tamanho de cada tabela principal + total, e última coleta geral + por loja (com leituras nas últimas 24h); usuário não-admin não vê o item de menu e é redirecionado ao acessar a rota direto (mesma guarda de `/usuarios`) | ✅ Done — **validado ao vivo** | **Implementado:** nova RPC `public.admin_estatisticas()` (`SECURITY DEFINER`) em `project/migrations/sprint32_admin_estatisticas.sql`, retornando um único `jsonb` com `contagens`/`tamanho` (`pg_total_relation_size` + `pg_size_pretty`, já formatado no banco)/`coleta` (última leitura geral + agregação por loja via `lojas ⟕ itens ⟕ historico_precos`); novo `services/admin.service.js` (`buscarEstatisticas()` via `supabase.rpc(...)` — primeiro uso de RPC custom no frontend); nova `pages/Admin.jsx` seguindo o mesmo padrão visual de `pages/Usuarios.jsx`; rota `/admin` em `App.jsx` e item "▣ Admin" em `NavDrawer.jsx` (gate revisado na Sprint 32b, ver abaixo). **Decisão de escopo registrada:** "saúde do cron/coleta" foi implementada como proxy observável a partir de `historico_precos` (última leitura geral/por loja, contagem nas últimas 24h) — **não** é uma leitura do histórico de execuções do GitHub Actions (sucesso/falha por run), que exigiria uma integração servidor-side nova com a API do GitHub; a tela deixa isso explícito num aviso de rodapé. **Validação:** `npm run build` — 111 módulos, sem erros. **Validado ao vivo em duas rodadas** (Chrome reconectado, sessão real logada como pedrosacanhadas): 1ª rodada confirmou dados reais em `/admin` (33 itens, 3398 leituras, tamanho de cada tabela, e a saúde da coleta batendo com a limitação conhecida da Pichau — última coleta 09/07 vs. Kabum/Terabyte em 22/08); 2ª rodada (pós Sprint 32b) reconfirmou `/admin` funcionando pelo novo gate `ver_banco` |
+
+**Migrações aplicadas e confirmadas ao vivo pelo usuário:**
+`project/migrations/sprint32_admin_estatisticas.sql` e `sprint32b_ver_banco.sql`
+(ver Sprint 32b abaixo) — ambas rodadas no SQL Editor do Supabase; `/admin`
+mostrando dados reais foi conferido ao vivo nesta sessão, com screenshot e sem
+erros no console.
+
+---
+
+## Sprint 32b — Restringe `/admin` a uma permissão própria (`ver_banco`) (23/08/2026)
+
+> Pedido direto do usuário no mesmo dia da Sprint 32, **não vinha do `todo`** —
+> registrado aqui por ser follow-up imediato da Sprint 32 (mesma RPC/página),
+> mas é uma decisão de acesso nova: "na parte de usuários somente colocar o
+> usuário pedrosacanhadas@gmail.com ver o banco, e somente ele pode liberar para
+> outra pessoa ver o banco". Instrução explícita e sem ambiguidade — não exigiu
+> parar para perguntar (só as pequenas decisões de nomenclatura/coluna ficaram a
+> critério de implementação, relatadas abaixo).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S32b · `/admin` deixa de depender de `isAdmin` e passa a depender de uma permissão própria (`usuarios.ver_banco`), com `pedrosacanhadas@gmail.com` liberado por padrão | Um admin comum (`nivel=2`) sem `ver_banco=true` não vê mais "▣ Admin" no menu nem consegue abrir `/admin` direto (redirecionado ao `/`); `pedrosacanhadas@gmail.com` continua vendo normalmente, sem nenhuma ação manual além de rodar a migração | ✅ Done — **validado ao vivo** | **Implementado:** migração `sprint32b_ver_banco.sql` — coluna `usuarios.ver_banco boolean default false`, backfill `true` só para `pedrosacanhadas@gmail.com`, nova função `pode_ver_banco()` (mesmo padrão `SECURITY DEFINER` de `is_admin()`) e `admin_estatisticas()` recriada trocando o gate de `is_admin()` para `pode_ver_banco()`. Frontend: `useAuth.js` passou a buscar `ver_banco` junto de `nivel`/`nome` (com fallback para o select antigo se a coluna ainda não existir, para não derrubar `isAdmin` durante a janela pré-migração) e expõe `podeVerBanco`; `NavDrawer.jsx` mostra "▣ Admin" por `podeVerBanco` (independente de `isAdmin` — a "Usuários" continua só para admin); `Admin.jsx` troca o gate/redirect de `isAdmin` para `podeVerBanco`. **Validado ao vivo:** antes de rodar a migração, `/admin` ficou inacessível **até para o próprio pedrosacanhadas** (efeito colateral esperado e avisado ao usuário — o gate virou estritamente `ver_banco`, que só existe depois da migração); depois de rodar e recarregar a sessão, `/admin` voltou a funcionar normalmente para ele |
+| S32b · Só `pedrosacanhadas@gmail.com` pode ligar/desligar o `ver_banco` de outra pessoa, pela tela Usuários | Endpoint `/api/usuarios` ganha `acao=ver_banco`; chamado por qualquer admin que não seja o dono, retorna 403 mesmo com token de admin válido; chamado pelo dono, atualiza `ver_banco` do `user_id` alvo | ✅ Done — **validado ao vivo** | **Implementado em paridade Flask×Vercel** (`app.py` e `api/usuarios.js`): a ação busca o email de quem está chamando (`uid` do token) e compara com a constante `pedrosacanhadas@gmail.com` — 403 para qualquer outro admin, mesmo com nível 2. `Usuarios.jsx` ganhou uma coluna "Banco" (mesmo padrão visual do toggle "Telegram" já existente) com `souDono = user.email === DONO_EMAIL` controlando `disabled` do botão — outros admins veem o estado mas não conseguem clicar. **Validado ao vivo:** logado como pedrosacanhadas, a coluna "Banco" apareceu com ele já `✓ ON` (seed da migração) e os demais `OFF`; toggle testado em `teste.claude@gmail.com` (OFF→ON→OFF, revertido ao estado original ao final do teste, sem deixar dado de teste); zero erros no console em ambas as telas |
+
+**Validação de regressão:** antes de `sprint32b_ver_banco.sql` rodar, a tela
+`/usuarios` foi conferida com a migração ausente — a coluna "Banco" simplesmente
+não apareceu (fallback `ver_banco_ok=false` do endpoint), sem quebrar a listagem
+nem gerar erro de console; confirma que o fallback de schema-em-atraso funciona
+como os já existentes (`telegram_ok`, Sprint 9).
+
+---
+
+## Sprint 32c — Medidor de cota de disco + barras proporcionais por tabela (23/08/2026)
+
+> Pedido direto do usuário, mesmo dia das Sprints 32/32b, **não vinha do `todo`**:
+> "gostaria de saber quanto cada tabela está consumindo, quanto ainda tenho de
+> disco disponível... utilize também o plugin de front-end para essa parte".
+> Antes de implementar, uma pergunta genuína ao usuário (a cota do plano Supabase
+> não é uma informação que o Postgres saiba sozinho) e consulta às skills
+> `frontend-design-system` (tokens/paleta do projeto) e `dataviz` (forma correta:
+> "uma razão contra um limite" → **meter**; comparação de magnitude entre 6
+> tabelas → **barra proporcional**, não um gráfico de pizza/rosca).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S32c · Medidor de uso de disco (banco inteiro vs. cota do plano), com severidade por cor e espaço disponível calculado | O card "ESPAÇO EM DISCO" mostra o tamanho real do banco (não só as 6 tabelas do app), a % da cota, quanto ainda está disponível, e uma barra cujo preenchimento fica verde/âmbar/vermelho conforme a faixa de uso (< 70% / 70–90% / ≥ 90%) | ✅ Done — **validado ao vivo** | **Implementado:** migração `sprint32c_admin_disco.sql` recria `admin_estatisticas()` adicionando `pg_database_size(current_database())` (banco inteiro — auth/storage/índices geridos pelo Supabase incluídos, não só as 6 tabelas do app) em `tamanho.banco_completo_bytes`/`banco_completo`. Frontend: constante `ADMIN_QUOTA_BYTES` (500 MB, plano Free — informado pelo usuário; documentado como hardcoded porque o Postgres não expõe a cota do plano) e `severidadeUso()` com os limiares 70%/90%; medidor construído em HTML/CSS puro (track `--bg3` + fill `--green`/`--amber`/`--red`, sem lib de gráfico, no mesmo espírito do único SVG customizado do projeto). **Validado ao vivo:** 13 MB usados (2,7% da cota), 486,6 MB disponíveis de 500 MB, barra verde (bem abaixo de 70%) — batendo com o número real do banco |
+| S32c · Tamanho por tabela como barra proporcional (magnitude), em vez de tabela de texto simples | O card "TAMANHO POR TABELA" mostra uma barra horizontal por tabela, comprimento proporcional ao tamanho, ordenada da maior para a menor, com o valor formatado no fim da barra | ✅ Done — **validado ao vivo** | **Implementado:** a RPC passou a devolver `tamanho.tabelas` como array `{tabela, bytes, pretty}` já ordenado por `bytes desc` (era um objeto fixo por nome de coluna); `Admin.jsx` renderiza uma `.disco-row` por tabela com barra `width: (bytes/maiorTabela)*100%` (hue único `--green-dim`, não a paleta de severidade do medidor — é magnitude, não alarme) e o valor em `tabular-nums`, alinhado à direita (regra do `dataviz`: rótulo na ponta da barra, nunca dentro se não couber). **Bug encontrado e corrigido no próprio teste ao vivo:** `maiorTabela` tinha sido declarado dentro do escopo de uma IIFE do card de disco e usado no card de tabelas logo abaixo, fora daquele escopo — `ReferenceError` quebrando a página inteira (tela preta). Corrigido subindo o cálculo para o escopo do componente, antes do `return`. **Validado ao vivo após o fix:** barras corretas e proporcionais — Histórico de preços (976 kB, barra cheia) muito à frente de Itens (128 kB) e as demais (Alertas/Usuários 64 kB, Produtos/Lojas 48 kB) |
+
+**Bug de regressão encontrado e corrigido durante a própria validação desta
+sprint** (não chegou a ficar em produção): antes da correção, qualquer resposta
+"antiga" da RPC (sem os campos novos) também quebrava a página com tela preta em
+vez de cair no estado "indisponível" já existente — o `carregar()` agora valida
+que `tamanho.tabelas` é um array e `tamanho.banco_completo_bytes` é number antes
+de aceitar os dados, tratando qualquer formato inesperado como indisponível em
+vez de deixar o React quebrar. **Validação final ao vivo:** dois reloads limpos
+sem nenhum erro de console, dados reais em todos os três cards do `/admin`
+(Visão geral, Espaço em disco, Tamanho por tabela) e na Saúde da coleta abaixo.
+
+---
+
+## Sprint 33 — Campo dedicado de criação de categoria em Novo Produto (23/08/2026)
+
+> Pergunta feita ao usuário no início da sprint (per a skill `autonomous-execution`
+> — decisão marcada como "em aberto" no plano exige parar e perguntar):
+> Sprint 31 já entregou "+ Nova categoria" como link dentro do campo Categoria; o
+> `todo:220` pede "um campo a parte". Confirmado com preview visual: o pedido é
+> **transformar em seção própria e separada**, tirando a criação de dentro do
+> campo Categoria — não é uma repetição da Sprint 31.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S33 · Campo dedicado (seção própria, fora do `<select>`) para criar categoria em Novo Produto, já utilizável na hora (todo:220) | A criação de categoria deixa de ser um botão-link abaixo do `<select>` de Categoria (comportamento da Sprint 31) e passa a ter seu próprio card/seção visível na tela (entre o formulário principal e a Fila de Envio); ao criar, a categoria nova aparece imediatamente disponível e já selecionada no `<select>` de Categoria, sem recarregar a página | ✅ Done — **validado ao vivo** | **Implementado:** novo `form-card` "CRIAR NOVA CATEGORIA" (admin-only, mesmo padrão visual de `data-label` usado em todo o app) inserido entre o card "DADOS DO PRODUTO" e "FILA DE ENVIO" em `NovoProduto.jsx`; reaproveita 100% a lógica já existente da Sprint 31 (`criarCategoria()`, `slugCategoria()`, policy `produtos_insert_admin`) — mudança é só de posicionamento/apresentação, sem lógica nova. Removido o estado `criandoCategoria` (toggle expandir/recolher), que deixou de fazer sentido com a seção sempre visível; o CSS `.link-btn` (só usado pelo link removido) também saiu, código morto. **Validado ao vivo:** criada a categoria de teste "ZZZ Teste Sprint33 Apagar" pela nova seção — apareceu imediatamente selecionada no campo Categoria acima, sem reload; zero erros de console; categoria de teste removida ao final via script pontual com `SUPABASE_SERVICE_KEY` (confirmado antes que nenhum item usava ela, mesmo procedimento de limpeza da Sprint 31) |
+
+**Nota de processo:** durante a limpeza pós-teste, tentei por engano navegar ao
+painel web do Supabase (ação incorreta — exigiria a sessão logada do usuário, que
+esta automação não tem); revertido imediatamente sem nenhuma ação lá, e a limpeza
+foi refeita do jeito certo (script local com a service key, mesmo padrão já usado
+na Sprint 31). Isso também fechou uma aba do navegador que o usuário havia logado
+manualmente mais cedo na sessão — uma nova aba foi aberta em seguida e a sessão
+(armazenada no perfil do Chrome, não na aba) continuou logada normalmente.
+
+---
+
 ## Resumo por status
 
 | Status | Qtde | Linhas do `todo` |
 |--------|------|-------------------|
-| ✅ Done | 15 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 216 |
-| ⬜ Todo | 3 | 204 (proposto na Sprint 30), 210 (absorvido pela V3 — ver nota na própria linha), 214 (proposto na Sprint 29, 5 lojas) |
+| ✅ Done | 17 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 216, 218, 220 |
+| ⬜ Todo | 3 | 204 (proposto na Sprint 30), 210 (absorvido pela V3 — ver nota na própria linha), 214 (Sprint 29 implementada e validada localmente — falta só a validação em CI, pendente de push, ver nota no topo) |
 | 🟡 Pending | 0 | — |
 
 ## Skills Futuras
@@ -263,5 +400,6 @@ Playstation/Amazon). Recomenda-se validar cada loja isoladamente com
 |-------|------------------|----------|------------|
 | `frontend-design-system` | já existe | Continua a referência de cores/tipografia/tom de voz usada nestas sprints (pop-up de busca, tooltip de preço, entorno dos botões, reaproveitamento do `--amber` como cor de atenção na Sprint 28) | Já feita |
 | `backend-conventions` | já existe | Referência obrigatória para a Sprint 29 (5 scrapers novos) — contrato `ScraperBase`, ordem de extração JSON-LD→meta→CSS→JS e registro no dict `SCRAPERS` | Já feita — primeira vez que a V3/V4 realmente precisa dela |
-| `db-migrations` | sugerida na Sprint 31 | A V3/V4 até aqui não mexia em schema/RLS; a Sprint 31 precisou de uma policy nova (`produtos_insert_admin`) e é fácil esquecer de rodar a migração manual antes de testar — uma skill/checklist "toda sprint com arquivo em `project/migrations/` precisa do usuário confirmar que já rodou no SQL Editor antes de dar a tarefa por concluída" evitaria esse ponto cego | Média |
-| `scraper-nova-loja` | sugerida desde a `sprint_v2.md` (S1/S4), nunca criada | Andaime para nova loja: gerar a subclasse de `ScraperBase`, o esqueleto de `_aguardar_preco`/`extrair_dados` e o registro no dict `SCRAPERS` — útil agora que a Sprint 29 pede **5 lojas de uma vez** | Alta (recomendada antes de iniciar a Sprint 29) |
+| `db-migrations` | sugerida na Sprint 31, reforçada nas 32/32b/32c | A V3/V4 até aqui não mexia em schema/RLS; a Sprint 31 precisou de uma policy nova (`produtos_insert_admin`) e as Sprints 32/32b/32c precisaram de **3 migrações no mesmo dia** (cada uma recriando `admin_estatisticas()` de novo) — é fácil esquecer de rodar a migração mais recente antes de testar (aconteceu 3x nesta V4, cada vez com o erro certo mas exigindo uma volta de ida e volta com o usuário); uma skill/checklist "toda sprint com arquivo novo em `project/migrations/` precisa do usuário confirmar que já rodou no SQL Editor antes de dar a tarefa por concluída" evitaria esse ponto cego recorrente | Alta (3 ocorrências na mesma sessão) |
+| `scraper-nova-loja` | sugerida desde a `sprint_v2.md` (S1/S4) — **criada em 23/08/2026**, pedido direto do usuário depois da Sprint 29 (Tuyo) | `.claude/skills/scraper-nova-loja/SKILL.md` — não é só o andaime da subclasse (isso já está na `backend-conventions`); documenta a **metodologia de teste** dos 3 scrapers já validados (Kabum/Terabyte/Pichau), como o ambiente CI difere do local (IP de datacenter, flags do Chromium, timeouts, detecção de challenge em `base.py`), e o padrão Pichau (retry+challenge honesta+decisão documentada) para quando uma loja nova bloquear sistematicamente do CI. Também fecha a `ci-diagnostics` sugerida na Sprint 1 (`sprint_v1.md`), que nunca virou skill separada | Já feita |
+| `db-admin-metrics` | sugerida na Sprint 32 | RPC(s) `SECURITY DEFINER` reaproveitáveis para expor métricas operacionais (tamanho de tabelas, contagens, saúde do cron) sem duplicar introspecção manual a cada nova pergunta "admin quer ver X do banco" | Média |

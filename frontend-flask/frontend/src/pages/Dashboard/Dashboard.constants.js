@@ -14,8 +14,13 @@ export const CAT_LABEL = {
 
 // `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
 export const LOJAS_FILTER = [
-  { key: "all",       label: "Todas Lojas", slug: null           },
-  { key: "kabum",     label: "KaBuM",       slug: "kabum"        },
-  { key: "terabyte",  label: "Terabyte",    slug: "terabyteshop" },
-  { key: "pichau",    label: "Pichau",      slug: "pichau"       },
+  { key: "all",          label: "Todas Lojas",  slug: null           },
+  { key: "kabum",        label: "KaBuM",        slug: "kabum"        },
+  { key: "terabyte",     label: "Terabyte",     slug: "terabyteshop" },
+  { key: "pichau",       label: "Pichau",       slug: "pichau"       },
+  { key: "tuyo",         label: "Tuyo",         slug: "tuyo"         },
+  { key: "playstation",  label: "Playstation",  slug: "playstation"  },
+  { key: "logitec",      label: "Logitec",      slug: "logitec"      },
+  { key: "tangleteezer", label: "Tangle Teezer",slug: "tangleteezer" },
+  { key: "amazon",       label: "Amazon",       slug: "amazon"       },
 ];

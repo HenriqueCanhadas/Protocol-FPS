@@ -35,9 +35,7 @@ const css = `
 .form-select:hover { border-color:var(--green-dim); }
 .form-select:focus { border-color:var(--green-dim); box-shadow:0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03); }
 .form-select option { background:var(--bg2); color:var(--text); }
-.link-btn { background:none; border:none; color:var(--green-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.08em; text-transform:uppercase; cursor:pointer; padding:.5rem 0 0; text-align:left; }
-.link-btn:hover { color:var(--green); text-decoration:underline; }
-.cat-new-row { display:flex; gap:.6rem; margin-top:.6rem; }
+.cat-new-row { display:flex; gap:.6rem; }
 .cat-new-row .field-input { flex:1; }
 .form-divider { height:1px; background:var(--border2); margin:.25rem 0; }
 
@@ -79,16 +77,25 @@ const css = `
 `;
 
 const LOJAS_DETECTADAS = {
-  "kabum.com.br":       "kabum",
+  "kabum.com.br":        "kabum",
   "terabyteshop.com.br": "terabyteshop",
-  "pichau.com.br":      "pichau",
+  "pichau.com.br":       "pichau",
+  "tuyo.com.br":            "tuyo",
+  "store.playstation.com": "playstation",
+  "logitechstore.com.br":  "logitec",
+  "tangleteezer.com.br":   "tangleteezer",
+  "amazon.com.br":         "amazon",
 };
 // Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
 // Categorias novas (todo, criadas por admin — ver criarCategoria) entram
 // depois destas, ordenadas por nome.
 const CATEGORIA_ORDEM_FIXA = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 const CATEGORIA_LABEL_FIXA = { GPU: "GPU", CPU: "CPU", RAM: "RAM", PSU: "Fonte", MOBO: "Placa Mãe", STORAGE: "Armazenamento", DIVERSOS: "Diversos" };
-const LOJAS_LABEL = { kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau" };
+const LOJAS_LABEL = {
+  kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
+  tuyo: "Tuyo", playstation: "Playstation", logitec: "Logitec",
+  tangleteezer: "Tangle Teezer", amazon: "Amazon",
+};
 
 function rotuloCategoria(categoria, nomeDb) {
   return CATEGORIA_LABEL_FIXA[categoria] || nomeDb || categoria;
@@ -135,8 +142,9 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
   const [salvando,  setSalvando]   = useState(false);
   const [progresso, setProgresso]  = useState(0);
 
-  // Criação de categoria nova (todo, admin-only — ver migrations/sprint31_categorias_insert.sql)
-  const [criandoCategoria,   setCriandoCategoria]   = useState(false);
+  // Criação de categoria nova (todo, admin-only — ver migrations/sprint31_categorias_insert.sql).
+  // Sprint 33 (todo:220): saiu de dentro do campo Categoria e virou uma seção
+  // própria e sempre visível (para admin), em vez de um link que expandia ali.
   const [novaCategoriaNome,  setNovaCategoriaNome]  = useState("");
   const [salvandoCategoria,  setSalvandoCategoria]  = useState(false);
 
@@ -183,7 +191,6 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
     setCategorias((c) => ordenarCategorias([...c, { categoria: slug, nome: data.nome }]));
     setCategoria(slug);
     setErros((e) => ({ ...e, categoria: false }));
-    setCriandoCategoria(false);
     setNovaCategoriaNome("");
     showToast(`Categoria "${nomeDigitado}" criada`, "ok");
   };
@@ -346,25 +353,6 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
                       <option key={c.categoria} value={c.categoria}>{rotuloCategoria(c.categoria, c.nome)}</option>
                     ))}
                   </select>
-                  {isAdmin && !criandoCategoria && (
-                    <button type="button" className="link-btn" onClick={() => setCriandoCategoria(true)}>+ Nova categoria</button>
-                  )}
-                  {isAdmin && criandoCategoria && (
-                    <div className="cat-new-row">
-                      <input
-                        className="field-input" type="text" placeholder="Nome da nova categoria (ex.: Cooler)"
-                        autoFocus value={novaCategoriaNome}
-                        onChange={(e) => setNovaCategoriaNome(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
-                      />
-                      <button className="btn-secondary" style={{ fontSize: "var(--fs-xs)", padding: "0 .9rem" }}
-                        onClick={() => { setCriandoCategoria(false); setNovaCategoriaNome(""); }}>✕</button>
-                      <button className="btn-primary" style={{ fontSize: "var(--fs-xs)", padding: "0 1.1rem" }}
-                        disabled={!novaCategoriaNome.trim() || salvandoCategoria} onClick={criarCategoria}>
-                        {salvandoCategoria ? "CRIANDO..." : "CRIAR"}
-                      </button>
-                    </div>
-                  )}
                   {erros.categoria && <div className="field-error">Selecione uma categoria</div>}
                 </div>
                 <div className="field-group">
@@ -422,6 +410,31 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
               <button className="btn-primary"   onClick={adicionar}>{editandoId != null ? "SALVAR EDIÇÃO" : "ADICIONAR À FILA"}</button>
             </div>
           </div>
+
+          {/* CRIAR CATEGORIA — seção própria, admin-only (Sprint 33, todo:220;
+              antes era um link dentro do campo Categoria, Sprint 31) */}
+          {isAdmin && (
+            <div className="form-card" data-label="CRIAR NOVA CATEGORIA">
+              <div className="form-body">
+                <div className="field-group">
+                  <div className="field-label">Nome da categoria</div>
+                  <div className="cat-new-row">
+                    <input
+                      className="field-input" type="text" placeholder="Nome da nova categoria (ex.: Cooler)"
+                      value={novaCategoriaNome}
+                      onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
+                    />
+                    <button className="btn-primary" style={{ whiteSpace: "nowrap" }}
+                      disabled={!novaCategoriaNome.trim() || salvandoCategoria} onClick={criarCategoria}>
+                      {salvandoCategoria ? "CRIANDO..." : "CRIAR CATEGORIA"}
+                    </button>
+                  </div>
+                  <div className="field-hint">Fica disponível no campo Categoria acima assim que criada, já selecionada.</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* FILA */}
           <div className="form-card" data-label="FILA DE ENVIO">

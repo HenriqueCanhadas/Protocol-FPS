@@ -13,13 +13,19 @@ const ITEMS_ADMIN = [
   { href: "/usuarios", icon: "◈", label: "Usuários" },
 ];
 
+// Visível apenas para quem tem usuarios.ver_banco=true (Sprint 32b) — não é
+// ligado a isAdmin: por padrão só o dono da conta, liberado individualmente
+// pela tela Usuários.
+const ITEM_BANCO = { href: "/admin", icon: "▣", label: "Admin" };
+
 const ITEMS_CONTA = [
   { href: "/conta", icon: "◉", label: "Minha Conta" },
 ];
 
-export default function NavDrawer({ open, onClose, user, isAdmin = false, onLogout }) {
+export default function NavDrawer({ open, onClose, user, isAdmin = false, podeVerBanco = false, onLogout }) {
   const { pathname } = useLocation();
-  const items = isAdmin ? [...ITEMS, ...ITEMS_ADMIN] : ITEMS;
+  let items = isAdmin ? [...ITEMS, ...ITEMS_ADMIN] : ITEMS;
+  if (podeVerBanco) items = [...items, ITEM_BANCO];
 
   return (
     <>
