@@ -9,10 +9,14 @@ Nome do arquivo/slug como digitado no todo/plano ("Logitec", não
 
 Estrutura confirmada:
   - SEM JSON-LD (`script[type='application/ld+json']` não existe na página).
-  - Meta tags: `product:price:amount`/`product:price:currency` — preço
-    principal, bate com o valor exibido em `.price-final_price`.
-    CUIDADO: existe um segundo preço (`.in_cash-price-box`, desconto à
-    vista/PIX) — não usar esse como preço de referência, é promocional.
+  - Preço de referência: `.in_cash-price-box .price` — o desconto à vista no
+    Pix (ex. R$ 1.019,92, ~15% sobre o de tabela). Corrigido na Sprint 34/35
+    (V5, todo:227): o rascunho original da Sprint 29 (V4) tratava esse valor
+    como "promocional" e usava a meta `product:price:amount`/
+    `.price-final_price` (preço de tabela, ex. R$ 1.199,90) — o usuário
+    reportou que queria monitorado justamente o valor com desconto (o que
+    ele paga de fato). Nem todo produto tem esse box (é uma promoção, não
+    universal); quando ausente, cai no preço de tabela (meta → CSS).
   - Disponibilidade: `div.stock.available` com texto "Em estoque" quando
     disponível — padrão de tema Magento (`stock unavailable` + "Fora de
     estoque"/"Indisponível" quando esgotado).
@@ -29,6 +33,7 @@ from .base import ScraperBase, DadosProduto
 logger = logging.getLogger(__name__)
 
 SELETOR_PRECO = ".price-final_price [itemprop='price'], .price-final_price .price"
+SELETOR_PRECO_PIX = ".in_cash-price-box .price"
 SELETOR_NOME  = "h1.page-title, h1"
 SELETOR_ESTOQUE = "div.stock"
 
@@ -51,15 +56,22 @@ class LogitecScraper(ScraperBase):
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
         nome = self._extrair_nome(page)
 
-        # 1. JSON-LD (não existe hoje na Logitech, mas mantém a ordem padrão
-        #    do projeto — se o tema adicionar um dia, passa a ser usado).
-        preco = self._extrair_preco_jsonld(page)
+        # 1. Desconto à vista no Pix (`.in_cash-price-box`) — preço de
+        #    referência desejado (todo:227); só existe quando o produto tem
+        #    essa promoção, então cai para a ordem padrão do projeto quando
+        #    ausente.
+        preco = self._extrair_preco_pix(page)
 
-        # 2. Meta tags — fonte primária real desta loja
+        # 2. JSON-LD (não existe hoje na Logitech, mas mantém a ordem padrão
+        #    do projeto — se o tema adicionar um dia, passa a ser usado).
+        if preco is None:
+            preco = self._extrair_preco_jsonld(page)
+
+        # 3. Meta tags (preço de tabela, sem o desconto Pix)
         if preco is None:
             preco = self._extrair_preco_meta(page)
 
-        # 3. CSS
+        # 4. CSS (preço de tabela)
         if preco is None:
             preco = self._extrair_preco_css(page)
 
@@ -96,6 +108,17 @@ class LogitecScraper(ScraperBase):
         except Exception:
             pass
         return "Nome não encontrado"
+
+    def _extrair_preco_pix(self, page: Page) -> float | None:
+        try:
+            el = page.query_selector(SELETOR_PRECO_PIX)
+            if el:
+                valor = self._limpar_preco(el.inner_text())
+                if valor and valor > 0:
+                    return valor
+        except Exception:
+            pass
+        return None
 
     def _extrair_preco_jsonld(self, page: Page) -> float | None:
         try:

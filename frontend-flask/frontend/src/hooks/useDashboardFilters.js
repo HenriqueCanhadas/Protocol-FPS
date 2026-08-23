@@ -14,6 +14,12 @@ const lerBuscaSalva = () => {
   try { return localStorage.getItem(CHAVE_BUSCA) || ""; } catch { return ""; }
 };
 
+// Mesma normalização do `_slug_loja` em main.py (minúsculas, sem espaços) —
+// necessária porque `lojas.nome` pode ter espaço (ex. "Tangle Teezer") enquanto
+// as `key`/`slug` de LOJAS_FILTER não têm (Sprint 34: sem isso o filtro de loja
+// nunca casava com "Tangle Teezer").
+const slugLoja = (nome) => (nome || "").toLowerCase().replace(/\s/g, "");
+
 export function useDashboardFilters({ dados, isAdmin, user }) {
   const [filtro,        setFiltro]        = useState("all");
   const [termoBusca,    setTermoBuscaState] = useState(lerBuscaSalva);
@@ -69,8 +75,7 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
       );
     }
     if (filtroLoja !== "all") {
-      const q = filtroLoja.toLowerCase();
-      d = d.filter(x => (x.loja || "").toLowerCase().includes(q));
+      d = d.filter(x => slugLoja(x.loja).includes(filtroLoja));
     }
     if (filtroProduto !== "all") {
       d = d.filter(x => x.item_id === filtroProduto);
@@ -110,7 +115,7 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
   // Produtos da loja selecionada (para o filtro "produto de loja")
   const produtosDaLoja = filtroLoja === "all" ? [] :
     dados
-      .filter((x) => (x.loja || "").toLowerCase().includes(filtroLoja))
+      .filter((x) => slugLoja(x.loja).includes(filtroLoja))
       .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
