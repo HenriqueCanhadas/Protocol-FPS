@@ -1,9 +1,8 @@
 # PROTOCOL FPS — Planejamento de Sprints — V4
 
 > Relatório gerado a partir da seção **V4** do arquivo `todo` (raiz do repositório).
-> Data de geração: **23/08/2026** (atualizado após a Sprint 29 completa — os 5
-> scrapers novos + registro em `lojas`/frontend, a pedido do usuário para "fazer a
-> sprint 29 inteira").
+> Data de geração: **23/08/2026** (atualizado após a Sprint 29 ser validada em CI —
+> **3/3 runs reais no GitHub Actions, as 5 lojas com sucesso**, fechando o item).
 >
 > A V4 é uma sequência de ajustes de UX pontuais sobre a Dashboard reconstruída na V3
 > (`project/sprint_v3.md`). As **Sprints 23, 24, 25, 26, 27, 28, 31, 32, 32b, 32c, 33
@@ -13,14 +12,15 @@
 > sprints executadas dessas duas versões mexeram só no frontend da Dashboard (as
 > Sprints 32/32b/32c mexeram em schema/RPC/API, mas não em scraper).
 >
-> ⚠️ **`todo:214` continua `⬜ Todo` no "Resumo por status"**, apesar dos 5 scrapers
-> estarem implementados e validados **localmente**: falta a validação em **CI**
-> (GitHub Actions, 3 runs — mesma barra usada para Kabum/Terabyte/Pichau, skill
-> `scraper-nova-loja`). Isso exige commitar e enviar (push) o trabalho desta sessão
-> para a branch remota primeiro — perguntei ao usuário e a resposta foi **não fazer
-> isso agora** ("só valide localmente por enquanto"); ver a nota completa na Sprint
-> 29 abaixo, incluindo um disparo de coleta real que confirmou exatamente esse
-> problema (rodou contra o código antigo no GitHub, sem nenhum dos 5 scrapers).
+> ✅ **`todo:214` fechado — Sprint 29 validada em CI de verdade** (não só local): o
+> usuário pediu para commitar e enviar (push) o trabalho da sessão, e depois validar
+> no CI de verdade. Commitado (`05d6cd7`) e enviado para `Duplicate-Main`, depois
+> disparados **3 runs reais** de `workflow_dispatch` (mesma barra "3/3" usada para
+> Kabum/Terabyte na Sprint 1, skill `scraper-nova-loja`) — **as 5 lojas coletaram
+> com sucesso nos 3 runs, com o preço idêntico em todos** (inclusive a Amazon, sem
+> nenhum bloqueio de bot a partir do IP de datacenter do runner). Detalhes completos
+> na Sprint 29 abaixo, incluindo o primeiro disparo (antes do push) que confirmou o
+> problema de rodar contra código desatualizado no GitHub.
 >
 > ✅ **Migração da Sprint 31 rodada pelo usuário e confirmada em produção local**:
 > `project/migrations/sprint31_categorias_insert.sql` já está aplicada — a criação
@@ -63,7 +63,7 @@
 | 26 | Barra de rolagem temática | 20/08/2026 | 1 | 1 |
 | 27 | Link do produto no hover do nome + editar item na fila de Novo Produto | 20/08/2026 | 1 | 2 |
 | 28 | Temporizador de sessão (contagem regressiva em amarelo no cabeçalho) | 20/08/2026 | 1 | 1 |
-| 29 | Novas lojas: Tuyo, Playstation, Logitec, Tangle Teezer, Amazon — 5 scrapers + `lojas` + frontend, **validados localmente**; CI (3 runs) pendente | 23/08/2026 | 5 | 1 (5 lojas) |
+| 29 | Novas lojas: Tuyo, Playstation, Logitec, Tangle Teezer, Amazon — 5 scrapers + `lojas` + frontend, **validados local + 3/3 runs de CI** | 23/08/2026 | 5 | 1 (5 lojas) |
 | 30 *(proposta, ainda não iniciada)* | Disponibilidade real: esgotado × não localizado | a definir | 2 | 1 |
 | 31 | Criar novas categorias pela tela Novo Produto (admin) | 20/08/2026 | 1 | 1 |
 | 32 | Painel admin de banco/monitoramento (tamanho do banco, contagens, saúde da coleta) | 23/08/2026 | 1 | 1 |
@@ -73,10 +73,10 @@
 
 **Sprints 23–28, 29, 31, 32, 32b, 32c e 33 concluídas** (19–20/08/2026 e 23/08/2026 —
 numeração não contígua, 30 segue proposta). A Sprint 29 está **implementada e
-validada localmente**, mas `todo:214` continua `⬜ Todo` até a validação em CI (3
-runs, pendente de push — ver nota no topo). Restam **3 itens `⬜ Todo`** na V4
-(1 na Sprint 29 proposta, 1 na Sprint 30 proposta + 1 já absorvido pela V3, ver
-"Resumo por status"). A numeração de sprints continua de onde a Sprint 33 parou.
+validada — local e 3/3 runs de CI reais** (ver nota no topo e detalhe completo na
+própria sprint). Restam **2 itens `⬜ Todo`** na V4 (1 na Sprint 30 proposta + 1 já
+absorvido pela V3, ver "Resumo por status"). A numeração de sprints continua de
+onde a Sprint 33 parou.
 
 ---
 
@@ -217,30 +217,37 @@ de rota). Console sem erros novos (só o warning pré-existente do GoTrueClient)
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
 | S29 · Scraper + registro da loja Tuyo (todo:214) | `TuyoScraper(headless=True).coletar(url)` retorna `DadosProduto` com nome/preço/disponibilidade corretos | ✅ Done — **validado com dados reais** | `scrapers/tuyo.py`. Shopify — o produto é um `ProductGroup` (schema.org) com variantes (cor) em `hasVariant`, cada uma com preço/disponibilidade próprios; a URL identifica a variante por `?variant=<id>`, casado contra `hasVariant[].offers.url`/`@id` (senão pegaria a variante errada). Ordem: JSON-LD → meta `og:price:amount`/`og:title` → CSS (`.product__price--regular`, `h1.product__title`) → JS. **Validado com as duas variantes reais do link de teste:** Navy Blue (esgotada de verdade) → `preco=None, disponivel=False`; Off White (disponível) → `preco=349.0, disponivel=True` — batendo exatamente com o JSON-LD/DOM inspecionados ao vivo antes de escrever o código |
-| S29 · Scraper + registro da loja Playstation Store (todo:214) | `PlaystationScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/playstation.py`. SPA Next.js — JSON-LD `Product` único (sem `availability`, loja digital não tem "esgotado" tradicional); preço também em `[data-qa='mfeCtaMain#offer0#finalPrice']` — **cuidado confirmado na inspeção real**: a página lista preços de OUTRAS edições do mesmo jogo em `[data-qa='mfeUpsell#...']`, nunca usar esses. Esgotamento = ausência do botão `mfeCtaMain#cta#action` ou texto de indisponibilidade. **Validado:** `preco=455.9, disponivel=True`, nome completo, idêntico ao inspecionado ao vivo. CI (bloqueio de datacenter) **não testado** |
+| S29 · Scraper + registro da loja Playstation Store (todo:214) | `PlaystationScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/playstation.py`. SPA Next.js — JSON-LD `Product` único (sem `availability`, loja digital não tem "esgotado" tradicional); preço também em `[data-qa='mfeCtaMain#offer0#finalPrice']` — **cuidado confirmado na inspeção real**: a página lista preços de OUTRAS edições do mesmo jogo em `[data-qa='mfeUpsell#...']`, nunca usar esses. Esgotamento = ausência do botão `mfeCtaMain#cta#action` ou texto de indisponibilidade. **Validado:** `preco=455.9, disponivel=True`, nome completo, idêntico ao inspecionado ao vivo, **e confirmado em 3/3 runs reais de CI** (ver nota ao final da sprint) |
 | S29 · Scraper + registro da loja Logitec (Logitech Store BR) (todo:214) | `LogitecScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/logitec.py`. Nome do arquivo/slug como digitado no `todo` ("Logitec", não "Logitech") — decisão de nomenclatura registrada aqui. Magento, **sem JSON-LD** (confirmado 0 scripts `ld+json`) — a extração real é via meta `product:price:amount` (1199.9, bate com o preço exibido) **cuidado**: existe um segundo preço `.in_cash-price-box` (desconto PIX) que não é o de referência. Disponibilidade via `div.stock.available`/`unavailable` (padrão de tema Magento). **Validado:** `preco=1199.9, disponivel=True`, nome idêntico ao `h1.page-title` |
 | S29 · Scraper + registro da loja Tangle Teezer BR (todo:214) | `TangleteezerScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais** | `scrapers/tangleteezer.py`. VTEX — mesma particularidade da Tuyo (múltiplas variantes com preço/disponibilidade próprios via `AggregateOffer.offers[]`), mas resolvida mais simples: o `Product` raiz já tem o `sku` da variante selecionada, só casar contra `offers.offers[].sku` (sem precisar da query string da URL). **Validado:** `preco=160.0, disponivel=True`, sku casado corretamente, nome "Escova de Cabelo The Ultimate Detangler" |
-| S29 · Scraper + registro da loja Amazon BR (todo:214) | `AmazonScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado com dados reais; risco de bot-block confirmado, mas não bloqueou o Playwright** | `scrapers/amazon.py`. **Achado importante:** ao inspecionar manualmente a página (navegador comum, não Playwright) para desenhar o scraper, a Amazon respondeu com a interstitial anti-bot "Clique no botão abaixo para continuar comprando" — confirma o risco já esperado no plano. **Não tentamos clicar/contornar essa interstitial** (fora do escopo permitido). Reaberta a página momentos depois, carregou normalmente — não foi bloqueio persistente. **Bug real encontrado e corrigido antes de finalizar:** o primeiro rascunho combinava 3 seletores de preço num único `query_selector("a, b, c")` — a página da Amazon tem DEZENAS de outros preços (produtos relacionados, combos); esse padrão pega o primeiro em ORDEM NO DOM da união, não o mais específico primeiro (confirmado ao vivo: 41 elementos `.a-price .a-offscreen` na página, vários "null" ou de outros produtos). Corrigido para tentar cada seletor **isolado**, do mais específico ao mais amplo, nunca combinado. **Validado com o fix:** `preco=265.17, disponivel=True` (nome completo do produto), conferido manualmente no navegador que R$265,17 é de fato o preço do produto principal, não de um relacionado |
-| S29 · Categoria/UI de cadastro para as 5 lojas novas (todo:214) | `NovoProduto.jsx` e o filtro de loja do Dashboard reconhecem as 5 lojas novas; um item de cada loja pode ser cadastrado ponta a ponta | ✅ Done — **validado ao vivo** | **Implementado:** as 5 lojas inseridas em `lojas` (Supabase, com `url_base` — coluna documentada em `banco.md` que eu não conhecia até o INSERT falhar por `NOT NULL`, corrigido na hora); `LOJAS_DETECTADAS`/`LOJAS_LABEL` em `NovoProduto.jsx` e `LOJAS_FILTER` em `Dashboard.constants.js` atualizados; comentários de `coletar.yml`/`CLAUDE.md`/`README.md`/`banco.md` atualizados com os 5 slugs novos. **Validado ao vivo:** cadastrado 1 item de teste por loja nova (5 no total) — DETECTAR reconheceu corretamente o domínio de cada uma (`tuyo.com.br`→Tuyo, `store.playstation.com`→Playstation, `logitechstore.com.br`→Logitec, `tangleteezer.com.br`→Tangle Teezer, `amazon.com.br`→Amazon), os 8 selects de loja (3 antigas + 5 novas) aparecem corretos, os 5 itens foram salvos e apareceram no Dashboard com a badge de loja certa. Itens de teste removidos ao final (nenhuma leitura chegou a ser gravada, ver nota de CI abaixo) |
+| S29 · Scraper + registro da loja Amazon BR (todo:214) | `AmazonScraper(headless=True).coletar(url)` retorna `DadosProduto` correto | ✅ Done — **validado local + 3/3 runs de CI reais, sem bloqueio de bot** | `scrapers/amazon.py`. **Achado durante a inspeção:** ao abrir a página manualmente (navegador comum, não Playwright) para desenhar o scraper, a Amazon respondeu uma vez com a interstitial anti-bot "Clique no botão abaixo para continuar comprando". **Não tentamos clicar/contornar essa interstitial** (fora do escopo permitido); reaberta a página momentos depois, carregou normal — não era bloqueio persistente. **Bug real encontrado e corrigido antes de finalizar:** o primeiro rascunho combinava 3 seletores de preço num único `query_selector("a, b, c")` — a página da Amazon tem DEZENAS de outros preços (produtos relacionados, combos); esse padrão pega o primeiro em ORDEM NO DOM da união, não o mais específico primeiro (confirmado ao vivo: 41 elementos `.a-price .a-offscreen` na página, vários "null" ou de outros produtos). Corrigido para tentar cada seletor **isolado**, do mais específico ao mais amplo. **Resultado final, o mais significativo da sprint:** rodou com sucesso nos **3 runs reais de CI** a partir do IP de datacenter do GitHub Actions, sem nenhum sinal de bloqueio — `preco=265.17` idêntico nos 3 runs, igual ao validado localmente. Diferente da Pichau, a Amazon **não precisou** do tratamento de retry/challenge |
+| S29 · Categoria/UI de cadastro para as 5 lojas novas (todo:214) | `NovoProduto.jsx` e o filtro de loja do Dashboard reconhecem as 5 lojas novas; um item de cada loja pode ser cadastrado ponta a ponta | ✅ Done — **validado ao vivo (UI) + 3/3 runs de CI (coleta)** | **Implementado:** as 5 lojas inseridas em `lojas` (Supabase, com `url_base` — coluna documentada em `banco.md` que eu não conhecia até o INSERT falhar por `NOT NULL`, corrigido na hora); `LOJAS_DETECTADAS`/`LOJAS_LABEL` em `NovoProduto.jsx` e `LOJAS_FILTER` em `Dashboard.constants.js` atualizados; comentários de `coletar.yml`/`CLAUDE.md`/`README.md`/`banco.md` atualizados com os 5 slugs novos. **Validado ao vivo (UI):** cadastrado 1 item de teste por loja nova — DETECTAR reconheceu corretamente o domínio de cada uma, os 8 selects de loja aparecem corretos, itens salvos com a badge certa no Dashboard. **Validado em CI:** 5 itens de teste recriados via service key, coletados com sucesso em 3 runs reais de `workflow_dispatch` (ver nota abaixo). Todos os itens/leituras de teste removidos ao final de cada rodada |
 
-**🟡 CI (GitHub Actions) — pendente, não validado nesta sessão.** Tentei disparar
-uma coleta real via "COLETAR" (filtro de busca "Sprint29", `ITEM_IDS` com os 5
-itens de teste) para validar no CI de verdade, como a skill `scraper-nova-loja`
-exige (3 runs batendo com a verdade local). **O disparo não validou nada**: o
-workflow do GitHub Actions roda o código já commitado/enviado na branch remota
-(`Duplicate-Main`), e nenhum arquivo desta sessão (5 scrapers, `main.py`,
-migrações, frontend) tinha sido commitado ainda — confirmado via
-`git log origin/Duplicate-Main` (parado no commit da Sprint 31). O run real
-apenas ignorou os 5 itens como "loja desconhecida" (confirmado: 0 leituras
-gravadas em `historico_precos` para os 5 itens de teste — nenhum dado incorreto,
-só nenhuma validação de fato). **Perguntei ao usuário se queria que eu commitasse e
-desse push para viabilizar o teste real de CI — a resposta foi não, "só valide
-localmente por enquanto".** Isso significa: os 5 scrapers estão implementados e
-corretos pelos testes locais (dados reais batendo com a inspeção manual), mas
-**nenhum deles tem cobertura de CI confirmada** — em especial a Amazon, cuja
-inspeção manual já mostrou um sinal de anti-bot, então o comportamento dela a
-partir de um IP de datacenter genuinamente não é conhecido (pode seguir o padrão
-Pichau, pode não seguir). `todo:214` fica `⬜ Todo` até essa validação acontecer.
+**✅ CI (GitHub Actions) — validado com 3/3 runs reais, todas as 5 lojas com
+sucesso.** Primeira tentativa (antes do commit) confirmou um problema real: o
+`workflow_dispatch` roda o código já commitado/enviado na branch remota
+(`Duplicate-Main`), e nada desta sessão tinha sido commitado ainda — o run
+ignorou os 5 itens de teste como "loja desconhecida" (0 leituras gravadas, nenhum
+dado incorreto, só nenhuma validação de fato) — confirmado via
+`git log origin/Duplicate-Main` parado no commit da Sprint 31. O usuário então
+pediu explicitamente para commitar, dar push e testar na branch. Feito: commit
+`05d6cd7` (26 arquivos, Sprints 29/32/32b/32c/33) enviado para `Duplicate-Main`,
+depois **3 dispatches reais** (`ITEM_IDS` com 5 itens de teste recriados via
+`SUPABASE_SERVICE_KEY`, um por loja nova), cada um monitorado via API do GitHub
+até `completed`/`success`:
+
+| Run | Tuyo | Playstation | Logitec | Tangle Teezer | Amazon |
+|---|---|---|---|---|---|
+| [32650434361](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/32650434361) | R$ 349,00 | R$ 455,90 | R$ 1.199,90 | R$ 160,00 | R$ 265,17 |
+| [32650607960](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/32650607960) | R$ 349,00 | R$ 455,90 | R$ 1.199,90 | R$ 160,00 | R$ 265,17 |
+| [32650732940](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/32650732940) | R$ 349,00 | R$ 455,90 | R$ 1.199,90 | R$ 160,00 | R$ 265,17 |
+
+**3/3 runs idênticos entre si e idênticos ao validado localmente** — mesma barra
+usada para Kabum/Terabyte na Sprint 1 (`sprint_v1.md`). Nenhuma das 5 lojas
+apresentou challenge/bloqueio a partir do IP de datacenter do runner — em
+particular a Amazon, que era a maior suspeita de precisar do tratamento estilo
+Pichau, **não precisou**. `todo:214` fechado — as 15 leituras de teste (5 itens ×
+3 runs) e os 5 itens foram removidos do banco ao final via `SUPABASE_SERVICE_KEY`.
 
 ---
 
@@ -390,8 +397,8 @@ manualmente mais cedo na sessão — uma nova aba foi aberta em seguida e a sess
 
 | Status | Qtde | Linhas do `todo` |
 |--------|------|-------------------|
-| ✅ Done | 17 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 216, 218, 220 |
-| ⬜ Todo | 3 | 204 (proposto na Sprint 30), 210 (absorvido pela V3 — ver nota na própria linha), 214 (Sprint 29 implementada e validada localmente — falta só a validação em CI, pendente de push, ver nota no topo) |
+| ✅ Done | 18 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 214, 216, 218, 220 |
+| ⬜ Todo | 2 | 204 (proposto na Sprint 30), 210 (absorvido pela V3 — ver nota na própria linha) |
 | 🟡 Pending | 0 | — |
 
 ## Skills Futuras
