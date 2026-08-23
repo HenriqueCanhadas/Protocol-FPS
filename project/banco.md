@@ -99,6 +99,11 @@ do `main.py`):
 | Kabum | https://www.kabum.com.br | `kabum` |
 | Pichau | https://www.pichau.com.br | `pichau` |
 | Terabyteshop | https://www.terabyteshop.com.br | `terabyteshop` |
+| Tuyo | https://tuyo.com.br | `tuyo` |
+| Playstation | https://store.playstation.com | `playstation` |
+| Logitec | https://www.logitechstore.com.br | `logitec` |
+| Tangle Teezer | https://www.tangleteezer.com.br | `tangleteezer` |
+| Amazon | https://www.amazon.com.br | `amazon` |
 
 ### 3.3 `produtos` — categorias de hardware
 

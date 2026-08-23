@@ -17,8 +17,14 @@
  *   { "acao": "trocar_senha", "user_id": ..., "senha": ... }
  *   { "acao": "listar" }
  *   { "acao": "telegram",     "user_id": ..., "ativo": true|false }
+ *   { "acao": "ver_banco",    "user_id": ..., "ativo": true|false }  (só o dono da conta)
  *   { "acao": "excluir",      "user_id": ... }
  */
+
+// Único email autorizado a liberar/revogar o acesso a /admin (ver_banco) de
+// outra pessoa (Sprint 32b, pedido do usuário) — checagem própria deste
+// endpoint, não é nível de RLS.
+const DONO_EMAIL = "pedrosacanhadas@gmail.com";
 
 async function usuarioDoToken(url, key, accessToken) {
   const resp = await fetch(`${url}/auth/v1/user`, {
@@ -122,8 +128,8 @@ export default async function handler(req, res) {
   const { acao } = body || {};
   const senha = body?.senha || "";
 
-  if (!["criar", "trocar_senha", "listar", "telegram", "excluir"].includes(acao)) {
-    return res.status(400).json({ error: "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram' ou 'excluir')" });
+  if (!["criar", "trocar_senha", "listar", "telegram", "ver_banco", "excluir"].includes(acao)) {
+    return res.status(400).json({ error: "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram', 'ver_banco' ou 'excluir')" });
   }
   if (["criar", "trocar_senha"].includes(acao) && senha.length < 8) {
     return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres." });
@@ -131,16 +137,24 @@ export default async function handler(req, res) {
 
   try {
     if (acao === "listar") {
-      // Perfis (usuarios) — com fallback caso a migração sprint9
-      // (coluna notificar_telegram) ainda não tenha rodado no banco.
+      // Perfis (usuarios) — com fallback caso as migrações sprint9
+      // (notificar_telegram) e/ou sprint32b (ver_banco) ainda não tenham
+      // rodado no banco.
       let telegramOk = true;
+      let verBancoOk = true;
       let perfis;
       try {
         perfis = await supabaseGet(url, key,
-          "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc");
+          "usuarios?select=id,email,nome,nivel,notificar_telegram,ver_banco&order=email.asc");
       } catch {
-        telegramOk = false;
-        perfis = await supabaseGet(url, key, "usuarios?select=id,email,nome,nivel&order=email.asc");
+        verBancoOk = false;
+        try {
+          perfis = await supabaseGet(url, key,
+            "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc");
+        } catch {
+          telegramOk = false;
+          perfis = await supabaseGet(url, key, "usuarios?select=id,email,nome,nivel&order=email.asc");
+        }
       }
 
       // Contagem de itens por dono — paginada (teto de 1000 do PostgREST)
@@ -170,13 +184,14 @@ export default async function handler(req, res) {
           nome:               p.nome ?? null,
           nivel:              p.nivel ?? 1,
           notificar_telegram: telegramOk ? (p.notificar_telegram ?? false) : null,
+          ver_banco:          verBancoOk ? (p.ver_banco ?? false) : null,
           itens:              contagem[p.id] || 0,
           criado_em:          au.created_at || null,
           ultimo_acesso:      au.last_sign_in_at || null,
           confirmado:         Boolean(au.email_confirmed_at),
         };
       });
-      return res.status(200).json({ ok: true, usuarios, telegram_disponivel: telegramOk });
+      return res.status(200).json({ ok: true, usuarios, telegram_disponivel: telegramOk, ver_banco_disponivel: verBancoOk });
     }
 
     if (acao === "telegram") {
@@ -206,6 +221,42 @@ export default async function handler(req, res) {
         throw err;
       }
       return res.status(200).json({ ok: true, notificar_telegram: ativo });
+    }
+
+    if (acao === "ver_banco") {
+      // Só o dono da conta libera/revoga o acesso de outra pessoa a
+      // /admin — checagem própria deste endpoint, não é nível de RLS.
+      const chamador = await supabaseGet(url, key, `usuarios?id=eq.${quem.uid}&select=email`);
+      const emailChamador = (chamador[0]?.email || "").toLowerCase();
+      if (emailChamador !== DONO_EMAIL) {
+        return res.status(403).json({ error: "Permissão negada: só o dono da conta pode liberar o acesso ao banco." });
+      }
+      const userId = String(body?.user_id || "").trim();
+      if (!userId) {
+        return res.status(400).json({ error: "user_id não informado." });
+      }
+      const ativo = Boolean(body?.ativo);
+      const resp = await fetch(`${url}/rest/v1/usuarios?id=eq.${userId}`, {
+        method: "PATCH",
+        headers: {
+          apikey:         key,
+          Authorization:  `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ver_banco: ativo }),
+      });
+      if (!resp.ok) {
+        if (resp.status === 400) {
+          return res.status(400).json({
+            error: "Coluna ver_banco ausente — rode a migração " +
+                   "sprint32b_ver_banco.sql no SQL Editor do Supabase.",
+          });
+        }
+        const err = new Error(await resp.text());
+        err.status = resp.status;
+        throw err;
+      }
+      return res.status(200).json({ ok: true, ver_banco: ativo });
     }
 
     if (acao === "excluir") {

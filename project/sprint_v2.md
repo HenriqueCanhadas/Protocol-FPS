@@ -1,16 +1,25 @@
 # PROTOCOL FPS — Planejamento de Sprints — V2
 
 > Relatório gerado a partir da seção **V2** do arquivo `todo` (raiz do repositório).
-> Data de geração: **14/07/2026** (atualizado após a conclusão da Sprint 14 —
-> ordenação avançada & filtro por dia de coleta, entregue no mesmo dia em que as
-> 2 tarefas entraram no `todo`: linhas 140 e 142). Com a inserção delas, o refino
-> final desceu da linha 140 para a **144**; referências atualizadas. A V2 tem
-> **22 tarefas**. O antigo plano da Sprint 14 (esgotado + refino juntos) foi
-> redistribuído em três sprints: 14 (ordenação/filtro — ✅), 15 (esgotado × não
-> localizado) e 16 (refino final — por último, como pede o `todo`).
+> Data de geração: **14/07/2026** · **atualizado em 20/08/2026: V2 fechada.**
+> A seção V2 do `todo` hoje contém **20 itens, todos `OK-`** — nenhuma linha `-`/
+> `Pending-` restante nela. As duas tarefas que este relatório ainda listava como
+> em aberto foram resolvidas fora da V2:
+> - **Sprint 15 (esgotado × não localizado):** nunca voltou a existir como linha
+>   própria da V2 — o pedido foi replanejado como item solto na seção **V4** do
+>   `todo` e hoje é a proposta de **Sprint 27** em `sprint_v4.md` (ainda `⬜ Todo`).
+> - **Sprint 16 (refino final: cards do topo & alertas recentes):** confirmado
+>   absorvido pela reestruturação da Dashboard na **V3** (`sprint_v3.md`, Sprints
+>   19 e 22) — nota já registrada abaixo desde a geração de 18/08/2026.
+>
+> Com isso a V2 está **congelada/histórica**, no mesmo estado de fechamento da V1
+> — segue [`CLAUDE.md`](../CLAUDE.md): "V1-V3 são congeladas; V4 é o plano ativo".
 > **Correção de auditoria (geração de 08/07, mantida):** os itens das linhas 134
 > e 136 estavam fora do plano original por referência de linha trocada — o 134
-> foi entregue na Sprint 12 e o 136 segue planejado (hoje na Sprint 15).
+> foi entregue na Sprint 12 e o 136 é a linha do menor preço (também Sprint 12);
+> não há relação com a tarefa de "esgotado × não localizado" da Sprint 15, cuja
+> referência `todo:136` era apenas o placeholder herdado desse mesmo erro de
+> numeração original — corrigido nesta atualização (ver Sprint 15 abaixo).
 > Início do planejamento: **08/07/2026**.
 > A V1 (Sprints 0–7, concluída em 05/07/2026) está em [`sprint_v1.md`](sprint_v1.md);
 > a numeração aqui **continua de onde a V1 parou** (Sprint 8 em diante).
@@ -39,14 +48,16 @@
 | Sprint 12 | Edição de produto & menor preço | 08/07 (concluída) | 1 | 4 ✅ |
 | Sprint 13 | Sessão & conta | 08/07 (concluída) | 1 | 2 ✅ |
 | Sprint 14 | Ordenação avançada & filtro por data de coleta | 14/07 (concluída) | 1 | 2 ✅ |
-| Sprint 15 | Esgotado × não localizado | 15/07 – 17/07 | 3 | 1 ⬜ |
-| Sprint 16 | Refino final: cards do topo & alertas recentes | 20/07 – 21/07 | 2 | 1 ⬜ |
+| Sprint 15 | Esgotado × não localizado | ⤴ movida p/ V4 (Sprint 27, `sprint_v4.md`) | — | 0 (era 1 ⬜) |
+| Sprint 16 | Refino final: cards do topo & alertas recentes | ⤴ absorvida pela V3 (Sprints 19/22, `sprint_v3.md`) | — | 0 (era 1 ⬜) |
 
-**Total da V2:** 22 tarefas · **20 concluídas** (Sprints 8, 9 e 10 em 07/07;
-Sprints 11, 12 e 13 em 08/07; Sprint 14 em 14/07) · **2 a fazer** · 0 pendentes.
-Com a Sprint 14 fechada em 1 dia (contra 2 planejados), as Sprints 15 e 16
-adiantam: a 15 fecha na sexta 17/07 e a 16 (refino por último, por exigência do
-`todo` — "apenas no final") fica para 20–21/07, após o fim de semana.
+**Total da V2:** 20 tarefas na seção do `todo`, **20/20 concluídas** (Sprints 8, 9
+e 10 em 07/07; Sprints 11, 12 e 13 em 08/07; Sprint 14 em 14/07) · 0 a fazer ·
+0 pendentes — **V2 fechada em 20/08/2026**. As Sprints 15 e 16, que este relatório
+mantinha como planejadas dentro da V2, nunca chegaram a virar linhas `-` na seção
+V2 do `todo`: a 16 foi absorvida pela reestruturação da V3 e a 15 foi replanejada
+como item solto na V4 (proposta de Sprint 27) — nenhuma das duas soma mais no
+total desta versão.
 
 ---
 
@@ -158,27 +169,36 @@ SPA com Playwright (usuário e2e admin temporário, removido no fim).
 
 ---
 
-## Sprint 15 — Esgotado × não localizado (15/07 – 17/07)
+## Sprint 15 — Esgotado × não localizado ⤴ MOVIDA PARA A V4
 
-Foco: fechar a lógica de disponibilidade (item herdado da auditoria do plano) —
-distinguir "esgotado de fato na loja" de "página fora do ar / produto não localizado".
-Mexe no contrato `DadosProduto` + 3 scrapers + coletor e reflete na UI; 3 dias úteis
-(quarta a sexta).
+> **20/08/2026: movida para `project/sprint_v4.md`.** Este item nunca chegou a
+> virar uma linha `-` própria dentro da seção V2 do `todo` (a referência
+> `todo:136` era um placeholder herdado do erro de numeração já registrado no
+> cabeçalho deste arquivo). O pedido de distinguir "esgotado de fato" de
+> "não localizado/erro de página" segue em aberto, mas hoje mora na seção **V4**
+> do `todo` como item solto (`-Ajustar uma logica caso o produto nao tenha sido
+> localizado ou se ele esta esgotado...`) e está agrupado na proposta de
+> **Sprint 27** de `sprint_v4.md`. Não reimplementar isto isoladamente aqui —
+> seguir `sprint_v4.md`.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S15 · Informar esgotado × não localizado (todo:136) | Um produto com página fora do ar / não localizado é informado como tal, distinto de "realmente esgotado" na loja | ⬜ Todo | Hoje o scraper devolve `disponivel=false` sem separar "esgotado de fato" de "não localizado/erro de página" (e sem preço nada é salvo). Definir a distinção no `DadosProduto`/scrapers (o out-of-stock já é decidido antes do preço; challenge/manutenção detectados em `_detectar_challenge`) e refletir no status da UI ("ESGOTADO" × "NÃO LOCALIZADO"); se precisar de coluna nova em `historico_precos`, migração versionada em `project/migrations/` |
+| S15 · Informar esgotado × não localizado | — | ⤴ Movida | Ver `sprint_v4.md`, Sprint 27 (proposta) |
 
 ---
 
-## Sprint 16 — Refino final: cards do topo & alertas recentes (20/07 – 21/07)
+## Sprint 16 — Refino final: cards do topo & alertas recentes ⤴ ABSORVIDA PELA V3
 
-Foco: o acabamento visual — executa **somente após as demais sprints**, como pede o
-`todo` ("apenas no final").
+> **18/08/2026: absorvida por `project/sprint_v3.md`.** O pedido de reestruturar a
+> Dashboard inteira com base no protótipo de `project/project-complete.zip`
+> reconstrói exatamente esta área (KpiRibbon na Sprint 19, seção de Alertas na
+> Sprint 22) — manter esta sprint separada duplicaria o trabalho. `todo:144`
+> passou a `todo:148` (linhas inseridas depois) e está anotado no `todo` como
+> absorvido. Não regenerar/reimplementar isto isoladamente — seguir `sprint_v3.md`.
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S16 · Ajustar cards do topo e alertas recentes (todo:144) | Revisar a faixa superior (Itens monitorados · Abaixo da meta · Menor preço hoje · Última coleta) e a seção inferior (Alertas recentes / "Nenhum alerta disparado hoje") com o visual aprovado pelo usuário | ⬜ Todo | Cards e seção de alertas refinados por último, já refletindo tudo que a V2 mudou (novos usuários, categoria Diversos, alertas por dono, menor preço histórico, status esgotado/não localizado); detalhes do ajuste a definir com o usuário no início da sprint |
+| S16 · Ajustar cards do topo e alertas recentes (todo:148) | — | ⤴ Absorvida | Ver `sprint_v3.md`, Sprints 19 (KpiRibbon) e 22 (Alertas recentes) |
 
 ---
 
@@ -186,9 +206,11 @@ Foco: o acabamento visual — executa **somente após as demais sprints**, como 
 
 | Status | Qtde | Itens (linha no `todo`) |
 |--------|------|--------------------------|
-| ✅ Done | 20 | 102,104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,138,140,142 |
+| ✅ Done | 20 | 102,104,106,108,110,112,114,116,118,120,122,124,126,128,130,132,134,136,138,140 |
 | 🟡 Pending | 0 | — |
-| ⬜ Todo | 2 | 136,144 |
+| ⬜ Todo | 0 | — (Sprint 15 movida p/ V4 · Sprint 16 absorvida p/ V3 — nenhuma das duas soma na V2) |
+
+**V2 fechada em 20/08/2026** — 20/20 itens da seção concluídos, 0 pendentes.
 
 > **Sprint 8 concluída em 07/07/2026** (1 dia, contra 5 planejados): categoria
 > DIVERSOS + migração dos dados legados Kabum (23 itens, 2.691 leituras reais) com
@@ -238,8 +260,10 @@ Foco: o acabamento visual — executa **somente após as demais sprints**, como 
 > RLS (item alheio intocável, snapshot íntegro) + fluxo completo da UI 7/7 com
 > Playwright (renomear e reclassificar de ponta a ponta, com screenshots).
 > Auditoria do plano: itens das linhas 134 e 136 do `todo` estavam fora do
-> relatório (referências trocadas) — 134 entregue nesta sprint; 136 replanejado
-> (hoje na Sprint 15).
+> relatório (referências trocadas) — 134 entregue nesta sprint; 136 é a linha
+> do menor preço (também entregue aqui). A tarefa de "esgotado × não localizado"
+> (então chamada Sprint 15) nunca teve linha própria na V2 — hoje é a proposta
+> de Sprint 27 em `sprint_v4.md`.
 >
 > **Sprint 13 concluída em 08/07/2026** (todo:120/122 ✅, 1 dia contra 2
 > planejados): Conta sem troca de senha própria (aviso azul neutro, `--blue`

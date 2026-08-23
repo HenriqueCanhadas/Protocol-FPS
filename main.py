@@ -23,9 +23,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from utils.supabase_client import get_supabase
-from scrapers.kabum    import KabumScraper
-from scrapers.terabyte import TerabyteScraper
-from scrapers.pichau   import PichauScraper
+from scrapers.kabum        import KabumScraper
+from scrapers.terabyte     import TerabyteScraper
+from scrapers.pichau       import PichauScraper
+from scrapers.tuyo         import TuyoScraper
+from scrapers.playstation  import PlaystationScraper
+from scrapers.logitec      import LogitecScraper
+from scrapers.tangleteezer import TangleteezerScraper
+from scrapers.amazon       import AmazonScraper
 from notificacoes.email    import enviar_email
 from notificacoes.telegram import enviar_telegram
 
@@ -162,6 +167,11 @@ SCRAPERS = {
     "kabum":        KabumScraper,
     "terabyteshop": TerabyteScraper,
     "pichau":       PichauScraper,
+    "tuyo":         TuyoScraper,
+    "playstation":  PlaystationScraper,
+    "logitec":      LogitecScraper,
+    "tangleteezer": TangleteezerScraper,
+    "amazon":       AmazonScraper,
 }
 
 logger = logging.getLogger("main")

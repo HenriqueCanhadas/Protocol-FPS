@@ -56,6 +56,17 @@ body::before {
   pointer-events: none; z-index: 9999;
 }
 
+/* ── BARRA DE ROLAGEM ───────────────────────────────────────── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--green-dim) var(--bg2);
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--green-dim); border: 2px solid var(--bg2); }
+::-webkit-scrollbar-thumb:hover { background: var(--green); }
+::-webkit-scrollbar-corner { background: var(--bg2); }
+
 /* ── UTILITÁRIOS ────────────────────────────────────────────── */
 .glow    { text-shadow: 0 0 16px var(--green), 0 0 32px var(--green-dim); }
 .hidden  { display: none !important; }
