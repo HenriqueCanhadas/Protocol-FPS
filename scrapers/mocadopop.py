@@ -14,29 +14,54 @@ Amazon): a página do produto principal e os carrosséis de "produtos
 relacionados" reusam as MESMAS classes de preço/botão (`.preco-promocional`,
 `.desconto-a-vista`, `.botao-comprar.principal`) — um `query_selector` sem
 escopo pega o primeiro da UNIÃO da página inteira, que pode ser de um
-produto relacionado, não do produto sendo coletado (confirmado ao vivo: sem
-escopo, o preco-promocional retornado batia com um produto errado). A
-correcao é escopar toda extração dentro de `div.span12.produto` —
-container único por página (confirmado `count == 1`) que embrulha o bloco
-do produto principal; mesmo dentro dele ainda há múltiplos matches (algum
-carrossel também mora lá dentro), mas o PRIMEIRO nessa escopagem bateu
-corretamente em 3/3 produtos testados (inclusive batendo com o preço Pix já
-registrado no histórico legado do dia).
+produto relacionado, não do produto sendo coletado.
+
+**Bug real encontrado em produção e corrigido nesta sprint (reportado pelo
+usuário ao comparar com o preço real do site, 25/08/2026):** a 1ª versão
+deste scraper escopava a extração em `div.span12.produto` — parecia
+suficiente (`count == 1`, e bateu em 7 de 9 produtos testados na 1ª rodada),
+mas **carrosséis de relacionados moram DENTRO desse mesmo container**, mais
+abaixo na página. Para a maioria dos produtos isso não importava, porque o
+preço do PRÓPRIO produto vem primeiro no DOM. Mas em produtos com preço
+"sob consulta" (ver abaixo) o bloco do próprio produto não tem NENHUM
+elemento de preço — então o `query_selector` "vazava" escopo e pegava o
+primeiro preço de um card de carrossel mais abaixo, um valor de OUTRO
+produto, sem dar nenhum sinal de erro (confirmado ao vivo com o navegador
+real: a Evangelion Eva Unit 01 747 e a LoL Dj Sona Concussive 08 mostram
+"Consulte o preço" na página de verdade, mas o scraper antigo reportava
+R$ 899,91 e R$ 89,91 respectivamente — coincidindo por acaso com valores já
+existentes no histórico legado, o que mascarou o bug na validação inicial).
+Corrigido escopando em `div.principal.geral` — o container que agrupa
+título (`h1.nome-produto`) e bloco de preço/compra do produto sendo
+coletado, ANTES de onde os carrosséis de relacionados começam
+(`count == 1`, confirmado nos 9 produtos legados, incluindo os 2 casos
+"sob consulta" onde agora corretamente não acha preço nenhum).
 
 - Nome: `.nome-produto` (h1) dentro do escopo.
 - Preço: `.desconto-a-vista` — o preco à vista no Pix (ex. "R$ 89,91 via
   Pix", às vezes com uma linha extra "Economize: R$ X" — por isso a extração
   usa regex pra pegar só o primeiro valor "R$ ...", nunca o texto inteiro do
   elemento). É o mesmo valor que o scraper legado do projeto `Monitoramento`
-  vinha registrando (confirmado batendo nos 3 produtos testados) — mantém
+  vinha registrando para os produtos com preço publicado (confirmado
+  batendo em 7/9 produtos reais, após a correção de escopo acima) — mantém
   continuidade da série histórica migrada. Fallback: `.preco-promocional`
   (tem o atributo numérico limpo `data-sell-price`, sem precisar parsear
   texto) e, por último, `.preco-venda` (preço de tabela, sem desconto).
+- **Preço "sob consulta"**: alguns produtos (confirmado em 2 dos 9 legados —
+  ambos com a badge "Item raro"/"Encomenda") não têm NENHUM dos três
+  elementos de preço acima — a loja mostra um botão "Consulte o preço" em
+  vez de vender diretamente. Sem escopo vazando (ver bug acima), isso já
+  resulta naturalmente em `preco=None`; como não está esgotado
+  (`#avise-me-cadastro` não aparece — o produto está disponível, só sem
+  preço público), o resultado correto é `encontrado=False` ("não
+  localizado"), nunca um preço inventado. Detectado explicitamente via
+  `.preco-produto` (texto contém "consulte") só para deixar o log claro
+  sobre a causa.
 - Disponibilidade: `#avise-me-cadastro` (id único na página, confirmado) é o
   formulário "Ops! Esse produto encontra-se indisponível" — sempre presente
   no HTML mas com `style="display:none"` quando o produto está disponível, e
-  visível via JS quando esgotado. **Não confirmado ao vivo** (os 9 produtos
-  legados testados estavam todos disponíveis hoje) — mesmo precedente já
+  visível via JS quando esgotado. **Não confirmado ao vivo** (nenhum dos 9
+  produtos legados testados estava esgotado) — mesmo precedente já
   documentado no scraper da Amazon: mantém como segurança extra uma
   varredura por palavras-chave.
 """
@@ -49,14 +74,16 @@ from .base import ScraperBase, DadosProduto
 
 logger = logging.getLogger(__name__)
 
-SELETOR_ESCOPO = "div.span12.produto"
+SELETOR_ESCOPO = "div.principal.geral"
 SELETOR_NOME = ".nome-produto"
 SELETOR_PRECO_PIX = ".desconto-a-vista"
 SELETOR_PRECO_PROMO = ".preco-promocional"
 SELETOR_PRECO_DE = ".preco-venda"
+SELETOR_PRECO_PRODUTO = ".preco-produto"
 SELETOR_AVISE_ME = "#avise-me-cadastro"
 
 _INDISPONIVEL_KW = ("esgotado", "indisponível", "indisponivel", "fora de estoque")
+_SOB_CONSULTA_KW = "consulte"
 
 _RE_PRECO = re.compile(r"R\$\s*[\d.,]+")
 
@@ -88,7 +115,10 @@ class MocadopopScraper(ScraperBase):
             return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
 
         if preco is None:
-            logger.warning("Preço não encontrado na Mocadopop: %s", url)
+            if self._esta_sob_consulta(escopo):
+                logger.info("Preço sob consulta na Mocadopop (loja não publica preço): %s", nome)
+            else:
+                logger.warning("Preço não encontrado na Mocadopop: %s", url)
             return DadosProduto(nome=nome, preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Mocadopop: R$ %.2f", preco)
@@ -158,6 +188,16 @@ class MocadopopScraper(ScraperBase):
         except Exception:
             pass
         return None
+
+    def _esta_sob_consulta(self, escopo) -> bool:
+        try:
+            if escopo:
+                el = escopo.query_selector(SELETOR_PRECO_PRODUTO)
+                if el and _SOB_CONSULTA_KW in el.inner_text().lower():
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _esta_esgotado(self, page: Page) -> bool:
         try:
