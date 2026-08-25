@@ -93,6 +93,7 @@ const LOJAS_DETECTADAS = {
   "amazon.com.br":         "amazon",
   "shopee.com.br":         "shopee",
   "aliexpress.com":        "aliexpress",
+  "mocadopop.com.br":      "mocadopop",
 };
 // Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
 // Categorias novas (todo, criadas por admin — ver criarCategoria) entram
@@ -103,7 +104,7 @@ const LOJAS_LABEL = {
   kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
   tuyo: "Tuyo", playstation: "Playstation", logitec: "Logitec",
   tangleteezer: "Tangle Teezer", amazon: "Amazon", shopee: "Shopee",
-  aliexpress: "AliExpress",
+  aliexpress: "AliExpress", mocadopop: "Mocadopop",
 };
 // Sprint 42 (V5, todo:239): lojas com limitação estrutural CONHECIDA e
 // documentada (README.md/CLAUDE.md) — o item pode ser cadastrado normalmente,
@@ -112,6 +113,7 @@ const LOJAS_LABEL = {
 const LOJAS_SEM_COLETA = {
   pichau: "A Pichau bloqueia coletas feitas a partir de IP de datacenter — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária (GitHub Actions) este item tende a aparecer como \"não localizado\".",
   shopee: "A Shopee exige login para mostrar o preço — o projeto não consegue coletar essa loja em nenhum ambiente hoje (nem local, nem automático). O item pode ser cadastrado, mas o preço nunca vai atualizar sozinho.",
+  aliexpress: "O AliExpress redireciona a coleta automática (GitHub Actions) para o site americano (aliexpress.us), que não carrega — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária este item tende a aparecer como \"não localizado\".",
 };
 
 function rotuloCategoria(categoria, nomeDb) {

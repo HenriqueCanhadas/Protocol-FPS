@@ -2,10 +2,10 @@
 
 **Monitor de preços para lojas brasileiras** — coleta diária automatizada de preços
 na **KaBuM**, **Terabyteshop**, **Pichau**, **Tuyo**, **Playstation Store**,
-**Logitech Store**, **Tangle Teezer** e **Amazon** (a Shopee está registrada no
-código mas não coleta em nenhum ambiente — ver limitação conhecida abaixo),
-histórico no Supabase e alertas por **Email + Telegram** quando o preço cai ou
-fura a meta que você definiu.
+**Logitech Store**, **Tangle Teezer** e **Amazon** (a Shopee e o AliExpress estão
+registrados no código mas não coletam de forma confiável em CI — ver limitação
+conhecida abaixo), histórico no Supabase e alertas por **Email + Telegram** quando
+o preço cai ou fura a meta que você definiu.
 
 > Coletor em Python (Playwright + stealth) rodando no GitHub Actions · SPA em React
 > hospedada na Vercel · banco e autenticação no Supabase · **multiusuário com papel
@@ -65,6 +65,23 @@ sessão logada persistida, não há tentativa que funcione. O scraper
 `disponivel=False`/sem preço (nunca um falso "esgotado") em poucos segundos, mas
 fica registrado como não-operante até (se algum dia fizer sentido) o projeto
 suportar sessão autenticada persistida — fora do escopo atual.
+
+O **AliExpress** (Sprint 47) tem um terceiro mecanismo de bloqueio, diferente dos
+dois acima: localmente a URL de teste (`pt.aliexpress.com`) carrega normal — JSON-LD
+`Product` limpo, preço em BRL batendo com o visível na página (`R$29,56`),
+disponibilidade correta — validado **local, headless=True e headless=False**. Mas
+no CI (IP de datacenter do GitHub Actions) o AliExpress **redireciona a mesma URL
+para `www.aliexpress.us`** (domínio da vitrine americana, com um id de item
+diferente) por geolocalização de IP, e essa página não chega a renderizar dentro do
+timeout (`título=''`) — confirmado **3/3** via `workflow_dispatch loja=aliexpress`.
+Não é um rate-limit (onde retry com backoff ajudaria, padrão Pichau): é um
+redirecionamento estrutural por região do próprio AliExpress, então o IP do runner
+continua sendo dos EUA em qualquer tentativa. O scraper (`scrapers/aliexpress.py`)
+não faz nenhuma tentativa de contornar isso — quando o JSON-LD/CSS não é
+encontrado, retorna `encontrado=False` (marcado como "não localizado", nunca um
+falso "esgotado"), mesmo comportamento já usado pela Amazon/Shopee. A loja fica
+registrada em `SCRAPERS`/`lojas`/no cadastro do frontend, mas a coleta automática
+diária só vai funcionar de fato quando rodada localmente.
 
 ---
 

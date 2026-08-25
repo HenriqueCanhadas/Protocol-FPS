@@ -104,6 +104,9 @@ do `main.py`):
 | Logitec | https://www.logitechstore.com.br | `logitec` |
 | Tangle Teezer | https://www.tangleteezer.com.br | `tangleteezer` |
 | Amazon | https://www.amazon.com.br | `amazon` |
+| Shopee | https://shopee.com.br | `shopee` |
+| Aliexpress | https://pt.aliexpress.com | `aliexpress` |
+| Mocadopop | https://www.mocadopop.com.br | `mocadopop` |
 
 ### 3.3 `produtos` — categorias de hardware
 

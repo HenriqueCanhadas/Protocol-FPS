@@ -109,7 +109,7 @@ it exists to mirror the Vercel rewrite in dev.
 3. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
    that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
    (`kabum`/`terabyteshop`/`pichau`/`tuyo`/`playstation`/`logitec`/`tangleteezer`/
-   `amazon`/`shopee`) and/or owner (`itens.user_id`). Combinable. The
+   `amazon`/`shopee`/`aliexpress`/`mocadopop`) and/or owner (`itens.user_id`). Combinable. The
    category/store filters run in Python; the user filter is in the PostgREST query.
    The SPA sends `user_id` automatically for a non-admin "collect all" with no filters
    (Sprint 9); admins and the cron stay global.
@@ -195,6 +195,23 @@ redirect — the page stayed at `título=''` for the full 40s timeout, i.e. the
 runner's datacenter IP gets an even more silent block than a local dev IP. Don't
 treat a Shopee failure in Actions logs as a scraper regression, and don't spend
 time trying to make it work harder without a persisted session.
+
+**Known limitation — AliExpress redirects to a different country domain in CI
+(Sprint 47)**: `scrapers/aliexpress.py` works correctly locally — validated
+headless=True and headless=False against the test URL (`pt.aliexpress.com`),
+matching the real page exactly (JSON-LD `Product`, R$29,56, `disponivel=True`).
+In CI (GitHub Actions datacenter IP), AliExpress's own geo-IP routing redirects
+the same `pt.aliexpress.com` URL to `www.aliexpress.us` (a different item id, the
+US storefront) and that page never finishes rendering within the timeout
+(`título=''`) — confirmed **3/3** via `workflow_dispatch loja=aliexpress` on
+`Duplicate-Main`. Unlike Pichau (an IP-based rate-limit, where retry/backoff can
+outrun it), this is a structural region redirect tied to the runner's IP
+geolocation — no amount of retrying changes which country that IP resolves to.
+The scraper doesn't attempt to work around it: when JSON-LD/CSS extraction comes
+up empty, it returns `encontrado=False` ("não localizado"), never a false
+"esgotado". The `aliexpress` slug is registered in `SCRAPERS` (`main.py`) and in
+`lojas` (Supabase) — items can be added normally — but the daily CI cron won't be
+able to collect this store; it only works run locally.
 
 ## Commands
 
