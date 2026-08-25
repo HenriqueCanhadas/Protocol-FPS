@@ -106,6 +106,16 @@ class MocadopopScraper(ScraperBase):
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
         escopo = page.query_selector(SELETOR_ESCOPO)
 
+        try:
+            n_escopo = page.eval_on_selector_all(SELETOR_ESCOPO, "els => els.length")
+            preco_produto_texto = escopo.query_selector(SELETOR_PRECO_PRODUTO).inner_text()[:80] if escopo and escopo.query_selector(SELETOR_PRECO_PRODUTO) else None
+            logger.warning(
+                "[DEBUG-TEMP] n_escopo=%s escopo_existe=%s preco_produto_texto=%r",
+                n_escopo, escopo is not None, preco_produto_texto,
+            )
+        except Exception as exc:
+            logger.warning("[DEBUG-TEMP] erro ao coletar debug: %s", exc)
+
         nome = self._extrair_nome(page, escopo)
         preco = self._extrair_preco(escopo)
         esgotado = self._esta_esgotado(page)
