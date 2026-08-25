@@ -44,6 +44,7 @@ export const LOJAS_FILTER = [
   { key: "tangleteezer", label: "Tangle Teezer",slug: "tangleteezer" },
   { key: "amazon",       label: "Amazon",       slug: "amazon"       },
   { key: "shopee",       label: "Shopee",       slug: "shopee"       },
+  { key: "aliexpress",   label: "AliExpress",   slug: "aliexpress"   },
 ];
 
 /**
