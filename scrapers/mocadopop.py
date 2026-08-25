@@ -37,6 +37,24 @@ coletado, ANTES de onde os carrosséis de relacionados começam
 (`count == 1`, confirmado nos 9 produtos legados, incluindo os 2 casos
 "sob consulta" onde agora corretamente não acha preço nenhum).
 
+**2º bug real, encontrado em CI logo depois de corrigir o 1º (mesmo dia):**
+`div.principal.geral` funcionou 100% em teste local, mas o `workflow_dispatch`
+real (runner do GitHub Actions) voltou **NÃO LOCALIZADO nos 9/9 itens**, de
+forma sistemática em 2 runs seguidos — e simular o mesmo ambiente localmente
+(`GITHUB_ACTIONS=true`, mesmos timeouts/flags do Chromium) funcionava
+perfeitamente, o que descartou timing/flags como causa. Debug temporário
+direto no CI (removido depois de confirmado) revelou a causa: o elemento
+ainda existe, mas com **uma classe a menos** — no runner, o ancestral do
+bloco de preço é `<div class="principal">`, sem a `geral` que aparece
+sempre no ambiente local. Não há indício de bloqueio (título da página
+sempre correto) nem de geolocalização (mesmo domínio `.com.br`, sem
+redirecionamento) — a classe `geral` parece vir de alguma personalização/
+experimento do lado do servidor que às vezes não é aplicada (não foi
+possível confirmar a causa exata sem acesso ao backend da loja). Corrigido
+trocando o escopo para `div.principal` (sem exigir `geral`) — continua
+único por página (`count == 1`, reconfirmado) e não depende dessa classe
+instável.
+
 - Nome: `.nome-produto` (h1) dentro do escopo.
 - Preço: `.desconto-a-vista` — o preco à vista no Pix (ex. "R$ 89,91 via
   Pix", às vezes com uma linha extra "Economize: R$ X" — por isso a extração
@@ -74,7 +92,7 @@ from .base import ScraperBase, DadosProduto
 
 logger = logging.getLogger(__name__)
 
-SELETOR_ESCOPO = "div.principal.geral"
+SELETOR_ESCOPO = "div.principal"
 SELETOR_NOME = ".nome-produto"
 SELETOR_PRECO_PIX = ".desconto-a-vista"
 SELETOR_PRECO_PROMO = ".preco-promocional"
@@ -105,26 +123,6 @@ class MocadopopScraper(ScraperBase):
 
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
         escopo = page.query_selector(SELETOR_ESCOPO)
-
-        try:
-            diag = page.evaluate("""() => {
-                const infoPrincipal = document.querySelector('.info-principal-produto');
-                let ancestrais = [];
-                let cur = infoPrincipal ? infoPrincipal.parentElement : null;
-                for (let i = 0; i < 5 && cur; i++) {
-                    ancestrais.push(cur.tagName + '.' + (cur.className || '').toString().replace(/\\s+/g, '.'));
-                    cur = cur.parentElement;
-                }
-                return {
-                    bodyLen: document.body.innerHTML.length,
-                    temPrincipalGeral: !!document.querySelector('div.principal.geral'),
-                    temInfoPrincipal: !!infoPrincipal,
-                    ancestraisDoInfoPrincipal: ancestrais,
-                };
-            }""")
-            logger.warning("[DEBUG-TEMP] diag=%r", diag)
-        except Exception as exc:
-            logger.warning("[DEBUG-TEMP] erro ao coletar debug: %s", exc)
 
         nome = self._extrair_nome(page, escopo)
         preco = self._extrair_preco(escopo)
