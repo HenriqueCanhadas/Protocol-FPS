@@ -107,16 +107,21 @@ class MocadopopScraper(ScraperBase):
         escopo = page.query_selector(SELETOR_ESCOPO)
 
         try:
-            diag = page.evaluate("""() => ({
-                bodyLen: document.body.innerHTML.length,
-                temH1NomeProduto: !!document.querySelector('.nome-produto'),
-                temInfoPrincipal: !!document.querySelector('.info-principal-produto'),
-                temRowFluid: !!document.querySelector('.row-fluid'),
-                temPrecoProduto: !!document.querySelector('.preco-produto'),
-                temSpan12Produto: !!document.querySelector('div.span12.produto'),
-                classesBody: document.body.className,
-                bodySnippet: document.body.innerText.slice(0, 300),
-            })""")
+            diag = page.evaluate("""() => {
+                const infoPrincipal = document.querySelector('.info-principal-produto');
+                let ancestrais = [];
+                let cur = infoPrincipal ? infoPrincipal.parentElement : null;
+                for (let i = 0; i < 5 && cur; i++) {
+                    ancestrais.push(cur.tagName + '.' + (cur.className || '').toString().replace(/\\s+/g, '.'));
+                    cur = cur.parentElement;
+                }
+                return {
+                    bodyLen: document.body.innerHTML.length,
+                    temPrincipalGeral: !!document.querySelector('div.principal.geral'),
+                    temInfoPrincipal: !!infoPrincipal,
+                    ancestraisDoInfoPrincipal: ancestrais,
+                };
+            }""")
             logger.warning("[DEBUG-TEMP] diag=%r", diag)
         except Exception as exc:
             logger.warning("[DEBUG-TEMP] erro ao coletar debug: %s", exc)
