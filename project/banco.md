@@ -156,12 +156,18 @@ form de cadastro e na coleta segmentada (`CATEGORIA` do `main.py`):
 |---|---|---|---|---|
 | `id` | `uuid` | não | `gen_random_uuid()` | **PK** |
 | `item_id` | `uuid` | não | — | FK → `itens.id` |
-| `preco` | `numeric` | não | — | preço coletado |
+| `preco` | `numeric` | **sim** (Sprint 41) | — | preço coletado; `null` quando não há preço confirmado |
 | `disponivel` | `boolean` | não | `true` | `false` = esgotado no momento da leitura |
+| `encontrado` | `boolean` | não | `true` (Sprint 41) | `false` = o scraper NÃO confirmou nada sobre o produto (erro, timeout, challenge/bloqueio ou seletor ausente); distinto de `disponivel=false` (esgotamento confirmado) |
 | `coletado_em` | `timestamptz` | não | `now()` | **UTC** (o front converte para America/Sao_Paulo via `utils/datas.js`) |
 
 - Escrita: **somente o coletor** (não há política de INSERT — a SERVICE_KEY ignora RLS).
-  Quando o scraper não obtém preço (esgotado/bloqueado), **nenhuma linha é gravada**.
+  Até a Sprint 41, quando o scraper não obtinha preço (esgotado ou bloqueado),
+  **nenhuma linha era gravada** — nem um esgotamento real chegava a aparecer na
+  Dashboard. Desde a Sprint 41 (`project/migrations/sprint41_status_localizacao.sql`,
+  todo:204) toda leitura vira uma linha, com `encontrado` distinguindo esgotado
+  confirmado (`encontrado=true, disponivel=false, preco=null`) de não localizado
+  (`encontrado=false`).
 - Leitura: frontend (RLS: visível se o item pai é do usuário, ou admin).
 - Remoção pontual (registro específico do histórico): `/api/remover` com `tipo=historico`.
 

@@ -11,19 +11,26 @@
  * useDashboardFilters). Recebe o retorno de useDashboardFilters em `filters`.
  */
 import { useState } from "react";
-import { FILTROS_CAT, CAT_LABEL, LOJAS_FILTER } from "@/pages/Dashboard/Dashboard.constants";
+import { rotuloCategoria, LOJAS_FILTER } from "@/pages/Dashboard/Dashboard.constants";
 import SearchDialog from "@/pages/Dashboard/dialogs/SearchDialog";
 
+// Sprint 50 (todo:256): ganhou loja/categoria/status — mesmos critérios que
+// o clique no cabeçalho da coluna da tabela agora também aciona (ver
+// ProductTable/toggleSort) — dropdown e cabeçalho ficam sincronizados por
+// compartilharem o mesmo sortCampo/sortDir de useDashboardFilters.
 const CRITERIOS_ORDENACAO = [
-  ["nome",  "Nome"],
-  ["preco", "Preço Atual"],
-  ["menor", "Menor Preço"],
-  ["meta",  "Meta"],
-  ["data",  "Coleta"],
+  ["nome",      "Nome"],
+  ["loja",      "Loja"],
+  ["categoria", "Categoria"],
+  ["preco",     "Preço Atual"],
+  ["menor",     "Menor Preço"],
+  ["meta",      "Meta"],
+  ["status",    "Status"],
+  ["data",      "Coleta"],
 ];
 
 export default function ControlBar({
-  dados, isAdmin, user, coletando, onColetarClick, filters,
+  dados, categorias, isAdmin, user, coletando, onColetarClick, filters,
   selected, onOpcoes, onRemover,
 }) {
   const [buscaAberta, setBuscaAberta] = useState(false); // controla o pop-up SearchDialog
@@ -70,8 +77,9 @@ export default function ControlBar({
             className={`filter-select${filtro !== "all" ? " active" : ""}`}
             value={filtro} onChange={(e) => setFiltro(e.target.value)}
           >
-            {FILTROS_CAT.map((f) => (
-              <option key={f} value={f}>{CAT_LABEL[f] || f}</option>
+            <option value="all">Todos</option>
+            {categorias.map((c) => (
+              <option key={c.categoria} value={c.categoria}>{rotuloCategoria(c.categoria, c.nome)}</option>
             ))}
           </select>
         </div>

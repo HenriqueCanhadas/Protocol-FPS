@@ -10,19 +10,21 @@
  * SERVICE_KEY; o browser só envia o access_token da sessão do admin.
  */
 import { useState, useEffect, useCallback } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { getSupabase } from "@/services/supabase";
 import { dataHoraBRT } from "@/utils/datas";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
 .nu-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
-.page-wrap { width:min(960px,100%); display:flex; flex-direction:column; gap:2rem; }
-.breadcrumb { display:flex; align-items:center; gap:.6rem; font-size:var(--fs-sm); letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; }
-.breadcrumb a { color:var(--text-dim); text-decoration:none; transition:color .15s; }
-.breadcrumb a:hover { color:var(--green); }
-.page-title { font-family:var(--display); font-size:clamp(2.5rem,7vw,4rem); letter-spacing:.08em; color:var(--green); text-shadow:0 0 24px var(--green-dim); line-height:1; }
-.page-subtitle { font-size:var(--fs-base); color:var(--text-dim); letter-spacing:.1em; margin-top:.4rem; }
+.page-wrap { width:min(1800px,100%); display:flex; flex-direction:column; gap:2rem; }
+
+/* esquerda (listagem, mais larga) + direita (criar usuário / trocar senha) —
+   mesmo corte de 1100px/2rem de gap já usado no .dash-grid do Dashboard
+   (Sprint 21) e no .admin-grid do Admin (Sprint 46) */
+.nu-grid { display:grid; grid-template-columns:minmax(0,1fr) 460px; gap:2rem; align-items:start; }
+.nu-content { display:flex; flex-direction:column; gap:2rem; min-width:0; }
+.nu-sidebar { display:flex; flex-direction:column; gap:2rem; position:sticky; top:1.75rem; }
 
 .form-card { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); position:relative; }
 .form-card::before { content:attr(data-label); position:absolute; top:-1px; left:1.75rem; background:var(--bg2); color:var(--green-dim); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
@@ -72,6 +74,11 @@ const css = `
 .btn-excluir:hover:not(:disabled) { border-color:var(--red); background:rgba(255,60,60,.08); }
 .btn-excluir:disabled { opacity:.35; cursor:not-allowed; }
 .users-empty { padding:1.5rem; color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.08em; }
+
+@media (max-width:1100px) {
+  .nu-grid { grid-template-columns:1fr; }
+  .nu-sidebar { position:static; }
+}
 
 @media (max-width:640px) {
   .nu-main { padding:1.25rem 1rem; }
@@ -281,14 +288,55 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
 
       <main className="nu-main">
         <div className="page-wrap">
-          <nav className="breadcrumb">
-            <Link to="/">Dashboard</Link>
-            <span>›</span><span>Usuários</span>
-          </nav>
+          <div className="nu-grid">
+          <div className="nu-content">
+          {/* CRIAR USUÁRIO — acima da listagem (Sprint 53b, pedido do usuário) */}
+          <div className="form-card" data-label="CRIAR USUÁRIO">
+            <div className="form-body">
+              <div className="field-group">
+                <div className="field-label">Email <span className="red">*</span></div>
+                <input className="field-input" type="email" placeholder="usuario@email.com"
+                  autoComplete="off" value={email}
+                  onChange={(e) => { setEmail(e.target.value); setErros((x) => ({ ...x, email: null })); }} />
+                {erros.email && <div className="field-error">{erros.email}</div>}
+              </div>
 
-          <div>
-            <div className="page-title">USUÁRIOS</div>
-            <div className="page-subtitle">Gestão de acesso — visível apenas para administradores</div>
+              <div className="fields-grid cols-2">
+                <div className="field-group">
+                  <div className="field-label">Senha <span className="red">*</span></div>
+                  <input className="field-input" type="password" placeholder="••••••••"
+                    autoComplete="new-password" value={senha}
+                    onChange={(e) => { setSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
+                  <div className="field-hint">Mínimo 8 caracteres</div>
+                </div>
+                <div className="field-group">
+                  <div className="field-label">Confirmar senha <span className="red">*</span></div>
+                  <input className="field-input" type="password" placeholder="••••••••"
+                    autoComplete="new-password" value={confSenha}
+                    onChange={(e) => { setConfSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
+                  {erros.senha && <div className="field-error">{erros.senha}</div>}
+                </div>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Papel <span className="red">*</span></div>
+                <div className="papel-chips">
+                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}>
+                    <span>Usuário padrão</span>
+                    <span className="pc-sub">Vê e gerencia apenas os próprios itens</span>
+                  </div>
+                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}>
+                    <span>Admin</span>
+                    <span className="pc-sub">Vê os itens de todos e gerencia usuários</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="btn-primary" onClick={criar} disabled={criando}>
+                {criando ? "CRIANDO..." : "CRIAR USUÁRIO"}
+              </button>
+            </div>
           </div>
 
           {/* LISTAGEM */}
@@ -379,57 +427,11 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
               </div>
             )}
           </div>
-
-          {/* CRIAR USUÁRIO */}
-          <div className="form-card" data-label="CRIAR USUÁRIO">
-            <div className="form-body">
-              <div className="field-group">
-                <div className="field-label">Email <span className="red">*</span></div>
-                <input className="field-input" type="email" placeholder="usuario@email.com"
-                  autoComplete="off" value={email}
-                  onChange={(e) => { setEmail(e.target.value); setErros((x) => ({ ...x, email: null })); }} />
-                {erros.email && <div className="field-error">{erros.email}</div>}
-              </div>
-
-              <div className="fields-grid cols-2">
-                <div className="field-group">
-                  <div className="field-label">Senha <span className="red">*</span></div>
-                  <input className="field-input" type="password" placeholder="••••••••"
-                    autoComplete="new-password" value={senha}
-                    onChange={(e) => { setSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
-                  <div className="field-hint">Mínimo 8 caracteres</div>
-                </div>
-                <div className="field-group">
-                  <div className="field-label">Confirmar senha <span className="red">*</span></div>
-                  <input className="field-input" type="password" placeholder="••••••••"
-                    autoComplete="new-password" value={confSenha}
-                    onChange={(e) => { setConfSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
-                  {erros.senha && <div className="field-error">{erros.senha}</div>}
-                </div>
-              </div>
-
-              <div className="field-group">
-                <div className="field-label">Papel <span className="red">*</span></div>
-                <div className="papel-chips">
-                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}>
-                    <span>Usuário padrão</span>
-                    <span className="pc-sub">Vê e gerencia apenas os próprios itens</span>
-                  </div>
-                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}>
-                    <span>Admin</span>
-                    <span className="pc-sub">Vê os itens de todos e gerencia usuários</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="form-actions">
-              <button className="btn-primary" onClick={criar} disabled={criando}>
-                {criando ? "CRIANDO..." : "CRIAR USUÁRIO"}
-              </button>
-            </div>
           </div>
 
-          {/* TROCAR SENHA */}
+          <div className="nu-sidebar">
+          {/* TROCAR SENHA — única card da sidebar (Sprint 53b); largura da
+              sidebar aumentada para caber melhor os 2 campos de senha lado a lado */}
           <div className="form-card card-amber" data-label="ALTERAR SENHA DE USUÁRIO">
             <div className="form-body">
               <div className="field-group">
@@ -470,6 +472,8 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                 {trocando ? "ALTERANDO..." : "ALTERAR SENHA"}
               </button>
             </div>
+          </div>
+          </div>
           </div>
         </div>
       </main>

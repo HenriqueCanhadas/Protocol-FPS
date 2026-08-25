@@ -128,6 +128,7 @@ class TerabyteScraper(ScraperBase):
                 preco=None,
                 disponivel=False,
                 url=url,
+                encontrado=False,
             )
 
         nome = self._extrair_nome(page)
@@ -150,7 +151,7 @@ class TerabyteScraper(ScraperBase):
             logger.warning("[terabyte] Preço não encontrado: %s", url)
             if IS_CI:
                 logger.warning("[terabyte] CI Debug - body snippet: %s", body_snip[:300])
-            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("[terabyte] preço: R$ %.2f | esgotado: %s", preco, esgotado)
         return DadosProduto(

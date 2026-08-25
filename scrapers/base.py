@@ -48,6 +48,11 @@ class DadosProduto:
     preco:      float | None   # None = fora de estoque / não encontrado
     disponivel: bool
     url:        str
+    # Sprint 41 (V5, todo:204): True = a leitura é confirmada (preço OU
+    # esgotamento real detectado na página); False = o scraper NÃO conseguiu
+    # confirmar nada (erro, timeout, challenge/bloqueio ou seletor ausente
+    # mesmo após todos os fallbacks) — distinto de um esgotamento real.
+    encontrado: bool = True
 
 
 # ── Instância de Stealth reutilizável ──────────────────────────────────────────
@@ -130,6 +135,7 @@ class ScraperBase(ABC):
                     preco=None,
                     disponivel=False,
                     url=url,
+                    encontrado=False,
                 )
             finally:
                 browser.close()

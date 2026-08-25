@@ -141,6 +141,7 @@ class PichauScraper(ScraperBase):
                                 preco=None,
                                 disponivel=False,
                                 url=url,
+                                encontrado=False,
                             )
 
                         logger.info("[pichau] Página carregada: '%s'", titulo[:60])
@@ -158,6 +159,7 @@ class PichauScraper(ScraperBase):
                                 preco=None,
                                 disponivel=False,
                                 url=url,
+                                encontrado=False,
                             )
                     finally:
                         browser.close()
@@ -170,10 +172,11 @@ class PichauScraper(ScraperBase):
                         preco=None,
                         disponivel=False,
                         url=url,
+                        encontrado=False,
                     )
 
         # Não deve chegar aqui
-        return DadosProduto(nome="Erro ao coletar", preco=None, disponivel=False, url=url)
+        return DadosProduto(nome="Erro ao coletar", preco=None, disponivel=False, url=url, encontrado=False)
 
     def extrair_dados(self, page: Page, url: str) -> DadosProduto:
         nome = self._extrair_nome(page)
@@ -200,7 +203,7 @@ class PichauScraper(ScraperBase):
 
         if preco is None:
             logger.warning("[pichau] Preço não encontrado: %s", url)
-            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("[pichau] preço: R$ %.2f | disponível: %s", preco, disponivel)
         return DadosProduto(nome=nome, preco=preco, disponivel=disponivel, url=url)

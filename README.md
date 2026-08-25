@@ -51,16 +51,20 @@ validada com múltiplos runs (mesma metodologia usada para KaBuM/Terabyte/Pichau
 ver skill `scraper-nova-loja`); a Amazon é a candidata mais provável a precisar do
 mesmo tratamento da Pichau, dado o histórico conhecido de anti-bot agressivo.
 
-A **Shopee não coleta em nenhum ambiente** (nem local, nem CI): toda visita
-anônima/automatizada é redirecionada via JS para uma parede "Login Necessário"
+A **Shopee não coleta em nenhum ambiente** (confirmado local **e** em CI, por dois
+mecanismos diferentes): localmente, toda visita anônima/automatizada é
+redirecionada via JS para uma parede "Login Necessário"
 (`shopee.com.br/verify/traffic/error`) — confirmado **3/3** com o Playwright real
 do coletor (headless e não-headless), com um `tracking_id` diferente em cada
-tentativa. Diferente da Pichau (rate-limit por IP, onde retry ajuda), aqui é um
-portão de autenticação: sem uma sessão logada persistida, não há tentativa que
-funcione. O scraper (`scrapers/shopee.py`) detecta esse bloqueio honestamente e
-retorna `disponivel=False`/sem preço (nunca um falso "esgotado") em poucos
-segundos, mas fica registrado como não-operante até (se algum dia fizer sentido)
-o projeto suportar sessão autenticada persistida — fora do escopo atual.
+tentativa. No CI (IP de datacenter do runner) o bloqueio é ainda mais silencioso:
+a página nem chega a redirecionar, fica travada sem título por todo o timeout
+(40s) — validado ao vivo via `workflow_dispatch loja=shopee`. Diferente da Pichau
+(rate-limit por IP, onde retry ajuda), aqui é um portão de autenticação: sem uma
+sessão logada persistida, não há tentativa que funcione. O scraper
+(`scrapers/shopee.py`) detecta esse bloqueio honestamente e retorna
+`disponivel=False`/sem preço (nunca um falso "esgotado") em poucos segundos, mas
+fica registrado como não-operante até (se algum dia fizer sentido) o projeto
+suportar sessão autenticada persistida — fora do escopo atual.
 
 ---
 

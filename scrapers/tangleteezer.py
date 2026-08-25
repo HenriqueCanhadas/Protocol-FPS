@@ -74,7 +74,7 @@ class TangleteezerScraper(ScraperBase):
 
         if preco is None:
             logger.warning("Preço não encontrado na Tangle Teezer: %s", url)
-            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Tangle Teezer: R$ %.2f", preco)
         return DadosProduto(nome=nome or "Nome não encontrado", preco=preco, disponivel=True, url=url)

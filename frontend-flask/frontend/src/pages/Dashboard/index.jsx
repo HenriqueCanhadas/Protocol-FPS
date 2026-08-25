@@ -28,12 +28,12 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "@/services/supabase";
-import { buscarItens, removerNoServidor } from "@/services/dashboard.service";
+import { buscarItens, buscarCategorias, removerNoServidor } from "@/services/dashboard.service";
 import { useDashboardFilters } from "@/hooks/useDashboardFilters";
 import { useProductSelection } from "@/hooks/useProductSelection";
 import { dataBRT } from "@/utils/datas";
 import { formatBRL } from "@/utils/format";
-import { CAT_LABEL } from "./Dashboard.constants";
+import { rotuloCategoria, ordenarCategorias } from "./Dashboard.constants";
 
 import ConfirmModal from "@/components/ConfirmModal";
 import ControlBar from "./components/ControlBar";
@@ -214,14 +214,23 @@ const css = `
 
 /* tabela */
 .price-table-wrap { overflow-x:auto; border:1px solid var(--border2); }
-table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:760px; }
-/* Larguras fixas das colunas (Sprint 19: coluna Ações saiu, virou ActionBar) */
-.col-produto { width:45%; }
-.col-loja    { width:17%; }
-.col-preco   { width:20%; }
-.col-status  { width:18%; }
+table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:820px; }
+/* Larguras fixas das colunas (Sprint 19: coluna Ações saiu, virou ActionBar;
+   Sprint 44/V5, todo:243: coluna Categoria nova, tirado espaço de Produto/
+   Loja/Status para caber) */
+.col-produto   { width:40%; }
+.col-loja      { width:15%; }
+.col-categoria { width:12%; }
+.col-preco     { width:18%; }
+.col-status    { width:15%; }
+.td-categoria  { color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.06em; }
 thead { background:var(--bg3); position:sticky; top:0; z-index:2; }
 th { text-align:left; padding:.85rem 1.1rem; font-size:var(--fs-xs); letter-spacing:.25em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border2); white-space:nowrap; }
+/* cabeçalho clicável (Sprint 50/V5, todo:256) — mesmo padrão .sortable/
+   .sort-arrow já usado na tabela "Detalhe por usuário e item" do Admin */
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--green); }
+th .sort-arrow { color:var(--green); margin-left:.3rem; }
 tbody tr { border-bottom:1px solid var(--border); transition:background .15s; cursor:pointer; }
 tbody tr:hover { background:rgba(57,255,20,.025); }
 tbody tr:last-child { border-bottom:none; }
@@ -274,6 +283,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .status-badge.out   { color:var(--text-muted); border-color:var(--border); }
 .status-badge.alert { color:var(--amber); border-color:var(--amber); }
 .status-badge.off   { color:var(--red); border-color:rgba(255,68,68,.4); }
+.status-badge.notfound { color:var(--blue); border-color:var(--blue); }
 .prod-nome-link { color:inherit; text-decoration:none; border-bottom:1px solid transparent; transition:color .15s,border-color .15s; }
 .prod-nome-link:hover { color:var(--green); border-bottom-color:var(--green-dim); }
 /* Sprint 27/V4 (todo:206): URL completa em tooltip ao passar o mouse sobre
@@ -431,8 +441,9 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
   .price-table-wrap td { display:block; padding:0; }
   .price-table-wrap .td-produto { flex:1 1 100%; order:1; min-width:0; }
   .price-table-wrap td:nth-child(2) { order:2; }
-  .price-table-wrap td:nth-child(3) { order:3; margin-left:auto; }
-  .price-table-wrap td:nth-child(4) { order:4; }
+  .price-table-wrap td:nth-child(3) { order:3; }
+  .price-table-wrap td:nth-child(4) { order:4; margin-left:auto; }
+  .price-table-wrap td:nth-child(5) { order:5; }
   /* .price-tooltip (nowrap, sem max-width) ficava invisível mas ainda
      contava no scrollWidth do .price-table-wrap ao extrapolar a largura do
      card — rolagem horizontal "fantasma" reportada pelo usuário no celular
@@ -452,6 +463,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 
 export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [dados,         setDados]         = useState([]);
+  const [categorias,    setCategorias]    = useState([]); // [{ categoria, nome }] — Sprint 45, todo:245
   const [coletando,     setColetando]     = useState(false);
   const [progresso,     setProgresso]     = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem, setHistoricoItem] = useState(null);
@@ -459,8 +471,13 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [diaDetalhe,    setDiaDetalhe]    = useState(null); // CollectionDayDialog (Sprint 21)
   const [confirm,       setConfirm]       = useState(null);
 
+  // Rótulo amigável de uma sigla de categoria, incluindo categorias criadas
+  // depois (Sprint 45) — rotuloCategoria já cai para o nome salvo em
+  // produtos.nome quando não há rótulo fixo conhecido.
+  const rotuloCat = (slug) => rotuloCategoria(slug, categorias.find((c) => c.categoria === slug)?.nome);
+
   const filters = useDashboardFilters({ dados, isAdmin, user });
-  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos } = filters;
+  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos, sortCampo, sortDir, toggleSort } = filters;
 
   // Sprint 19/V3: seleção de linha da ActionBar + navegação por teclado.
   // Desabilitada enquanto qualquer modal está aberto, para não competir com
@@ -486,6 +503,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   useEffect(() => {
     carregarPrecos();
   }, [carregarPrecos]);
+
+  // Categorias cadastradas em `produtos` — fonte dinâmica do filtro de
+  // categoria e do modal "Alterar categoria" (Sprint 45, todo:245), no lugar
+  // do dict estático que não enxergava categorias criadas depois em Novo
+  // Produto. Carrega uma vez; não muda durante a sessão do Dashboard.
+  useEffect(() => {
+    buscarCategorias().then((cats) => setCategorias(ordenarCategorias(cats)));
+  }, []);
 
   // Sem barra de rolagem na página (pedido do usuário): a Dashboard passa a
   // ocupar exatamente a viewport, com a tabela e a sidebar rolando por dentro
@@ -537,7 +562,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       return { item_id: filtroProduto, total: 1, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
     }
     const partes = [];
-    if (filtro !== "all")     partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`);
+    if (filtro !== "all")     partes.push(`categoria ${rotuloCat(filtro)}`);
     if (filtroLoja !== "all") partes.push(`loja ${lojaAtiva?.label}`);
     if (isAdmin && filtroUsuario !== "all") {
       const dono = donos.find((d) => d.id === filtroUsuario);
@@ -614,7 +639,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     const { error } = await sb.from("itens").update({ produto_id: prods[0].id }).eq("id", itemId);
     if (error) { showToast("Erro ao alterar categoria: " + error.message, "error"); return; }
     setAcoesItem(null);
-    showToast(`✓ Categoria alterada para ${CAT_LABEL[categoria] || categoria}.`, "ok");
+    showToast(`✓ Categoria alterada para ${rotuloCat(categoria)}.`, "ok");
     carregarPrecos();
   };
 
@@ -743,6 +768,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       />
       <ProductActionsDialog
         item={acoesItem}
+        categorias={categorias}
         onClose={() => setAcoesItem(null)}
         onSalvarMeta={salvarMeta}
         onSalvarNome={salvarNome}
@@ -763,6 +789,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
 
           <ControlBar
             dados={dados}
+            categorias={categorias}
             isAdmin={isAdmin}
             user={user}
             coletando={coletando}
@@ -795,6 +822,9 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
             rotuloDono={filters.rotuloDono}
             selectedId={selecao.selectedId}
             onSelectRow={selecao.select}
+            sortCampo={sortCampo}
+            sortDir={sortDir}
+            toggleSort={toggleSort}
           />
         </section>
       </div>

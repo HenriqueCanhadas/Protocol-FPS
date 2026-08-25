@@ -99,7 +99,7 @@ class ColorFormatter(logging.Formatter):
 
         # Esgotado / não encontrado / erro
         if any(kw in msg.lower() for kw in (
-            "esgotado", "indispon", "não encontrado", "not found",
+            "esgotado", "indispon", "não encontrado", "não localizado", "not found",
             "sem preço", "histórico não salvo", "bloqueado", "falhou",
             "erro ao", "error"
         )):
@@ -307,10 +307,11 @@ def main() -> None:
     usuarios = _carregar_usuarios(sb)
 
     # Contadores para resumo final
-    total_ok      = 0
-    total_esgotado = 0
-    total_erro    = 0
-    alertas_total = 0
+    total_ok            = 0
+    total_esgotado      = 0
+    total_nao_localizado = 0
+    total_erro          = 0
+    alertas_total       = 0
 
     for idx, item in enumerate(itens, 1):
         item_id   = item["id"]
@@ -331,15 +332,27 @@ def main() -> None:
         dados = ScraperClass().coletar(url)
 
         # ── Log do resultado de coleta ───────────────────────────────
+        # Sprint 41 (V5, todo:204): distingue esgotamento CONFIRMADO
+        # (dados.encontrado=True — o scraper leu a página e confirmou fora de
+        # estoque) de NÃO LOCALIZADO (dados.encontrado=False — erro, timeout,
+        # challenge/bloqueio ou seletor ausente mesmo após os fallbacks).
+        # Antes os dois casos ficavam indistinguíveis (mesmo log, e nenhuma
+        # linha era salva no histórico por falta de preço).
         if dados.preco is not None and dados.disponivel:
             logger.info(
                 "\033[32m  ✓ PREÇO: R$ %.2f\033[0m  |  %s",
                 dados.preco, dados.nome[:70]
             )
             total_ok += 1
-        elif not dados.disponivel and dados.preco is None:
+        elif not dados.encontrado:
             logger.error(
-                "\033[31m  ✗ ESGOTADO / NÃO ENCONTRADO\033[0m  |  %s",
+                "\033[31m  ✗ NÃO LOCALIZADO (erro/challenge/seletor ausente)\033[0m  |  %s",
+                dados.nome[:70]
+            )
+            total_nao_localizado += 1
+        elif not dados.disponivel:
+            logger.error(
+                "\033[31m  ✗ ESGOTADO (confirmado)\033[0m  |  %s",
                 dados.nome[:70]
             )
             total_esgotado += 1
@@ -351,17 +364,16 @@ def main() -> None:
             total_erro += 1
 
         # ── Salva histórico ──────────────────────────────────────────
-        if dados.preco is None:
-            logger.info(
-                "Sem preço coletado (disponivel=%s) — histórico não salvo",
-                dados.disponivel,
-            )
-            continue
-
+        # Toda leitura agora vira uma linha (mesmo sem preço) — antes uma
+        # leitura sem preço nunca era salva, então um esgotamento real nunca
+        # aparecia na Dashboard (só o último preço válido anterior, sempre
+        # desatualizado). `encontrado` é o que permite ao front distinguir
+        # esgotado confirmado de não localizado sem reinterpretar disponivel.
         hist_payload = {
             "item_id":    item_id,
             "preco":      dados.preco,
             "disponivel": dados.disponivel,
+            "encontrado": dados.encontrado,
         }
 
         try:
@@ -376,8 +388,8 @@ def main() -> None:
             logger.error("Erro ao salvar histórico: %s", exc)
             continue
 
-        if not dados.disponivel:
-            logger.info("Produto indisponível — sem verificação de alertas")
+        if dados.preco is None or not dados.disponivel:
+            logger.info("Sem preço disponível — sem verificação de alertas")
             continue
 
         # ── Verifica alertas ─────────────────────────────────────────
@@ -453,10 +465,12 @@ def main() -> None:
     # ── Resumo final ─────────────────────────────────────────────────
     print(f"\n\033[90m  {'═' * 60}\033[0m")
     print(f"\033[1m  RESUMO DA COLETA\033[0m")
-    print(f"  \033[32m✓ Com preço:    {total_ok}\033[0m")
-    print(f"  \033[31m✗ Esgotados:    {total_esgotado}\033[0m")
+    print(f"  \033[32m✓ Com preço:      {total_ok}\033[0m")
+    print(f"  \033[31m✗ Esgotados:      {total_esgotado}\033[0m")
+    if total_nao_localizado:
+        print(f"  \033[31m✗ Não localizados: {total_nao_localizado}\033[0m")
     if total_erro:
-        print(f"  \033[33m⚠ Erros:        {total_erro}\033[0m")
+        print(f"  \033[33m⚠ Erros:          {total_erro}\033[0m")
     if alertas_total:
         print(f"  \033[33m⚡ Alertas:      {alertas_total}\033[0m")
     print(f"\033[90m  {'═' * 60}\033[0m\n")

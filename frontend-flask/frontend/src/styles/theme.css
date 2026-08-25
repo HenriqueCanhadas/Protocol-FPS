@@ -92,6 +92,15 @@ header {
   text-shadow: 0 0 12px var(--green-dim);
   text-decoration: none; flex-shrink: 0;
 }
+/* nome da página atual, ao lado do menu hambúrguer (Sprint 60) — agrupados
+   num único flex item pra não brigar com o justify-content:space-between
+   do header (3 blocos: esquerda/logo central/meta à direita) */
+.header-left { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+.header-page-name {
+  font-size: var(--fs-sm); letter-spacing: .15em; text-transform: uppercase;
+  color: var(--green); white-space: nowrap;
+}
+@media (max-width: 480px) { .header-page-name { display: none; } }
 .header-meta { display: flex; align-items: center; gap: 1rem; }
 .status-dot {
   width: 8px; height: 8px; border-radius: 50%;
@@ -219,6 +228,7 @@ header {
   box-shadow: 0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03);
 }
 .field-error { font-size: var(--fs-xs); color: var(--red); margin-top: .35rem; letter-spacing: .05em; }
+.field-warn { font-size: var(--fs-xs); color: var(--amber); margin-top: .5rem; letter-spacing: .03em; line-height: 1.5; border: 1px solid var(--amber); background: rgba(255,184,0,.08); padding: .6rem .8rem; }
 
 /* ── TOAST ──────────────────────────────────────────────────── */
 #toast {
@@ -278,6 +288,17 @@ header {
   content: 'AUTH REQUIRED'; position: absolute; top: -1px; left: 1.75rem;
   background: var(--bg2); color: var(--green-dim);
   font-size: var(--fs-xs); letter-spacing: .3em; padding: 0 .6rem; transform: translateY(-50%);
+}
+.login-box .field-input {
+  background: var(--bg3); color: var(--green); caret-color: var(--green);
+}
+.login-box .field-input::placeholder { color: var(--text-muted); }
+.login-box .field-input:-webkit-autofill,
+.login-box .field-input:-webkit-autofill:hover,
+.login-box .field-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--green);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg3) inset;
+  caret-color: var(--green);
 }
 .login-error { font-size: var(--fs-base); color: var(--red); text-align: center; min-height: 1.2rem; }
 .login-footer { font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: .2em; text-align: center; }

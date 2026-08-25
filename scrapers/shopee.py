@@ -93,7 +93,7 @@ class ShopeeScraper(ScraperBase):
                 "Shopee exigiu login para %s (url final: %s) — visita anônima "
                 "bloqueada, não é um erro de extração", url, page.url
             )
-            return DadosProduto(nome="Bloqueio Shopee — login necessário", preco=None, disponivel=False, url=url)
+            return DadosProduto(nome="Bloqueio Shopee — login necessário", preco=None, disponivel=False, url=url, encontrado=False)
 
         nome, preco, disponivel_jsonld = self._extrair_jsonld(page)
 
@@ -117,7 +117,7 @@ class ShopeeScraper(ScraperBase):
 
         if preco is None:
             logger.warning("Preço não encontrado na Shopee: %s", url)
-            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Shopee: R$ %.2f", preco)
         return DadosProduto(nome=nome or "Nome não encontrado", preco=preco, disponivel=True, url=url)

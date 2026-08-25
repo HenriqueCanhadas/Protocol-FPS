@@ -19,7 +19,7 @@ export async function buscarItens() {
 
   let { data: itens, error } = await sb
     .from("itens")
-    .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), ultima:historico_precos(preco, disponivel, coletado_em), minimo:historico_precos(preco, coletado_em)")
+    .select("id, nome_na_loja, url, monitorando, preco_meta, user_id, lojas(nome), produtos(categoria), usuarios(email, nome), ultima:historico_precos(preco, disponivel, encontrado, coletado_em), minimo:historico_precos(preco, coletado_em)")
     .order("nome_na_loja", { ascending: true })
     .order("coletado_em", { referencedTable: "ultima", ascending: false })
     .limit(1, { referencedTable: "ultima" })
@@ -31,7 +31,7 @@ export async function buscarItens() {
     // Fallback: banco ainda sem a migração multiusuário (sem user_id/usuarios)
     ({ data: itens, error } = await sb
       .from("itens")
-      .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria), historico_precos(preco, disponivel, coletado_em)")
+      .select("id, nome_na_loja, url, monitorando, preco_meta, lojas(nome), produtos(categoria), historico_precos(preco, disponivel, encontrado, coletado_em)")
       .order("nome_na_loja", { ascending: true })
       .order("coletado_em", { referencedTable: "historico_precos", ascending: false })
       .limit(1, { referencedTable: "historico_precos" }));
@@ -48,6 +48,10 @@ export async function buscarItens() {
       loja: item.lojas?.nome || "—", categoria: item.produtos?.categoria || "—",
       monitorando: item.monitorando, preco_meta: item.preco_meta,
       preco: ult.preco ?? null, disponivel: ult.disponivel ?? false,
+      // Sprint 41 (todo:204): sem nenhuma leitura ainda, o default fica em
+      // "encontrado" (não em "não localizado") — mantém o mesmo comportamento
+      // de sempre para item nunca coletado (cai em ESGOTADO pelo disponivel).
+      encontrado: ult.encontrado ?? true,
       coletado_em: ult.coletado_em ?? null,
       // Menor preço já obtido (Sprint 12) — convive com a meta, não a substitui
       menor:    min.preco       ?? null,
@@ -61,6 +65,22 @@ export async function buscarItens() {
 }
 
 /**
+ * Categorias cadastradas em `produtos` (Sprint 45, todo:245) — fonte única
+ * para o filtro de categoria da Dashboard e o modal "Alterar categoria" do
+ * ProductActionsDialog. Antes os dois usavam um dict estático (FILTROS_CAT)
+ * que não sabia de categorias criadas depois pelo admin em "Criar categoria"
+ * (Novo Produto, Sprints 31/33): a categoria nova ficava invisível nesses
+ * dois lugares mesmo já existindo no banco. Mesma tabela que NovoProduto.jsx
+ * já consulta ao carregar o formulário.
+ */
+export async function buscarCategorias() {
+  const sb = await getSupabase();
+  const { data, error } = await sb.from("produtos").select("categoria, nome");
+  if (error || !data) return [];
+  return data;
+}
+
+/**
  * Últimas leituras registradas no sistema, de qualquer item (Sprint 21) —
  * feed real de atividade para o ItemDetailPanel, no lugar do "log de
  * scraping ao vivo" 100% mockado do protótipo de referência (sem endpoint
@@ -71,7 +91,7 @@ export async function buscarAtividadeRecente(limite = 12) {
   const sb = await getSupabase();
   const { data } = await sb
     .from("historico_precos")
-    .select("id, preco, disponivel, coletado_em, itens(nome_na_loja, lojas(nome))")
+    .select("id, preco, disponivel, encontrado, coletado_em, itens(nome_na_loja, lojas(nome))")
     .order("coletado_em", { ascending: false })
     .limit(limite);
   return data || [];
@@ -154,7 +174,7 @@ export async function buscarDetalheDia(dia) {
   for (let de = 0; ; de += PAGINA) {
     const { data, error } = await sb
       .from("historico_precos")
-      .select("id, item_id, preco, disponivel, coletado_em, itens(nome_na_loja, lojas(nome))")
+      .select("id, item_id, preco, disponivel, encontrado, coletado_em, itens(nome_na_loja, lojas(nome))")
       .gte("coletado_em", ini).lt("coletado_em", fim)
       .order("coletado_em", { ascending: false })
       .range(de, de + PAGINA - 1);
@@ -188,6 +208,7 @@ export async function buscarDetalheDia(dia) {
       loja: l.itens?.lojas?.nome || "—",
       preco: l.preco,
       disponivel: l.disponivel,
+      encontrado: l.encontrado,
       coletadoEm: l.coletado_em,
       variacao,
     };
@@ -204,7 +225,7 @@ export async function buscarHistoricoCompleto(itemId) {
   for (;;) {
     const { data, error } = await sb
       .from("historico_precos")
-      .select("id, preco, disponivel, coletado_em")
+      .select("id, preco, disponivel, encontrado, coletado_em")
       .eq("item_id", itemId)
       .order("coletado_em", { ascending: false })
       .range(de, de + PAGINA - 1);

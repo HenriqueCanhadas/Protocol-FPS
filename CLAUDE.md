@@ -188,6 +188,13 @@ a persisted logged-in session, which is out of scope. `scrapers/shopee.py` detec
 this honestly (`_eh_parede_de_login`) and returns `disponivel=False`/no price in a
 few seconds instead of retrying or guessing — treat every Shopee item as expected to
 never populate `historico_precos` until the project supports a persisted session.
+**CI confirms the same outcome through a different mechanism**: run
+[32674108485](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/32674108485)
+(`workflow_dispatch loja=shopee` on `Duplicate-Main`) never even got the login
+redirect — the page stayed at `título=''` for the full 40s timeout, i.e. the
+runner's datacenter IP gets an even more silent block than a local dev IP. Don't
+treat a Shopee failure in Actions logs as a scraper regression, and don't spend
+time trying to make it work harder without a persisted session.
 
 ## Commands
 

@@ -9,10 +9,10 @@
 import { useState, useEffect, useRef } from "react";
 import TerminalModal from "@/components/TerminalModal";
 import { formatBRL } from "@/utils/format";
-import { FILTROS_CAT, CAT_LABEL } from "@/pages/Dashboard/Dashboard.constants";
+import { rotuloCategoria } from "@/pages/Dashboard/Dashboard.constants";
 
 export default function ProductActionsDialog({
-  item, onClose, onSalvarMeta, onSalvarNome, onSalvarCategoria, onColetar, onToggle,
+  item, categorias = [], onClose, onSalvarMeta, onSalvarNome, onSalvarCategoria, onColetar, onToggle,
 }) {
   const [modo, setModo] = useState("menu"); // menu | meta | nome | categoria
   const [valor, setValor] = useState("");
@@ -67,7 +67,7 @@ export default function ProductActionsDialog({
           </button>
           <button className="opcao-btn" onClick={() => setModo("categoria")}>
             <span className="op-ic">▤</span>
-            <span className="op-tx"><span className="op-tt">Alterar categoria</span><span className="op-sub">{`Categoria atual: ${item.categoria || "—"}`}</span></span>
+            <span className="op-tx"><span className="op-tt">Alterar categoria</span><span className="op-sub">{`Categoria atual: ${item.categoria ? rotuloCategoria(item.categoria, categorias.find((c) => c.categoria === item.categoria)?.nome) : "—"}`}</span></span>
             <span className="op-arr">→</span>
           </button>
           <button className="opcao-btn coletar" onClick={() => { onClose(); onColetar(item); }}>
@@ -190,7 +190,6 @@ export default function ProductActionsDialog({
   }
 
   // ── Modo: alterar categoria ──────────────────────────────────
-  const cats = FILTROS_CAT.filter((c) => c !== "all");
   const salvarCategoria = () => {
     if (!cat) return;
     if (cat === item.categoria) { onClose(); return; } // nada mudou
@@ -210,9 +209,9 @@ export default function ProductActionsDialog({
         <div>
           <div className="field-label" style={{ marginBottom: ".6rem" }}>Nova categoria</div>
           <div className="catm-grid">
-            {cats.map((c) => (
-              <div key={c} className={`catm-chip${cat === c ? " sel" : ""}`} onClick={() => setCat(c)}>
-                {CAT_LABEL[c] || c}
+            {categorias.map((c) => (
+              <div key={c.categoria} className={`catm-chip${cat === c.categoria ? " sel" : ""}`} onClick={() => setCat(c.categoria)}>
+                {rotuloCategoria(c.categoria, c.nome)}
               </div>
             ))}
           </div>
