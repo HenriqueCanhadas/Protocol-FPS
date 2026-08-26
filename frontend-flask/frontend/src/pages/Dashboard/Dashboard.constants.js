@@ -46,6 +46,7 @@ export const LOJAS_FILTER = [
   { key: "shopee",       label: "Shopee",       slug: "shopee"       },
   { key: "aliexpress",   label: "AliExpress",   slug: "aliexpress"   },
   { key: "mocadopop",    label: "Mocadopop",    slug: "mocadopop"    },
+  { key: "mercadolivre", label: "Mercado Livre",slug: "mercadolivre" },
 ];
 
 /**

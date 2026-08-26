@@ -16,7 +16,7 @@ import { dataHoraBRT } from "@/utils/datas";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
-.nu-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
+.nu-main { flex:1; padding:1.1rem 1.5rem .5rem; display:flex; justify-content:center; }
 .page-wrap { width:min(1800px,100%); display:flex; flex-direction:column; gap:2rem; }
 
 /* esquerda (listagem, mais larga) + direita (criar usuário / trocar senha) —
@@ -24,21 +24,31 @@ const css = `
    (Sprint 21) e no .admin-grid do Admin (Sprint 46) */
 .nu-grid { display:grid; grid-template-columns:minmax(0,1fr) 460px; gap:2rem; align-items:start; }
 .nu-content { display:flex; flex-direction:column; gap:2rem; min-width:0; }
-.nu-sidebar { display:flex; flex-direction:column; gap:2rem; position:sticky; top:1.75rem; }
+/* Sprint 66 (todo:286): sidebar reduzida pra caber os 2 cards na tela sem
+   rolagem própria (paddings internos menores que os padrões de
+   NovoProduto/Admin — esta é a única sidebar do projeto com 2 cards
+   "pesados" empilhados, então precisa ser mais compacta que as outras).
+   O gap entre os cards, porém, é o mesmo padrão do .dash-sidebar
+   (Dashboard) e .admin-sidebar (Admin) — Sprint 67 devolveu esse valor
+   depois que remover o subtítulo dos chips de Papel abriu espaço de sobra */
+.nu-sidebar { display:flex; flex-direction:column; gap:1.25rem; position:sticky; top:1.75rem; }
 
 .form-card { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); position:relative; }
 .form-card::before { content:attr(data-label); position:absolute; top:-1px; left:1.75rem; background:var(--bg2); color:var(--green-dim); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
 .form-card.card-amber { border-top-color:var(--amber); }
 .form-card.card-amber::before { color:var(--amber); }
-.form-body { padding:2rem; display:flex; flex-direction:column; gap:1.75rem; }
-.fields-grid { display:grid; gap:1.5rem; }
+.form-body { padding:.8rem 1.25rem; display:flex; flex-direction:column; gap:.6rem; }
+.fields-grid { display:grid; gap:.55rem; }
 .fields-grid.cols-2 { grid-template-columns:1fr 1fr; }
 .field-group { display:flex; flex-direction:column; }
-.form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 2rem; border-top:1px solid var(--border2); background:var(--bg3); }
+.form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:.5rem 1.5rem; border-top:1px solid var(--border2); background:var(--bg3); }
 
-.papel-chips { display:flex; gap:.6rem; flex-wrap:wrap; }
-.papel-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; display:flex; flex-direction:column; gap:.2rem; }
-.papel-chip .pc-sub { font-size:var(--fs-xs); color:var(--text-muted); text-transform:none; letter-spacing:.02em; }
+/* Papel padrão/Admin lado a lado (Sprint 66) — cada chip com flex:1 pra
+   dividir a largura igualmente. Sprint 67: subtítulo explicativo removido
+   do corpo do chip (texto passou pro atributo title, some ao passar o
+   mouse) — sem ele o chip vira 1 linha só, ainda mais compacto. */
+.papel-chips { display:flex; gap:.6rem; }
+.papel-chip { flex:1; min-width:0; text-align:center; background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.6rem .75rem; cursor:pointer; transition:all .15s; user-select:none; }
 .papel-chip:hover { border-color:var(--green-dim); color:var(--text); }
 .papel-chip.sel-normal { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .papel-chip.sel-admin  { border-color:var(--amber); color:var(--amber); background:rgba(255,184,0,.08); }
@@ -290,55 +300,6 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
         <div className="page-wrap">
           <div className="nu-grid">
           <div className="nu-content">
-          {/* CRIAR USUÁRIO — acima da listagem (Sprint 53b, pedido do usuário) */}
-          <div className="form-card" data-label="CRIAR USUÁRIO">
-            <div className="form-body">
-              <div className="field-group">
-                <div className="field-label">Email <span className="red">*</span></div>
-                <input className="field-input" type="email" placeholder="usuario@email.com"
-                  autoComplete="off" value={email}
-                  onChange={(e) => { setEmail(e.target.value); setErros((x) => ({ ...x, email: null })); }} />
-                {erros.email && <div className="field-error">{erros.email}</div>}
-              </div>
-
-              <div className="fields-grid cols-2">
-                <div className="field-group">
-                  <div className="field-label">Senha <span className="red">*</span></div>
-                  <input className="field-input" type="password" placeholder="••••••••"
-                    autoComplete="new-password" value={senha}
-                    onChange={(e) => { setSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
-                  <div className="field-hint">Mínimo 8 caracteres</div>
-                </div>
-                <div className="field-group">
-                  <div className="field-label">Confirmar senha <span className="red">*</span></div>
-                  <input className="field-input" type="password" placeholder="••••••••"
-                    autoComplete="new-password" value={confSenha}
-                    onChange={(e) => { setConfSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
-                  {erros.senha && <div className="field-error">{erros.senha}</div>}
-                </div>
-              </div>
-
-              <div className="field-group">
-                <div className="field-label">Papel <span className="red">*</span></div>
-                <div className="papel-chips">
-                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}>
-                    <span>Usuário padrão</span>
-                    <span className="pc-sub">Vê e gerencia apenas os próprios itens</span>
-                  </div>
-                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}>
-                    <span>Admin</span>
-                    <span className="pc-sub">Vê os itens de todos e gerencia usuários</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="form-actions">
-              <button className="btn-primary" onClick={criar} disabled={criando}>
-                {criando ? "CRIANDO..." : "CRIAR USUÁRIO"}
-              </button>
-            </div>
-          </div>
-
           {/* LISTAGEM */}
           <div className="form-card" data-label="USUÁRIOS CADASTRADOS">
             {carregando ? (
@@ -430,8 +391,57 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
           </div>
 
           <div className="nu-sidebar">
-          {/* TROCAR SENHA — única card da sidebar (Sprint 53b); largura da
-              sidebar aumentada para caber melhor os 2 campos de senha lado a lado */}
+          {/* CRIAR USUÁRIO — de volta pra sidebar (Sprint 65/todo:284), acima
+              de ALTERAR SENHA; tinha ido pra cima da listagem na Sprint 53b */}
+          <div className="form-card" data-label="CRIAR USUÁRIO">
+            <div className="form-body">
+              <div className="field-group">
+                <div className="field-label">Email <span className="red">*</span></div>
+                <input className="field-input" type="email" placeholder="usuario@email.com"
+                  autoComplete="off" value={email}
+                  onChange={(e) => { setEmail(e.target.value); setErros((x) => ({ ...x, email: null })); }} />
+                {erros.email && <div className="field-error">{erros.email}</div>}
+              </div>
+
+              <div className="fields-grid">
+                <div className="field-group">
+                  <div className="field-label">Senha <span className="red">*</span></div>
+                  <input className="field-input" type="password" placeholder="••••••••"
+                    autoComplete="new-password" value={senha}
+                    onChange={(e) => { setSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
+                  <div className="field-hint">Mínimo 8 caracteres</div>
+                </div>
+                <div className="field-group">
+                  <div className="field-label">Confirmar senha <span className="red">*</span></div>
+                  <input className="field-input" type="password" placeholder="••••••••"
+                    autoComplete="new-password" value={confSenha}
+                    onChange={(e) => { setConfSenha(e.target.value); setErros((x) => ({ ...x, senha: null })); }} />
+                  {erros.senha && <div className="field-error">{erros.senha}</div>}
+                </div>
+              </div>
+
+              <div className="field-group">
+                <div className="field-label">Papel <span className="red">*</span></div>
+                <div className="papel-chips">
+                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}
+                    title="Vê e gerencia apenas os próprios itens">
+                    Usuário padrão
+                  </div>
+                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}
+                    title="Vê os itens de todos e gerencia usuários">
+                    Admin
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="form-actions">
+              <button className="btn-primary" onClick={criar} disabled={criando}>
+                {criando ? "CRIANDO..." : "CRIAR USUÁRIO"}
+              </button>
+            </div>
+          </div>
+
+          {/* ALTERAR SENHA — abaixo de CRIAR USUÁRIO na sidebar (Sprint 65) */}
           <div className="form-card card-amber" data-label="ALTERAR SENHA DE USUÁRIO">
             <div className="form-body">
               <div className="field-group">
@@ -448,7 +458,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                 {errosTs.alvo && <div className="field-error">{errosTs.alvo}</div>}
               </div>
 
-              <div className="fields-grid cols-2">
+              <div className="fields-grid">
                 <div className="field-group">
                   <div className="field-label">Nova senha <span className="red">*</span></div>
                   <input className="field-input" type="password" placeholder="••••••••"

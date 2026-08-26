@@ -94,6 +94,7 @@ const LOJAS_DETECTADAS = {
   "shopee.com.br":         "shopee",
   "aliexpress.com":        "aliexpress",
   "mocadopop.com.br":      "mocadopop",
+  "mercadolivre.com.br":   "mercadolivre",
 };
 // Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
 // Categorias novas (todo, criadas por admin — ver criarCategoria) entram
@@ -104,7 +105,7 @@ const LOJAS_LABEL = {
   kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
   tuyo: "Tuyo", playstation: "Playstation", logitec: "Logitec",
   tangleteezer: "Tangle Teezer", amazon: "Amazon", shopee: "Shopee",
-  aliexpress: "AliExpress", mocadopop: "Mocadopop",
+  aliexpress: "AliExpress", mocadopop: "Mocadopop", mercadolivre: "Mercado Livre",
 };
 // Sprint 42 (V5, todo:239): lojas com limitação estrutural CONHECIDA e
 // documentada (README.md/CLAUDE.md) — o item pode ser cadastrado normalmente,

@@ -107,6 +107,7 @@ do `main.py`):
 | Shopee | https://shopee.com.br | `shopee` |
 | Aliexpress | https://pt.aliexpress.com | `aliexpress` |
 | Mocadopop | https://www.mocadopop.com.br | `mocadopop` |
+| Mercadolivre | https://www.mercadolivre.com.br | `mercadolivre` |
 
 ### 3.3 `produtos` — categorias de hardware
 

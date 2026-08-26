@@ -165,17 +165,21 @@ const css = `
 
 /* painel único de filtros — dropdowns compactos em vez de fileiras de chips
    (pedido do usuário: sobrar espaço vertical para a tabela) */
-.filters-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.85rem 1rem; padding:.85rem 1rem; background:var(--bg2); border:1px solid var(--border2); }
+.filters-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.7rem .75rem; padding:.7rem .85rem; background:var(--bg2); border:1px solid var(--border2); }
 .filter-group { display:flex; flex-direction:column; gap:.3rem; }
 .filter-group-label { font-size:var(--fs-xs); letter-spacing:.18em; text-transform:uppercase; color:var(--text-dim); white-space:nowrap; }
 .filter-select {
   background:var(--bg3); border:1px solid var(--border2);
   color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm);
-  letter-spacing:.04em; padding:.5rem .6rem; cursor:pointer;
-  /* largura reduzida (era 220px) — margem extra para nunca estourar a
-     largura do card de filtros em navegadores que renderizam <select>
-     nativo um pouco mais largo (ex.: Opera GX) */
-  max-width:180px; outline:none; transition:border-color .15s,box-shadow .15s,color .15s;
+  letter-spacing:.04em; padding:.45rem .55rem; cursor:pointer;
+  /* largura reduzida (era 220px, depois 180px — Sprint 64/todo:282: com
+     admin + uma loja específica selecionada, os grupos extras "Usuário" e
+     "Produto" apareciam juntos e estouravam a largura da linha por poucos
+     pixels, empurrando "Ações" pra uma linha própria; 150px reabre a folga
+     necessária em telas normais, sem cortar nenhum rótulo hoje existente —
+     o texto integral de cada opção continua visível no menu aberto,
+     independente da largura da caixa fechada) */
+  max-width:150px; outline:none; transition:border-color .15s,box-shadow .15s,color .15s;
 }
 .filter-select:hover,.filter-select:focus { border-color:var(--green-dim); color:var(--text); }
 .filter-select.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }

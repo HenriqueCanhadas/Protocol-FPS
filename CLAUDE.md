@@ -109,7 +109,7 @@ it exists to mirror the Vercel rewrite in dev.
 3. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
    that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
    (`kabum`/`terabyteshop`/`pichau`/`tuyo`/`playstation`/`logitec`/`tangleteezer`/
-   `amazon`/`shopee`/`aliexpress`/`mocadopop`) and/or owner (`itens.user_id`). Combinable. The
+   `amazon`/`shopee`/`aliexpress`/`mocadopop`/`mercadolivre`) and/or owner (`itens.user_id`). Combinable. The
    category/store filters run in Python; the user filter is in the PostgREST query.
    The SPA sends `user_id` automatically for a non-admin "collect all" with no filters
    (Sprint 9); admins and the cron stay global.

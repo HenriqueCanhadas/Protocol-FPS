@@ -88,6 +88,19 @@
 > (25/08/2026), fora da ordem cronológica originalmente planejada (depois das
 > Sprints 47–49, scrapers novos), a pedido explícito do usuário.
 >
+> **Sprint 63:** não veio do `todo` — surgiu da validação da migração da
+> Sprint 48 (26/08/2026): a view `ultimo_preco` estava sem RLS ("Unrestricted"
+> no Supabase Studio) e vazava itens/preços de todos os usuários pra chave
+> anônima. Corrigida (apagada, já que nenhum código a usava) e seguida de uma
+> auditoria completa do banco, sem outras brechas encontradas.
+>
+> **Sprints 64–65:** 2 itens novos adicionados pelo usuário direto no `todo`
+> em 26/08/2026 (`todo:282` e `todo:284`) — o filtro de loja do Dashboard
+> quebrando linha com nomes longos (Moça do Pop) e reduzir seu tamanho geral,
+> e reorganizar os formulários de Usuários (campos de senha empilhados em vez
+> de lado a lado, e "Criar Usuário" voltando para a sidebar direita, acima de
+> "Alterar Senha"). Ainda não iniciadas.
+>
 > **Legenda de status**
 > - ✅ **Done** — concluído (item `OK-` no `todo`)
 > - 🟡 **Pending** — iniciado mas não finalizado (item `Pending-` no `todo`)
@@ -137,6 +150,11 @@
 | 60 | Mover o título da página (Novo Produto/Usuários/Admin/Dashboard/Conta) para o cabeçalho, ao lado do menu hambúrguer | 25/08/2026 | 1 | 1 |
 | 61 | Remover os textos de resumo do corpo das páginas (ex. subtítulo do Admin), consequência da Sprint 60 | 25/08/2026 | 1 | 1 |
 | 62 | Admin: cabeçalho da tabela "Detalhe por usuário e item" fixo durante a rolagem | 25/08/2026 | 1 | 1 |
+| 63 | Auditoria de segurança do Supabase (view `ultimo_preco` sem RLS + varredura geral) | 26/08/2026 | 1 | 1 |
+| 64 | Dashboard: filtro de loja quebra linha com nomes longos (Moça do Pop); reduzir tamanho geral | 27/08/2026 | 1 | 1 |
+| 65 | Usuários: campos de senha empilhados verticalmente; "Criar Usuário" volta pra sidebar, acima de "Alterar Senha" | 27/08/2026 | 1 | 1 |
+| 66 | Usuários: cards da sidebar sem rolagem; chips Usuário/Admin lado a lado | 27/08/2026 | 1 | 1 |
+| 67 | Usuários: gap padrão entre cards da sidebar; remover texto dos chips de Papel | 27/08/2026 | 1 | 1 |
 
 Sprints 34 a 40 concluídas, todas validadas ao vivo/com testes reais no mesmo
 dia (23/08/2026). A numeração continua de onde a Sprint 33 (V4) parou. Único
@@ -300,7 +318,7 @@ desde a Sprint 29 e deixada de fora a pedido explícito do usuário na época
 
 | SPRINT | TEST | STATUS | RESULTS |
 |--------|------|--------|---------|
-| S49 · Criar `scrapers/mercadolivre.py` e registrar `"mercadolivre"` em `SCRAPERS`; validar com o link de teste (todo:254) | `MercadoLivreScraper(headless=False).coletar('<link de teste>')` retorna nome/preço/disponibilidade corretos comparados à página real; seguir a metodologia da skill `scraper-nova-loja` | ⬜ Todo | **Nota:** o link de teste do `todo` traz uma URL longa com parâmetros de rastreamento de anúncio (`matt_*`, `gclid`, etc.) — confirmar que o scraper extrai o mesmo produto a partir da URL "limpa" (`.../p/MLB...`), já que esses parâmetros de campanha tendem a expirar/mudar e não devem ser parte do contrato do scraper. Resultado esperado: mesma ordem de extração em camadas (JSON-LD → meta → CSS → texto) já usada nos demais scrapers; Mercado Livre também tem histórico de bot-protection — se o CI travar, registrar a mesma decisão honesta já aplicada a Pichau/Shopee em vez de insistir sem uma sessão persistida |
+| S49 · Criar `scrapers/mercadolivre.py` e registrar `"mercadolivre"` em `SCRAPERS`; validar com o link de teste (todo:254) | `MercadoLivreScraper(headless=False).coletar('<link de teste>')` retorna nome/preço/disponibilidade corretos comparados à página real; seguir a metodologia da skill `scraper-nova-loja` | 🟡 Parcial — **validado local; CI em andamento** | **Nota do plano confirmada ao vivo:** a URL "limpa" (`.../p/MLB65917242`, sem `pdp_filters`/`matt_*`/`gclid`) devolve exatamente o mesmo JSON-LD e o mesmo preço da URL completa do `todo` — confirmado navegando as duas e comparando. **Inspeção real:** JSON-LD `Product` limpo (`offers.price` 65.99, batendo com o preço visível "R$ 65,99"; `priceCurrency` "BRL"; `availability` "InStock"); sem meta tags de preço (`product:price:amount`/`og:price:amount` ausentes, só `og:title` traz o preço embutido no texto). Armadilha real encontrada (mesmo padrão do comentário da Amazon/Mocadopop): a página tem 5 elementos com a MESMA classe `.ui-pdp-price__part__container` (preço riscado, preço atual, valor da parcela) — confirmado que o preço atual fica especificamente dentro de `.ui-pdp-price__second-line` (o riscado não tem esse wrapper), então o fallback CSS sempre escopa a esse container. **Implementado** `scrapers/mercadolivre.py`: nome via `h1.ui-pdp-title`; preço via JSON-LD → fallback `.andes-money-amount__fraction`/`__cents` escopados; disponibilidade via `offers.availability` (não confirmado ao vivo o caminho esgotado — mesmo precedente da Amazon/Mocadopop) + varredura de palavras-chave. Registrado em `SCRAPERS` (`main.py`) e nas 3 listas do frontend. **Validado local:** headless=False e headless=True, com a URL completa (com `matt_*`/`gclid`) e com a URL limpa — as 4 combinações retornaram `preco=65.99, disponivel=True, encontrado=True`, nome idêntico ao real. `npm run build` — 111 módulos, sem erros. **CI pendente** — ver resultado abaixo |
 
 ---
 
@@ -413,12 +431,63 @@ Consequência direta da Sprint 60 — implementada em sequência, mesmo dia.
 
 ---
 
+## Sprint 63 — Auditoria de segurança do Supabase (view `ultimo_preco` sem RLS + varredura geral) (26/08/2026)
+
+Não veio de uma linha do `todo` — surgiu da validação da migração da Sprint 48: ao
+conferir a limpeza das tabelas legadas (`produtos_funko`/`historico_precos_funko`,
+já removidas pelo usuário), o usuário reparou que a view `ultimo_preco` aparecia
+marcada como **"Unrestricted"** no Supabase Studio e pediu uma explicação — o que
+levou a confirmar um vazamento de dados real e ativo, e depois a uma varredura
+completa do banco atrás de outras brechas.
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S63 · Investigar a tag "Unrestricted" da view `ultimo_preco` e corrigir se for um vazamento real; em seguida auditar o restante do banco (RLS de todas as tabelas ativas, RPCs, tentativas de escrita indevida) em busca de outras brechas | Confirmar com uma chamada real (chave anônima, sem login) se `ultimo_preco` devolve dados de outros usuários; se sim, corrigir. Repetir o mesmo tipo de sonda (anônimo + usuário autenticado não-dono) contra `itens`/`historico_precos`/`alertas`/`usuarios`/`lojas`/`produtos` e as RPCs (`verificar_alertas`, `admin_estatisticas`, `is_admin`, `pode_ver_banco`) | ✅ Done | **Achado confirmado e corrigido:** `ultimo_preco` (view de conveniência da Sprint 6, nunca usada por nenhum código do projeto — confirmado por busca no repositório inteiro, só aparecia citada em `banco.md`) não tinha RLS. Chamada real com a `ANON_KEY` (a mesma chave pública embutida no bundle JS do site, sem qualquer sessão) devolveu itens monitorados de **múltiplos usuários diferentes** — nome do produto, URL, `preco_meta` (o alvo de alerta que cada um definiu), preço atual e disponibilidade — enquanto a mesma chamada contra `itens` (que tem RLS) corretamente devolveu vazio. Causa: uma view roda por padrão com o privilégio de quem a criou, então mesmo com RLS habilitado nas tabelas de origem (`itens`/`historico_precos`), a view as contornava por completo. **Correção preparada** em `project/migrations/sprint48c_ultimo_preco_rls.sql` (Opção A — apagar a view, já que nada a usa; Opção B — recriar com `security_invoker=true` se algum dia for necessária de novo) e **aplicada pelo próprio usuário** direto no SQL Editor (`drop view`) — confirmado depois: `ultimo_preco` não existe mais no schema exposto pelo PostgREST. **Auditoria geral do restante do banco, sem encontrar nenhuma outra brecha:** (1) leitura anônima bloqueada em `itens`/`historico_precos`/`alertas`/`usuarios`/`lojas`/`produtos` — todas devolvem vazio sem sessão, como documentado em `banco.md` §6; (2) as 4 RPCs testadas anonimamente: `is_admin()`/`pode_ver_banco()` devolvem `False`, `admin_estatisticas()` nega acesso explicitamente, e `verificar_alertas()` — embora chamável por qualquer um sem erro — comparada lado a lado (mesma chamada, mesmo item, `SERVICE_KEY` vs `ANON_KEY`) devolve o alerta real só com a chave de serviço e vazio com a anônima, ou seja, não vaza preço/meta de terceiros nem permite forjar alertas; (3) criada uma conta de teste descartável (nível 1, comum) para validar isolamento **entre usuários autenticados** (não só anônimo vs. logado): não conseguiu ver itens/histórico/perfil de outro usuário real, não conseguiu criar item se passando pelo `user_id` de outra pessoa (403, violação de RLS), não conseguiu alterar/apagar item alheio nem se auto-promover a admin (0 linhas afetadas em todos os casos), não conseguiu inserir direto em `historico_precos`/`alertas` (403 — reservado ao coletor via `SERVICE_KEY`) — item real do pedrosacanhadas conferido intacto ao final. Conta de teste removida por completo (auth + perfil em cascata, sem resíduo). **Fora do escopo desta sprint** (é aplicação, não banco): os endpoints server-side `/api/remover`/`/api/usuarios`/`/api/trigger-coleta` (Flask/Vercel) têm autorização própria por token de sessão, não RLS — não foram auditados agora |
+
+---
+
+## Sprint 64 — Dashboard: filtro de loja quebra com nomes longos (Moça do Pop) (27/08/2026)
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S64 · Na barra de filtros do Dashboard (`ControlBar.jsx`), corrigir a quebra de linha que acontece ao selecionar/exibir a loja "Moça do Pop" (rótulo mais longo que os demais) — o botão "Opções"/"Remover" desce ou quebra junto. Validar com todas as lojas do filtro (`LOJAS_FILTER`) pra garantir que nenhuma outra causa a mesma quebra. Depois de corrigido, reduzir um pouco o tamanho geral da barra de filtros (todo:282) | Selecionar cada uma das lojas do filtro (inclusive Moça do Pop) não quebra a linha da barra de filtros nem empurra os botões de ação (Opções/Remover) pra fora do lugar, em nenhuma largura de tela suportada; a barra fica visualmente um pouco mais compacta que a atual, sem cortar texto nem ficar apertada demais pro toque (mobile) | ✅ Done | **Causa real (não era sobre o nome da loja):** reproduzido ao vivo (conta de teste temporária promovida a admin, removida ao final) — o problema não é o rótulo "Moça do Pop" ser mais longo, é que quando o grupo "Usuário" (só admin) e o grupo "Produto" (só quando uma loja específica é selecionada) aparecem **juntos**, a soma das larguras da linha de filtros passava a exceder o espaço disponível **por só 6px** (medido via JS: 1529px necessários vs. 1523px disponíveis) — o suficiente pro `flex-wrap` empurrar "Ações" pra uma linha própria. Confirmado que acontecia com **qualquer** loja selecionada (testado com "KaBuM", nome curto, e "Tangle Teezer", o rótulo mais longo de todos) — não é específico da Mocadopop, só foi a loja usada no teste que revelou o bug (dado real migrado na Sprint 48). Confirmado também que um usuário comum (não-admin) nunca via a quebra, já que o grupo "Usuário" não aparece pra ele. **Corrigido** em `Dashboard/index.jsx`: `.filter-select` de `max-width:180px` → `150px` (nenhum rótulo existente precisa de mais que isso — o texto completo de cada opção continua visível no menu aberto, só a caixa fechada encolhe) e `.filters-row` com `gap`/`padding` reduzidos (`.85rem 1rem`→`.7rem .85rem`), como pedido ("diminua um pouco"). Resultado: folga de **+124px** no pior caso (Loja + Produto + Usuário todos visíveis), ante os -6px de antes — testado com todas as 12 opções de loja, nenhuma quebra mais. `npm run build` — 111 módulos, sem erros. **Não testado** (limitação do ambiente desta sessão — `resize_window` não reduziu o viewport real, preso em 1920px): o comportamento em telas bem estreitas (mobile/tablet) continua fazendo `flex-wrap` normalmente abaixo de um certo breakpoint, o que é esperado/aceitável (mesmo padrão de todo o resto do projeto) — recomenda-se uma conferência visual rápida num dispositivo real ou emulador na próxima sessão com o navegador disponível |
+
+---
+
+## Sprint 65 — Usuários: campos de senha empilhados; reposicionar Criar Usuário (27/08/2026)
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S65 · Em `Usuarios.jsx`: (1) no formulário "Alterar Senha de Usuário" e no formulário "Criar Usuário", empilhar os dois campos de senha (senha/confirmar senha) um embaixo do outro em vez de lado a lado; (2) mover o card "Criar Usuário" — hoje acima da listagem "Usuários Cadastrados", na coluna principal (decisão da Sprint 53b) — para a sidebar direita, posicionado **acima** do card "Alterar Senha de Usuário" (todo:284) | Nos dois formulários, os campos de senha aparecem um abaixo do outro (não lado a lado) em qualquer largura de tela; o card "Criar Usuário" aparece na coluna direita (sidebar), acima de "Alterar Senha de Usuário", e a coluna principal passa a ter só a listagem "Usuários Cadastrados"; nenhum fluxo de criar usuário/trocar senha quebra (mensagens de erro, toasts, confirmação) | ✅ Done | **Implementado exatamente como planejado:** removidas as duas ocorrências de `cols-2` das classes `fields-grid` (Senha/Confirmar Senha em Criar Usuário; Nova Senha/Confirmar Nova Senha em Alterar Senha) — sem `grid-template-columns` explícito, `.fields-grid` já empilha em coluna única por padrão, então não foi preciso nenhuma regra CSS nova. O bloco JSX inteiro do card "Criar Usuário" foi movido de dentro de `.nu-content` (coluna principal, onde ficava acima da listagem desde a Sprint 53b) para dentro de `.nu-sidebar`, antes do card "Alterar Senha de Usuário" — a coluna principal ficou só com "Usuários Cadastrados". Largura da sidebar (`460px`) mantida sem alteração — não foi pedido reduzir, e o card "Papel" (com as descrições dos chips Usuário padrão/Admin) ainda se beneficia do espaço. **Validado ao vivo** (conta de teste temporária promovida a admin, removida ao final): confirmado visualmente que os dois cards aparecem na ordem certa na sidebar, com os campos de senha empilhados nos dois formulários; **fluxo funcional completo testado ponta a ponta pela própria UI** — criado um usuário de teste real (apareceu na listagem), trocada a senha desse mesmo usuário (modal de confirmação abriu e fechou corretamente) e excluído ao final (removido da listagem) — os três fluxos funcionaram sem nenhuma regressão da mudança de layout. `npm run build` — 111 módulos, sem erros |
+
+---
+
+## Sprint 66 — Usuários: cards da sidebar sem rolagem; chips Usuário/Admin lado a lado (27/08/2026)
+
+Pedido direto do usuário na mesma sessão, na sequência imediata da Sprint 65 (mesmo dia).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S66 · Em `Usuarios.jsx`: (1) diminuir o tamanho dos 2 cards da sidebar ("Criar Usuário" + "Alterar Senha de Usuário") para caberem inteiros na tela sem gerar barra de rolagem; (2) colocar os botões de papel "Usuário padrão"/"Admin" lado a lado (hoje empilhados) para ganhar espaço vertical (todo:286) | Com os dois cards visíveis, a página não mostra barra de rolagem vertical numa tela comum (a sidebar cabe entre o topo e o fim da viewport); os chips "Usuário padrão" e "Admin" aparecem um ao lado do outro, com o texto de descrição ainda legível | ✅ Done | **Medido ao vivo antes de estimar a correção** (conta de teste temporária promovida a admin, removida ao final): a página tinha 1221px de conteúdo contra 919px de viewport visível (~300px de sobra causando a rolagem). **Chips lado a lado:** `.papel-chips` tinha `flex-wrap:wrap` e cada `.papel-chip` sem largura definida — o subtítulo comprido ("Vê e gerencia apenas os próprios itens") forçava cada chip a alargar até caber numa linha só, e os dois juntos nunca cabiam lado a lado, sempre quebrando para 2 linhas. Corrigido dando `flex:1` a cada chip (dividem a largura igualmente) e deixando o subtítulo quebrar em 2 linhas dentro do espaço menor, em vez de alargar o chip. **Redução de tamanho:** cortados incrementalmente (medindo a cada passo, sem chutar de uma vez) o padding vertical de `.nu-main`, o gap entre os 2 cards da sidebar (`2rem`→`.6rem`), o padding interno de `.form-body` (`2rem`→`.8rem 1.25rem`), o gap entre campos (`1.75rem`→`.6rem` e `1.5rem`→`.55rem`) e o padding de `.form-actions` (`1.4rem 2rem`→`.5rem 1.5rem`) — nenhuma classe global (`.field-input`/`.field-label`/etc., compartilhadas com outras páginas) foi tocada, só classes exclusivas desta página (`.nu-*`, `.form-*`, `.papel-*` só existem em `Usuarios.jsx`). Resultado final medido: sidebar termina ~19px antes do fim da viewport (folga real, não empurra o `body` — que tem `min-height:100vh` e por isso não encolhe abaixo da tela mesmo com conteúdo menor). **Validado ao vivo:** screenshot confirma os 2 cards inteiros visíveis sem cortar nada, chips lado a lado legíveis, e um clique real no chip "Admin" confirmou que a seleção visual (borda/fundo âmbar) continua funcionando com o novo layout. **Ressalva:** a margem de segurança (~19px) foi medida no viewport desta sessão (919px de altura útil); telas bem mais baixas que isso ainda podem precisar de rolagem — é um limite físico (não dá para encolher `.field-input`/fontes sem tocar CSS global compartilhado com outras páginas). `npm run build` — 111 módulos, sem erros |
+
+---
+
+## Sprint 67 — Usuários: gap padrão entre cards da sidebar; remover texto dos chips de Papel (27/08/2026)
+
+Pedido direto do usuário na mesma sessão, na sequência imediata da Sprint 66 (mesmo dia).
+
+| SPRINT | TEST | STATUS | RESULTS |
+|--------|------|--------|---------|
+| S67 · Em `Usuarios.jsx`: (1) usar o mesmo espaçamento vertical padrão entre os cards da sidebar que já existe no Dashboard (`.dash-sidebar`) e no Admin (`.admin-sidebar`), em vez do valor reduzido da Sprint 66; (2) remover o texto (subtítulo) dos botões de papel "Usuário"/"Admin" (todo:288) | O gap entre "Criar Usuário" e "Alterar Senha de Usuário" é o mesmo (`1.25rem`) usado nas outras duas sidebars do projeto; os chips de papel não mostram mais a frase descritiva, só o nome curto; a página continua sem barra de rolagem | ✅ Done | **Conflito real entre os dois pedidos, resolvido:** a Sprint 66 tinha reduzido o `gap` da sidebar pra `.6rem` (abaixo do padrão `1.25rem` de Dashboard/Admin) exatamente para caber sem rolagem — voltar ao padrão sozinho reintroduziria a rolagem. A saída foi remover o subtítulo dos chips de Papel ("Vê e gerencia apenas os próprios itens" / "Vê os itens de todos e gerencia usuários"), que abriu espaço de sobra suficiente pra devolver o gap ao valor padrão sem voltar a rolar. O texto não sumiu de vez: virou o atributo `title` do chip (tooltip nativo do navegador ao passar o mouse), então a explicação continua acessível. `.papel-chip` simplificado (sem mais `flex-direction:column`/`gap` interno, já que agora é só uma linha de texto centralizada) e a regra `.papel-chip .pc-sub` (morta) removida. `.nu-sidebar` voltou a `gap:1.25rem; top:1.75rem` — idêntico a `.dash-sidebar`/`.admin-sidebar`. **Bug real cometido e corrigido no caminho:** o comentário adicionado sobre a mudança usou crases (`` ` ``) ao redor de nomes de classe (`` `gap` ``, `` `.dash-sidebar` ``) — como todo o bloco `css` é um template literal JavaScript, essas crases fecharam a string prematuramente, quebrando a compilação (erro real do Vite/Babel, pego imediatamente ao testar ao vivo, antes de reportar como pronto). Corrigido removendo as crases do texto do comentário. **Validado ao vivo** (conta de teste temporária promovida a admin, removida ao final): medido via JS — página cabe exatamente na viewport (897px, sem rolagem), sidebar termina com 25px de folga; confirmado visualmente que os chips ficaram mais compactos (1 linha, sem subtítulo) e a seleção de papel (clique) continua funcionando (borda/fundo âmbar ao selecionar Admin). `npm run build` — 111 módulos, sem erros |
+
+---
+
 ## Resumo por status
 
 | Status | Qtde | Linhas do `todo` |
 |--------|------|-------------------|
-| ✅ Done | 26 | 204, 225, 227, 229, 231, 233, 235, 237, 239, 241, 243, 245, 247, 256, 258, 260, 262, 264, 266, 268, 270, 272, 274, 276, 278, 280 |
-| ⬜ Todo | 3 | 249, 251, 254 |
+| ✅ Done | 32 | 204, 225, 227, 229, 231, 233, 235, 237, 239, 241, 243, 245, 247, 249, 251, 256, 258, 260, 262, 264, 266, 268, 270, 272, 274, 276, 278, 280, 282, 284, 286, 288 |
+| ⬜ Todo | 1 | 254 |
 | 🟡 Pending | 0 | — |
 
 ## Skills Futuras

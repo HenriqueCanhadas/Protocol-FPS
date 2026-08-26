@@ -34,6 +34,7 @@ from scrapers.amazon       import AmazonScraper
 from scrapers.shopee       import ShopeeScraper
 from scrapers.aliexpress   import AliExpressScraper
 from scrapers.mocadopop    import MocadopopScraper
+from scrapers.mercadolivre import MercadoLivreScraper
 from notificacoes.email    import enviar_email
 from notificacoes.telegram import enviar_telegram
 
@@ -178,6 +179,7 @@ SCRAPERS = {
     "shopee":       ShopeeScraper,
     "aliexpress":   AliExpressScraper,
     "mocadopop":    MocadopopScraper,
+    "mercadolivre": MercadoLivreScraper,
 }
 
 logger = logging.getLogger("main")
