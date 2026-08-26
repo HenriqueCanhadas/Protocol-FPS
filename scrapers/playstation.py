@@ -62,11 +62,15 @@ class PlaystationScraper(ScraperBase):
         if preco is None:
             preco = self._extrair_preco_js(page)
 
-        esgotado = self._esta_esgotado(page) or preco is None
+        esgotado = self._esta_esgotado(page)
 
         if esgotado:
             logger.info("Produto indisponível na Playstation Store: %s", nome)
             return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url)
+
+        if preco is None:
+            logger.warning("Preço não encontrado na Playstation Store: %s", url)
+            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Playstation Store: R$ %.2f", preco)
         return DadosProduto(nome=nome or "Nome não encontrado", preco=preco, disponivel=True, url=url)

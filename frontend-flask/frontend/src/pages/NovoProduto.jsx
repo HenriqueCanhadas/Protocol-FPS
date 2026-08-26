@@ -3,18 +3,19 @@
  * Formulário para adicionar produtos ao monitoramento.
  */
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
 import { getSupabase } from "@/services/supabase";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
 .np-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
-.page-wrap { width:min(800px,100%); display:flex; flex-direction:column; gap:2rem; }
-.breadcrumb { display:flex; align-items:center; gap:.6rem; font-size:var(--fs-sm); letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; }
-.breadcrumb a { color:var(--text-dim); text-decoration:none; transition:color .15s; }
-.breadcrumb a:hover { color:var(--green); }
-.page-title { font-family:var(--display); font-size:clamp(2.5rem,7vw,4rem); letter-spacing:.08em; color:var(--green); text-shadow:0 0 24px var(--green-dim); line-height:1; }
-.page-subtitle { font-size:var(--fs-base); color:var(--text-dim); letter-spacing:.1em; margin-top:.4rem; }
+.page-wrap { width:min(1800px,100%); display:flex; flex-direction:column; gap:2rem; }
+
+/* esquerda (formulário + criar categoria) + direita (fila de envio) — mesmo
+   corte de 1100px/2rem de gap já usado no .dash-grid do Dashboard (Sprint 21)
+   e no .admin-grid do Admin (Sprint 46) */
+.np-grid { display:grid; grid-template-columns:minmax(0,1fr) 380px; gap:2rem; align-items:start; }
+.np-content { display:flex; flex-direction:column; gap:2rem; min-width:0; }
+.np-sidebar { display:flex; flex-direction:column; gap:2rem; position:sticky; top:1.75rem; }
 
 .form-card { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); position:relative; }
 .form-card::before { content:attr(data-label); position:absolute; top:-1px; left:1.75rem; background:var(--bg2); color:var(--green-dim); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
@@ -35,8 +36,6 @@ const css = `
 .form-select:hover { border-color:var(--green-dim); }
 .form-select:focus { border-color:var(--green-dim); box-shadow:0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03); }
 .form-select option { background:var(--bg2); color:var(--text); }
-.cat-new-row { display:flex; gap:.6rem; }
-.cat-new-row .field-input { flex:1; }
 .form-divider { height:1px; background:var(--border2); margin:.25rem 0; }
 
 .toggle-row { display:flex; align-items:center; gap:1rem; padding:.9rem 1.1rem; background:var(--bg3); border:1px solid var(--border2); cursor:pointer; transition:border-color .15s; }
@@ -53,7 +52,10 @@ const css = `
 
 .form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 2rem; border-top:1px solid var(--border2); background:var(--bg3); }
 
-.item-row { display:grid; grid-template-columns:1fr auto auto auto; gap:1.1rem; align-items:center; padding:.9rem 1.1rem; background:var(--bg2); border:1px solid var(--border2); border-left:3px solid var(--green-dim); font-size:var(--fs-base); margin-bottom:.6rem; }
+/* 2 colunas (não as 4 originais) — a fila agora mora na sidebar estreita
+   (380px, Sprint 53), então o item quebra em 2 linhas (info+loja / meta+ações)
+   em vez de tentar caber tudo numa linha só */
+.item-row { display:grid; grid-template-columns:1fr auto; gap:.5rem 1.1rem; align-items:center; padding:.9rem 1.1rem; background:var(--bg2); border:1px solid var(--border2); border-left:3px solid var(--green-dim); font-size:var(--fs-base); margin-bottom:.6rem; }
 .item-row.editing { border-left-color:var(--amber); box-shadow:inset 3px 0 0 var(--amber); }
 .item-actions { display:flex; gap:.35rem; }
 .item-nome { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -66,13 +68,17 @@ const css = `
 .np-progress-bar { height:3px; background:var(--border2); position:relative; overflow:hidden; }
 .np-progress-fill { position:absolute; left:0; top:0; height:100%; background:linear-gradient(90deg,var(--green-dim),var(--green)); transition:width .4s ease; }
 
+@media (max-width:1100px) {
+  .np-grid { grid-template-columns:1fr; }
+  .np-sidebar { position:static; }
+}
+
 @media (max-width:640px) {
   .np-main { padding:1.25rem 1rem; }
   .form-body { padding:1.25rem; }
   .form-actions { padding:1.1rem 1.25rem; flex-direction:column; }
   .fields-grid.cols-2 { grid-template-columns:1fr; }
   .preco-meta-fields.visible { grid-template-columns:1fr; }
-  .item-row { grid-template-columns:1fr auto; }
 }
 `;
 
@@ -85,6 +91,10 @@ const LOJAS_DETECTADAS = {
   "logitechstore.com.br":  "logitec",
   "tangleteezer.com.br":   "tangleteezer",
   "amazon.com.br":         "amazon",
+  "shopee.com.br":         "shopee",
+  "aliexpress.com":        "aliexpress",
+  "mocadopop.com.br":      "mocadopop",
+  "mercadolivre.com.br":   "mercadolivre",
 };
 // Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
 // Categorias novas (todo, criadas por admin — ver criarCategoria) entram
@@ -94,7 +104,17 @@ const CATEGORIA_LABEL_FIXA = { GPU: "GPU", CPU: "CPU", RAM: "RAM", PSU: "Fonte",
 const LOJAS_LABEL = {
   kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
   tuyo: "Tuyo", playstation: "Playstation", logitec: "Logitec",
-  tangleteezer: "Tangle Teezer", amazon: "Amazon",
+  tangleteezer: "Tangle Teezer", amazon: "Amazon", shopee: "Shopee",
+  aliexpress: "AliExpress", mocadopop: "Mocadopop", mercadolivre: "Mercado Livre",
+};
+// Sprint 42 (V5, todo:239): lojas com limitação estrutural CONHECIDA e
+// documentada (README.md/CLAUDE.md) — o item pode ser cadastrado normalmente,
+// mas a coleta de preço não funciona hoje. Aviso só para não surpreender o
+// usuário meses depois vendo "não localizado"/"esgotado" sem explicação.
+const LOJAS_SEM_COLETA = {
+  pichau: "A Pichau bloqueia coletas feitas a partir de IP de datacenter — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária (GitHub Actions) este item tende a aparecer como \"não localizado\".",
+  shopee: "A Shopee exige login para mostrar o preço — o projeto não consegue coletar essa loja em nenhum ambiente hoje (nem local, nem automático). O item pode ser cadastrado, mas o preço nunca vai atualizar sozinho.",
+  aliexpress: "O AliExpress redireciona a coleta automática (GitHub Actions) para o site americano (aliexpress.us), que não carrega — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária este item tende a aparecer como \"não localizado\".",
 };
 
 function rotuloCategoria(categoria, nomeDb) {
@@ -299,16 +319,8 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
 
       <main className="np-main">
         <div className="page-wrap">
-          <nav className="breadcrumb">
-            <Link to="/">Dashboard</Link>
-            <span>›</span><span>Novo Produto</span>
-          </nav>
-
-          <div>
-            <div className="page-title">NOVO<br />PRODUTO</div>
-            <div className="page-subtitle">Adicione URLs para monitorar — KaBuM, Terabyte ou Pichau</div>
-          </div>
-
+          <div className="np-grid">
+          <div className="np-content">
           {/* FORM */}
           <div className="form-card" data-label={editandoId != null ? "EDITANDO ITEM DA FILA" : "DADOS DO PRODUTO"}>
             <div className="form-body">
@@ -365,6 +377,9 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
                     ))}
                   </select>
                   {erros.loja && <div className="field-error">Selecione a loja</div>}
+                  {LOJAS_SEM_COLETA[loja] && (
+                    <div className="field-warn">⚠ {LOJAS_SEM_COLETA[loja]}</div>
+                  )}
                 </div>
               </div>
 
@@ -410,32 +425,31 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
               <button className="btn-primary"   onClick={adicionar}>{editandoId != null ? "SALVAR EDIÇÃO" : "ADICIONAR À FILA"}</button>
             </div>
           </div>
+          </div>
 
+          <div className="np-sidebar">
           {/* CRIAR CATEGORIA — seção própria, admin-only (Sprint 33, todo:220;
-              antes era um link dentro do campo Categoria, Sprint 31) */}
+              antes era um link dentro do campo Categoria, Sprint 31); movida
+              para a sidebar direita na Sprint 53b (pedido do usuário) */}
           {isAdmin && (
             <div className="form-card" data-label="CRIAR NOVA CATEGORIA">
               <div className="form-body">
                 <div className="field-group">
                   <div className="field-label">Nome da categoria</div>
-                  <div className="cat-new-row">
-                    <input
-                      className="field-input" type="text" placeholder="Nome da nova categoria (ex.: Cooler)"
-                      value={novaCategoriaNome}
-                      onChange={(e) => setNovaCategoriaNome(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
-                    />
-                    <button className="btn-primary" style={{ whiteSpace: "nowrap" }}
-                      disabled={!novaCategoriaNome.trim() || salvandoCategoria} onClick={criarCategoria}>
-                      {salvandoCategoria ? "CRIANDO..." : "CRIAR CATEGORIA"}
-                    </button>
-                  </div>
-                  <div className="field-hint">Fica disponível no campo Categoria acima assim que criada, já selecionada.</div>
+                  <input
+                    className="field-input" type="text" placeholder="Nome da nova categoria (ex.: Cooler)"
+                    value={novaCategoriaNome}
+                    onChange={(e) => setNovaCategoriaNome(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && criarCategoria()}
+                  />
+                  <button className="btn-primary" style={{ marginTop: ".9rem", width: "100%" }}
+                    disabled={!novaCategoriaNome.trim() || salvandoCategoria} onClick={criarCategoria}>
+                    {salvandoCategoria ? "CRIANDO..." : "CRIAR CATEGORIA"}
+                  </button>
                 </div>
               </div>
             </div>
           )}
-
           {/* FILA */}
           <div className="form-card" data-label="FILA DE ENVIO">
             <div className="form-body" style={{ gap: "1.1rem" }}>
@@ -474,6 +488,8 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
                 {salvando ? "SALVANDO..." : "SALVAR NO BANCO DE DADOS"}
               </button>
             </div>
+          </div>
+          </div>
           </div>
         </div>
       </main>

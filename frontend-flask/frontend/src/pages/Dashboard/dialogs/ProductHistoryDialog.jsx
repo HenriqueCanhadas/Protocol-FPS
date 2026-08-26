@@ -70,8 +70,9 @@ export default function ProductHistoryDialog({ itemId, nome, onClose, showToast,
   };
 
   const precos = (dados || []).filter((d) => d.preco).map((d) => d.preco);
-  const minPreco = precos.length ? Math.min(...precos) : 0;
-  const maxPreco = precos.length ? Math.max(...precos) : 0;
+  const temPreco = precos.length > 0;
+  const minPreco = temPreco ? Math.min(...precos) : 0;
+  const maxPreco = temPreco ? Math.max(...precos) : 0;
   const amplitude = maxPreco - minPreco || 1;
 
   return (
@@ -118,7 +119,7 @@ export default function ProductHistoryDialog({ itemId, nome, onClose, showToast,
               </div>
 
               <div style={{ fontSize: "var(--fs-sm)", color: "var(--text-dim)", marginBottom: "1.25rem", letterSpacing: ".15em" }}>
-                ★ MENOR PREÇO: <span className="green">{formatBRL(minPreco)}</span>
+                ★ MENOR PREÇO: <span className="green">{temPreco ? formatBRL(minPreco) : "—"}</span>
                 <span style={{ marginLeft: "1.5rem", color: "var(--text-muted)" }}>{dados.length} leitura(s)</span>
               </div>
               <GraficoHistorico dados={dados} onPontoClick={irParaLeitura} />
@@ -138,7 +139,7 @@ export default function ProductHistoryDialog({ itemId, nome, onClose, showToast,
                         <div className={`bar-fill${isMin ? " min-price" : ""}`} style={{ width: `${pct}%` }} />
                       </div>
                       <div className={`chart-price${isMin ? " min-price" : ""}`}>
-                        {d.preco ? formatBRL(d.preco) : "esgotado"}
+                        {d.preco ? formatBRL(d.preco) : d.encontrado === false ? "não localizado" : "esgotado"}
                       </div>
                       <button
                         className={`hist-check${isSel ? " on" : ""}`}

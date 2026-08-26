@@ -397,9 +397,11 @@ manualmente mais cedo na sessão — uma nova aba foi aberta em seguida e a sess
 
 | Status | Qtde | Linhas do `todo` |
 |--------|------|-------------------|
-| ✅ Done | 18 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 214, 216, 218, 220 |
-| ⬜ Todo | 2 | 204 (proposto na Sprint 30), 210 (absorvido pela V3 — ver nota na própria linha) |
+| ✅ Done | 18 | 182, 184, 186, 188, 190, 192, 194, 196, 198, 200, 202, 206, 208, 212, 214, 216, 218, 220 (Nota 23/08/2026: 214/218/220 estavam concluídos desde as Sprints 29/32-32c/33 mas ficaram sem `OK-` no `todo` até a reconciliação feita na Sprint 41/V5) |
+| ⬜ Todo | 0 | — |
 | 🟡 Pending | 0 | — |
+| Movido p/ V5 | 1 | 204 — proposta "Sprint 30" (deixada de fora a pedido do usuário), retomada e concluída na Sprint 41 (`project/sprint_v5.md`) |
+| Absorvido | 1 | 210 (absorvido pela reestruturação V3 — ver nota na própria linha do `todo`) |
 
 ## Skills Futuras
 

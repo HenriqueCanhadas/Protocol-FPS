@@ -13,13 +13,30 @@
  * Sprint 27/V4 (todo:206): passar o mouse sobre o nome do produto mostra
  * a URL completa de origem num tooltip (mesma linguagem visual do
  * .price-tooltip da Sprint 25) — o nome em si já é um link (item.url).
+ *
+ * Sprint 50/V5 (todo:256): cabeçalho de cada coluna (Produto/Loja/Categoria/
+ * Preço atual/Status) fica clicável para ordenar — mesmo sortCampo/sortDir/
+ * toggleSort já acionados pelo dropdown "Ordenar" da ControlBar (useDashboardFilters),
+ * então os dois ficam sincronizados; mesmo padrão visual (▲/▼) já usado na
+ * tabela "Detalhe por usuário e item" do Admin (Sprint 43). Abaixo de 700px
+ * o <thead> já é escondido (Sprint 39, layout de cards) — cabeçalho clicável
+ * é um recurso de desktop, o dropdown continua sendo o único caminho no celular.
  */
 import { dataBRT, dataHoraBRT } from "@/utils/datas";
 import { formatBRL } from "@/utils/format";
+import { statusItem, CAT_LABEL } from "@/pages/Dashboard/Dashboard.constants";
+
+function ThOrdenavel({ campo, label, sortCampo, sortDir, toggleSort }) {
+  return (
+    <th className="sortable" onClick={() => toggleSort(campo)}>
+      {label}{sortCampo === campo && <span className="sort-arrow">{sortDir === "asc" ? "▲" : "▼"}</span>}
+    </th>
+  );
+}
 
 export default function ProductTable({
   dados, dadosFiltrados, termoBusca, filtroDia, isAdmin, user, rotuloDono,
-  selectedId, onSelectRow,
+  selectedId, onSelectRow, sortCampo, sortDir, toggleSort,
 }) {
   return (
     <div className="price-table-wrap">
@@ -38,20 +55,23 @@ export default function ProductTable({
           <colgroup>
             <col className="col-produto" />
             <col className="col-loja" />
+            <col className="col-categoria" />
             <col className="col-preco" />
             <col className="col-status" />
           </colgroup>
           <thead>
             <tr>
-              <th>Produto</th><th>Loja</th><th>Preço atual</th><th>Status</th>
+              <ThOrdenavel campo="nome" label="Produto" sortCampo={sortCampo} sortDir={sortDir} toggleSort={toggleSort} />
+              <ThOrdenavel campo="loja" label="Loja" sortCampo={sortCampo} sortDir={sortDir} toggleSort={toggleSort} />
+              <ThOrdenavel campo="categoria" label="Categoria" sortCampo={sortCampo} sortDir={sortDir} toggleSort={toggleSort} />
+              <ThOrdenavel campo="preco" label="Preço atual" sortCampo={sortCampo} sortDir={sortDir} toggleSort={toggleSort} />
+              <ThOrdenavel campo="status" label="Status" sortCampo={sortCampo} sortDir={sortDir} toggleSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
             {dadosFiltrados.map((item) => {
               const monitorando  = item.monitorando !== false;
-              const abaixoDaMeta = monitorando && item.preco_meta && item.preco && item.preco < item.preco_meta;
-              const statusClass  = !monitorando ? "off" : !item.disponivel ? "out" : abaixoDaMeta ? "alert" : "ok";
-              const statusTxt    = !monitorando ? "OFF" : !item.disponivel ? "ESGOTADO" : abaixoDaMeta ? "ALERTA" : "OK";
+              const { classe: statusClass, texto: statusTxt } = statusItem(item);
               const precoFmt     = item.preco ? formatBRL(item.preco) : null;
               const selecionada  = item.item_id === selectedId;
               return (
@@ -69,16 +89,16 @@ export default function ProductTable({
                           </div>
                         : item.nome_na_loja}
                     </div>
-                    <div className="prod-cat">
-                      {item.categoria}
-                      {isAdmin && item.dono_id && (
+                    {isAdmin && item.dono_id && (
+                      <div className="prod-cat">
                         <span className={`prod-dono${item.dono_id === user?.id ? " prod-dono-voce" : ""}`}>
                           ◈ {rotuloDono(item)}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </td>
                   <td><span className="loja-badge">{item.loja}</span></td>
+                  <td className="td-categoria">{CAT_LABEL[item.categoria] || item.categoria}</td>
                   <td>
                     {precoFmt
                       ? <div className="price-hover" tabIndex={0}>

@@ -117,7 +117,7 @@ class KabumScraper(ScraperBase):
 
         if preco is None:
             logger.warning("Preço não encontrado: %s", url)
-            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado: R$ %.2f", preco)
         return DadosProduto(

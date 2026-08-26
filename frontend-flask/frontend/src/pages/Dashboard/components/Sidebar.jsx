@@ -3,9 +3,9 @@
  * Coluna lateral da Dashboard (Sprint 21/V3): gráfico do item selecionado,
  * últimos dias de coleta e detalhe/atividade.
  *
- * V4: ganhou o KpiRibbon (Itens monitorados/Abaixo da meta/Menor preço
- * hoje/Última coleta), que saiu da faixa full-width no topo da página e
- * virou mais um painel aqui, no mesmo estilo dos demais.
+ * V4: ganhou o KpiRibbon, que saiu da faixa full-width no topo da página e
+ * virou mais um painel aqui, no mesmo estilo dos demais (fórmulas dos 4
+ * cards revistas na Sprint 36/V5 — ver KpiRibbon.jsx).
  */
 import KpiRibbon from "./KpiRibbon";
 import PriceChartPanel from "./PriceChartPanel";

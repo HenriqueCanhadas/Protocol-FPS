@@ -10,33 +10,45 @@
  * SERVICE_KEY; o browser só envia o access_token da sessão do admin.
  */
 import { useState, useEffect, useCallback } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Navigate } from "react-router-dom";
 import { getSupabase } from "@/services/supabase";
 import { dataHoraBRT } from "@/utils/datas";
 import ConfirmModal from "@/components/ConfirmModal";
 
 const css = `
-.nu-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
-.page-wrap { width:min(960px,100%); display:flex; flex-direction:column; gap:2rem; }
-.breadcrumb { display:flex; align-items:center; gap:.6rem; font-size:var(--fs-sm); letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; }
-.breadcrumb a { color:var(--text-dim); text-decoration:none; transition:color .15s; }
-.breadcrumb a:hover { color:var(--green); }
-.page-title { font-family:var(--display); font-size:clamp(2.5rem,7vw,4rem); letter-spacing:.08em; color:var(--green); text-shadow:0 0 24px var(--green-dim); line-height:1; }
-.page-subtitle { font-size:var(--fs-base); color:var(--text-dim); letter-spacing:.1em; margin-top:.4rem; }
+.nu-main { flex:1; padding:1.1rem 1.5rem .5rem; display:flex; justify-content:center; }
+.page-wrap { width:min(1800px,100%); display:flex; flex-direction:column; gap:2rem; }
+
+/* esquerda (listagem, mais larga) + direita (criar usuário / trocar senha) —
+   mesmo corte de 1100px/2rem de gap já usado no .dash-grid do Dashboard
+   (Sprint 21) e no .admin-grid do Admin (Sprint 46) */
+.nu-grid { display:grid; grid-template-columns:minmax(0,1fr) 460px; gap:2rem; align-items:start; }
+.nu-content { display:flex; flex-direction:column; gap:2rem; min-width:0; }
+/* Sprint 66 (todo:286): sidebar reduzida pra caber os 2 cards na tela sem
+   rolagem própria (paddings internos menores que os padrões de
+   NovoProduto/Admin — esta é a única sidebar do projeto com 2 cards
+   "pesados" empilhados, então precisa ser mais compacta que as outras).
+   O gap entre os cards, porém, é o mesmo padrão do .dash-sidebar
+   (Dashboard) e .admin-sidebar (Admin) — Sprint 67 devolveu esse valor
+   depois que remover o subtítulo dos chips de Papel abriu espaço de sobra */
+.nu-sidebar { display:flex; flex-direction:column; gap:1.25rem; position:sticky; top:1.75rem; }
 
 .form-card { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); position:relative; }
 .form-card::before { content:attr(data-label); position:absolute; top:-1px; left:1.75rem; background:var(--bg2); color:var(--green-dim); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
 .form-card.card-amber { border-top-color:var(--amber); }
 .form-card.card-amber::before { color:var(--amber); }
-.form-body { padding:2rem; display:flex; flex-direction:column; gap:1.75rem; }
-.fields-grid { display:grid; gap:1.5rem; }
+.form-body { padding:.8rem 1.25rem; display:flex; flex-direction:column; gap:.6rem; }
+.fields-grid { display:grid; gap:.55rem; }
 .fields-grid.cols-2 { grid-template-columns:1fr 1fr; }
 .field-group { display:flex; flex-direction:column; }
-.form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 2rem; border-top:1px solid var(--border2); background:var(--bg3); }
+.form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:.5rem 1.5rem; border-top:1px solid var(--border2); background:var(--bg3); }
 
-.papel-chips { display:flex; gap:.6rem; flex-wrap:wrap; }
-.papel-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; display:flex; flex-direction:column; gap:.2rem; }
-.papel-chip .pc-sub { font-size:var(--fs-xs); color:var(--text-muted); text-transform:none; letter-spacing:.02em; }
+/* Papel padrão/Admin lado a lado (Sprint 66) — cada chip com flex:1 pra
+   dividir a largura igualmente. Sprint 67: subtítulo explicativo removido
+   do corpo do chip (texto passou pro atributo title, some ao passar o
+   mouse) — sem ele o chip vira 1 linha só, ainda mais compacto. */
+.papel-chips { display:flex; gap:.6rem; }
+.papel-chip { flex:1; min-width:0; text-align:center; background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.6rem .75rem; cursor:pointer; transition:all .15s; user-select:none; }
 .papel-chip:hover { border-color:var(--green-dim); color:var(--text); }
 .papel-chip.sel-normal { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .papel-chip.sel-admin  { border-color:var(--amber); color:var(--amber); background:rgba(255,184,0,.08); }
@@ -52,8 +64,8 @@ const css = `
 /* ── Listagem de usuários ─────────────────────────────────── */
 .users-scroll { overflow-x:auto; }
 .users-table { width:100%; border-collapse:collapse; font-family:var(--mono); font-size:var(--fs-sm); }
-.users-table th { text-align:left; padding:.7rem .9rem; color:var(--text-dim); font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; border-bottom:1px solid var(--border2); white-space:nowrap; }
-.users-table td { padding:.8rem .9rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:middle; white-space:nowrap; }
+.users-table th { text-align:left; padding:.7rem .55rem; color:var(--text-dim); font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; border-bottom:1px solid var(--border2); white-space:nowrap; }
+.users-table td { padding:.8rem .55rem; border-bottom:1px solid var(--border); color:var(--text); vertical-align:middle; white-space:nowrap; }
 .users-table tr:last-child td { border-bottom:none; }
 .users-table tr:hover td { background:var(--bg3); }
 .u-email { display:flex; flex-direction:column; gap:.15rem; }
@@ -72,6 +84,11 @@ const css = `
 .btn-excluir:hover:not(:disabled) { border-color:var(--red); background:rgba(255,60,60,.08); }
 .btn-excluir:disabled { opacity:.35; cursor:not-allowed; }
 .users-empty { padding:1.5rem; color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.08em; }
+
+@media (max-width:1100px) {
+  .nu-grid { grid-template-columns:1fr; }
+  .nu-sidebar { position:static; }
+}
 
 @media (max-width:640px) {
   .nu-main { padding:1.25rem 1rem; }
@@ -281,16 +298,8 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
 
       <main className="nu-main">
         <div className="page-wrap">
-          <nav className="breadcrumb">
-            <Link to="/">Dashboard</Link>
-            <span>›</span><span>Usuários</span>
-          </nav>
-
-          <div>
-            <div className="page-title">USUÁRIOS</div>
-            <div className="page-subtitle">Gestão de acesso — visível apenas para administradores</div>
-          </div>
-
+          <div className="nu-grid">
+          <div className="nu-content">
           {/* LISTAGEM */}
           <div className="form-card" data-label="USUÁRIOS CADASTRADOS">
             {carregando ? (
@@ -379,8 +388,11 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
               </div>
             )}
           </div>
+          </div>
 
-          {/* CRIAR USUÁRIO */}
+          <div className="nu-sidebar">
+          {/* CRIAR USUÁRIO — de volta pra sidebar (Sprint 65/todo:284), acima
+              de ALTERAR SENHA; tinha ido pra cima da listagem na Sprint 53b */}
           <div className="form-card" data-label="CRIAR USUÁRIO">
             <div className="form-body">
               <div className="field-group">
@@ -391,7 +403,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                 {erros.email && <div className="field-error">{erros.email}</div>}
               </div>
 
-              <div className="fields-grid cols-2">
+              <div className="fields-grid">
                 <div className="field-group">
                   <div className="field-label">Senha <span className="red">*</span></div>
                   <input className="field-input" type="password" placeholder="••••••••"
@@ -411,13 +423,13 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
               <div className="field-group">
                 <div className="field-label">Papel <span className="red">*</span></div>
                 <div className="papel-chips">
-                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}>
-                    <span>Usuário padrão</span>
-                    <span className="pc-sub">Vê e gerencia apenas os próprios itens</span>
+                  <div className={`papel-chip${nivel === 1 ? " sel-normal" : ""}`} onClick={() => setNivel(1)}
+                    title="Vê e gerencia apenas os próprios itens">
+                    Usuário padrão
                   </div>
-                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}>
-                    <span>Admin</span>
-                    <span className="pc-sub">Vê os itens de todos e gerencia usuários</span>
+                  <div className={`papel-chip${nivel === 2 ? " sel-admin" : ""}`} onClick={() => setNivel(2)}
+                    title="Vê os itens de todos e gerencia usuários">
+                    Admin
                   </div>
                 </div>
               </div>
@@ -429,7 +441,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
             </div>
           </div>
 
-          {/* TROCAR SENHA */}
+          {/* ALTERAR SENHA — abaixo de CRIAR USUÁRIO na sidebar (Sprint 65) */}
           <div className="form-card card-amber" data-label="ALTERAR SENHA DE USUÁRIO">
             <div className="form-body">
               <div className="field-group">
@@ -446,7 +458,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                 {errosTs.alvo && <div className="field-error">{errosTs.alvo}</div>}
               </div>
 
-              <div className="fields-grid cols-2">
+              <div className="fields-grid">
                 <div className="field-group">
                   <div className="field-label">Nova senha <span className="red">*</span></div>
                   <input className="field-input" type="password" placeholder="••••••••"
@@ -470,6 +482,8 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                 {trocando ? "ALTERANDO..." : "ALTERAR SENHA"}
               </button>
             </div>
+          </div>
+          </div>
           </div>
         </div>
       </main>

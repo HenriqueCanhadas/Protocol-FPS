@@ -1,0 +1,61 @@
+-- ═══════════════════════════════════════════════════════════════════════
+-- Correção de segurança — view `ultimo_preco` exposta sem RLS ("Unrestricted"
+-- no Supabase Studio).
+--
+-- Achado em 26/08/2026 ao validar a migração da Sprint 48: `ultimo_preco`
+-- é uma view de conveniência (documentada em project/banco.md §4, criada
+-- antes da convenção de RLS/migrations) que junta `itens` + última leitura
+-- de `historico_precos`. Ela NÃO tem RLS e, por padrão, uma view no
+-- Postgres roda com o privilégio de quem a criou — então mesmo `itens` e
+-- `historico_precos` tendo RLS habilitado, a view os contorna por completo.
+--
+-- CONFIRMADO AO VIVO (chave anônima pública, a mesma que fica no bundle JS
+-- do site, sem nenhum login): a consulta
+--   GET /rest/v1/ultimo_preco?select=*
+-- devolveu itens monitorados de VÁRIOS usuários diferentes — nome do
+-- produto, URL, preço-alvo (`preco_meta`), preço atual, disponibilidade.
+-- Comparação: a mesma chave contra `itens` (que tem RLS) devolveu vazio,
+-- como esperado. Ou seja, qualquer pessoa na internet, sem se autenticar,
+-- conseguia ler os itens/preços monitorados de todo mundo através dessa
+-- view — quebra a garantia central do modelo multiusuário (RLS "cada um só
+-- vê o que é seu").
+--
+-- A própria doc (banco.md) já registra que "o Dashboard atual NÃO usa esta
+-- view" — nenhuma referência a `ultimo_preco` existe em código (grep no
+-- projeto inteiro só retorna documentação). Por isso a correção recomendada
+-- é simplesmente apagá-la (Opção A) — elimina o vazamento de vez, sem
+-- perder nada em uso. A definição fica registrada aqui e em banco.md §4 se
+-- algum dia for realmente necessária de novo.
+--
+-- Rodar MANUALMENTE no SQL Editor do Supabase (a SERVICE_KEY não executa
+-- DDL).
+-- ═══════════════════════════════════════════════════════════════════════
+
+-- ── Opção A (recomendada): apagar a view, já que nada no projeto a usa ──
+drop view if exists public.ultimo_preco;
+
+-- ── Opção B (alternativa, SÓ SE você quiser manter a view pra uso futuro):
+--    em vez do DROP acima, habilite RLS nela e recrie com security_invoker,
+--    pra herdar as políticas de `itens`/`historico_precos` em vez de
+--    contorná-las. Descomente o bloco abaixo E comente o `drop view` acima.
+--
+-- create or replace view public.ultimo_preco
+-- with (security_invoker = true) as
+-- select
+--   i.id as item_id, i.nome_na_loja, i.url, i.preco_meta, i.monitorando,
+--   l.nome as loja, p.categoria, p.nome as produto,
+--   h.preco, h.disponivel, h.coletado_em
+-- from public.itens i
+-- join public.lojas l on l.id = i.loja_id
+-- join public.produtos p on p.id = i.produto_id
+-- left join lateral (
+--   select preco, disponivel, coletado_em
+--   from public.historico_precos
+--   where item_id = i.id
+--   order by coletado_em desc
+--   limit 1
+-- ) h on true;
+
+-- ── Conferência (rodar depois, com a ANON KEY do projeto — nunca deve
+--    devolver linhas sem estar autenticado) ───────────────────────────────
+-- select * from ultimo_preco limit 1;  -- via anon key, deve dar erro/vazio

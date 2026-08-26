@@ -5,16 +5,11 @@
  * gerenciadas apenas pelo fluxo admin (página Usuários); o card Segurança
  * orienta a pedir a um admin, sem revelar quem são os admins.
  */
-import { Link } from "react-router-dom";
 import { dataHoraBRT } from "@/utils/datas";
 
 const css = `
 .conta-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
 .page-wrap-sm { width:min(680px,100%); display:flex; flex-direction:column; gap:2rem; }
-.breadcrumb { display:flex; align-items:center; gap:.6rem; font-size:var(--fs-sm); letter-spacing:.15em; color:var(--text-dim); text-transform:uppercase; }
-.breadcrumb a { color:var(--text-dim); text-decoration:none; transition:color .15s; }
-.breadcrumb a:hover { color:var(--green); }
-.page-title-sm { font-family:var(--display); font-size:clamp(2.5rem,7vw,4rem); letter-spacing:.08em; color:var(--green); text-shadow:0 0 24px var(--green-dim); line-height:1; }
 
 .info-card { background:var(--bg2); border:1px solid var(--border2); border-top:2px solid var(--green-dim); position:relative; }
 .info-card::before { content:attr(data-label); position:absolute; top:-1px; left:1.75rem; background:var(--bg2); color:var(--green-dim); font-size:var(--fs-xs); letter-spacing:.3em; padding:0 .6rem; transform:translateY(-50%); text-transform:uppercase; }
@@ -51,13 +46,6 @@ export default function Conta({ user, perfil, signOut }) {
       <style>{css}</style>
       <main className="conta-main">
         <div className="page-wrap-sm">
-          <nav className="breadcrumb">
-            <Link to="/">Dashboard</Link>
-            <span>›</span><span>Conta</span>
-          </nav>
-
-          <div className="page-title-sm">CONTA</div>
-
           {/* Sessão */}
           <div className="info-card" data-label="SESSÃO ATIVA">
             <div className="info-body">

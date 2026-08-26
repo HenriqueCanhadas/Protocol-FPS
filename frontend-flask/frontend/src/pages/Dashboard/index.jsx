@@ -28,12 +28,12 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import { getSupabase } from "@/services/supabase";
-import { buscarItens, removerNoServidor } from "@/services/dashboard.service";
+import { buscarItens, buscarCategorias, removerNoServidor } from "@/services/dashboard.service";
 import { useDashboardFilters } from "@/hooks/useDashboardFilters";
 import { useProductSelection } from "@/hooks/useProductSelection";
 import { dataBRT } from "@/utils/datas";
 import { formatBRL } from "@/utils/format";
-import { CAT_LABEL } from "./Dashboard.constants";
+import { rotuloCategoria, ordenarCategorias } from "./Dashboard.constants";
 
 import ConfirmModal from "@/components/ConfirmModal";
 import ControlBar from "./components/ControlBar";
@@ -54,6 +54,7 @@ const css = `
 .stat-value { font-family:var(--display); font-size:1.2rem; letter-spacing:.03em; color:var(--green); line-height:1.1; }
 .stat-sub   { font-size:var(--fs-xs); color:var(--text-muted); line-height:1.2; word-break:break-word; }
 .stat-value.amber { color:var(--amber); }
+.stat-value.red { color:var(--red); }
 
 .dash-main { flex:1; padding:1.75rem 1.5rem; display:flex; flex-direction:column; gap:2rem; }
 
@@ -164,17 +165,21 @@ const css = `
 
 /* painel único de filtros — dropdowns compactos em vez de fileiras de chips
    (pedido do usuário: sobrar espaço vertical para a tabela) */
-.filters-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.85rem 1rem; padding:.85rem 1rem; background:var(--bg2); border:1px solid var(--border2); }
+.filters-row { display:flex; flex-wrap:wrap; align-items:flex-end; gap:.7rem .75rem; padding:.7rem .85rem; background:var(--bg2); border:1px solid var(--border2); }
 .filter-group { display:flex; flex-direction:column; gap:.3rem; }
 .filter-group-label { font-size:var(--fs-xs); letter-spacing:.18em; text-transform:uppercase; color:var(--text-dim); white-space:nowrap; }
 .filter-select {
   background:var(--bg3); border:1px solid var(--border2);
   color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm);
-  letter-spacing:.04em; padding:.5rem .6rem; cursor:pointer;
-  /* largura reduzida (era 220px) — margem extra para nunca estourar a
-     largura do card de filtros em navegadores que renderizam <select>
-     nativo um pouco mais largo (ex.: Opera GX) */
-  max-width:180px; outline:none; transition:border-color .15s,box-shadow .15s,color .15s;
+  letter-spacing:.04em; padding:.45rem .55rem; cursor:pointer;
+  /* largura reduzida (era 220px, depois 180px — Sprint 64/todo:282: com
+     admin + uma loja específica selecionada, os grupos extras "Usuário" e
+     "Produto" apareciam juntos e estouravam a largura da linha por poucos
+     pixels, empurrando "Ações" pra uma linha própria; 150px reabre a folga
+     necessária em telas normais, sem cortar nenhum rótulo hoje existente —
+     o texto integral de cada opção continua visível no menu aberto,
+     independente da largura da caixa fechada) */
+  max-width:150px; outline:none; transition:border-color .15s,box-shadow .15s,color .15s;
 }
 .filter-select:hover,.filter-select:focus { border-color:var(--green-dim); color:var(--text); }
 .filter-select.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
@@ -213,14 +218,23 @@ const css = `
 
 /* tabela */
 .price-table-wrap { overflow-x:auto; border:1px solid var(--border2); }
-table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:760px; }
-/* Larguras fixas das colunas (Sprint 19: coluna Ações saiu, virou ActionBar) */
-.col-produto { width:50%; }
-.col-loja    { width:17%; }
-.col-preco   { width:20%; }
-.col-status  { width:13%; }
+table { width:100%; border-collapse:collapse; font-size:var(--fs-base); table-layout:fixed; min-width:820px; }
+/* Larguras fixas das colunas (Sprint 19: coluna Ações saiu, virou ActionBar;
+   Sprint 44/V5, todo:243: coluna Categoria nova, tirado espaço de Produto/
+   Loja/Status para caber) */
+.col-produto   { width:40%; }
+.col-loja      { width:15%; }
+.col-categoria { width:12%; }
+.col-preco     { width:18%; }
+.col-status    { width:15%; }
+.td-categoria  { color:var(--text-dim); font-size:var(--fs-sm); letter-spacing:.06em; }
 thead { background:var(--bg3); position:sticky; top:0; z-index:2; }
 th { text-align:left; padding:.85rem 1.1rem; font-size:var(--fs-xs); letter-spacing:.25em; text-transform:uppercase; color:var(--text-dim); border-bottom:1px solid var(--border2); white-space:nowrap; }
+/* cabeçalho clicável (Sprint 50/V5, todo:256) — mesmo padrão .sortable/
+   .sort-arrow já usado na tabela "Detalhe por usuário e item" do Admin */
+th.sortable { cursor:pointer; user-select:none; }
+th.sortable:hover { color:var(--green); }
+th .sort-arrow { color:var(--green); margin-left:.3rem; }
 tbody tr { border-bottom:1px solid var(--border); transition:background .15s; cursor:pointer; }
 tbody tr:hover { background:rgba(57,255,20,.025); }
 tbody tr:last-child { border-bottom:none; }
@@ -235,7 +249,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .td-produto { min-width:220px; }
 .prod-nome { font-size:var(--fs-base); font-weight:500; line-height:1.35; }
 .prod-cat  { font-size:var(--fs-xs); color:var(--text-dim); margin-top:.15rem; letter-spacing:.1em; text-transform:uppercase; }
-.loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .65rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
+.loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .45rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.3rem; letter-spacing:.03em; color:var(--green); }
 /* meta/★ menor/data de coleta saíram da célula e viraram tooltip no hover
    do preço atual (Sprint 25/V4 — antes ficavam sempre visíveis, 3 linhas
@@ -268,11 +282,12 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .catm-chip:hover { border-color:var(--green-dim); color:var(--text); }
 .catm-chip.sel { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .price-unavailable { color:var(--text-muted); font-size:var(--fs-sm); }
-.status-badge { font-size:var(--fs-xs); letter-spacing:.15em; text-transform:uppercase; padding:.3rem .75rem; border:1px solid; }
+.status-badge { font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; padding:.3rem .5rem; border:1px solid; white-space:nowrap; }
 .status-badge.ok    { color:var(--green); border-color:var(--green-dim); }
 .status-badge.out   { color:var(--text-muted); border-color:var(--border); }
 .status-badge.alert { color:var(--amber); border-color:var(--amber); }
 .status-badge.off   { color:var(--red); border-color:rgba(255,68,68,.4); }
+.status-badge.notfound { color:var(--blue); border-color:var(--blue); }
 .prod-nome-link { color:inherit; text-decoration:none; border-bottom:1px solid transparent; transition:color .15s,border-color .15s; }
 .prod-nome-link:hover { color:var(--green); border-bottom-color:var(--green-dim); }
 /* Sprint 27/V4 (todo:206): URL completa em tooltip ao passar o mouse sobre
@@ -411,9 +426,39 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 
 .empty { text-align:center; padding:3rem 1.5rem; color:var(--text-dim); font-size:var(--fs-base); letter-spacing:.1em; line-height:2; }
 
+/* Sprint 39/V5 (todo:235): abaixo do min-width da tabela (760px) a rolagem
+   horizontal contida (.price-table-wrap) escondia Loja/Preço/Status fora da
+   tela sem nenhuma indicação visual de que havia mais conteúdo ao lado —
+   pior ainda, uma tentativa anterior aqui simplesmente escondia a coluna
+   Status via display:none, perdendo informação. Substituído por um layout
+   de cards: cada linha vira um cartão empilhado com todos os dados
+   visíveis, sem esconder nada e sem depender de rolagem lateral. */
 @media (max-width:700px) {
-  th:nth-child(4),td:nth-child(4) { display:none; }
   .dash-main { padding:1.25rem 1rem; }
+  .price-table-wrap table { min-width:0; }
+  .price-table-wrap thead { display:none; }
+  .price-table-wrap table, .price-table-wrap tbody { display:block; }
+  .price-table-wrap tbody tr {
+    display:flex; flex-wrap:wrap; align-items:center;
+    gap:.35rem .7rem; padding:.75rem .9rem;
+  }
+  .price-table-wrap td { display:block; padding:0; }
+  .price-table-wrap .td-produto { flex:1 1 100%; order:1; min-width:0; }
+  .price-table-wrap td:nth-child(2) { order:2; }
+  .price-table-wrap td:nth-child(3) { order:3; }
+  .price-table-wrap td:nth-child(4) { order:4; margin-left:auto; }
+  .price-table-wrap td:nth-child(5) { order:5; }
+  /* .price-tooltip (nowrap, sem max-width) ficava invisível mas ainda
+     contava no scrollWidth do .price-table-wrap ao extrapolar a largura do
+     card — rolagem horizontal "fantasma" reportada pelo usuário no celular
+     mesmo a página inteira não vazando. Ancorado no <tr> (padding-box vira o
+     containing block) em vez de no preço, com quebra de linha normal: o
+     tooltip fica sempre contido dentro da largura do próprio cartão. */
+  .price-table-wrap tbody tr { position:relative; }
+  .price-hover { position:static; }
+  .price-tooltip {
+    left:.9rem; right:.9rem; white-space:normal; max-width:none;
+  }
 }
 @media (max-width:480px) {
   .kpi-grid { grid-template-columns:1fr; }
@@ -422,6 +467,7 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 
 export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [dados,         setDados]         = useState([]);
+  const [categorias,    setCategorias]    = useState([]); // [{ categoria, nome }] — Sprint 45, todo:245
   const [coletando,     setColetando]     = useState(false);
   const [progresso,     setProgresso]     = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem, setHistoricoItem] = useState(null);
@@ -429,8 +475,13 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [diaDetalhe,    setDiaDetalhe]    = useState(null); // CollectionDayDialog (Sprint 21)
   const [confirm,       setConfirm]       = useState(null);
 
+  // Rótulo amigável de uma sigla de categoria, incluindo categorias criadas
+  // depois (Sprint 45) — rotuloCategoria já cai para o nome salvo em
+  // produtos.nome quando não há rótulo fixo conhecido.
+  const rotuloCat = (slug) => rotuloCategoria(slug, categorias.find((c) => c.categoria === slug)?.nome);
+
   const filters = useDashboardFilters({ dados, isAdmin, user });
-  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos } = filters;
+  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos, sortCampo, sortDir, toggleSort } = filters;
 
   // Sprint 19/V3: seleção de linha da ActionBar + navegação por teclado.
   // Desabilitada enquanto qualquer modal está aberto, para não competir com
@@ -456,6 +507,14 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   useEffect(() => {
     carregarPrecos();
   }, [carregarPrecos]);
+
+  // Categorias cadastradas em `produtos` — fonte dinâmica do filtro de
+  // categoria e do modal "Alterar categoria" (Sprint 45, todo:245), no lugar
+  // do dict estático que não enxergava categorias criadas depois em Novo
+  // Produto. Carrega uma vez; não muda durante a sessão do Dashboard.
+  useEffect(() => {
+    buscarCategorias().then((cats) => setCategorias(ordenarCategorias(cats)));
+  }, []);
 
   // Sem barra de rolagem na página (pedido do usuário): a Dashboard passa a
   // ocupar exatamente a viewport, com a tabela e a sidebar rolando por dentro
@@ -507,7 +566,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       return { item_id: filtroProduto, total: 1, descricao: `apenas "${prod?.nome_na_loja || "produto selecionado"}"` };
     }
     const partes = [];
-    if (filtro !== "all")     partes.push(`categoria ${CAT_LABEL[filtro] || filtro}`);
+    if (filtro !== "all")     partes.push(`categoria ${rotuloCat(filtro)}`);
     if (filtroLoja !== "all") partes.push(`loja ${lojaAtiva?.label}`);
     if (isAdmin && filtroUsuario !== "all") {
       const dono = donos.find((d) => d.id === filtroUsuario);
@@ -584,7 +643,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
     const { error } = await sb.from("itens").update({ produto_id: prods[0].id }).eq("id", itemId);
     if (error) { showToast("Erro ao alterar categoria: " + error.message, "error"); return; }
     setAcoesItem(null);
-    showToast(`✓ Categoria alterada para ${CAT_LABEL[categoria] || categoria}.`, "ok");
+    showToast(`✓ Categoria alterada para ${rotuloCat(categoria)}.`, "ok");
     carregarPrecos();
   };
 
@@ -713,6 +772,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       />
       <ProductActionsDialog
         item={acoesItem}
+        categorias={categorias}
         onClose={() => setAcoesItem(null)}
         onSalvarMeta={salvarMeta}
         onSalvarNome={salvarNome}
@@ -733,6 +793,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
 
           <ControlBar
             dados={dados}
+            categorias={categorias}
             isAdmin={isAdmin}
             user={user}
             coletando={coletando}
@@ -765,6 +826,9 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
             rotuloDono={filters.rotuloDono}
             selectedId={selecao.selectedId}
             onSelectRow={selecao.select}
+            sortCampo={sortCampo}
+            sortDir={sortDir}
+            toggleSort={toggleSort}
           />
         </section>
       </div>

@@ -41,7 +41,7 @@ export default function CollectionDayDialog({ dia, onClose }) {
                   {it.nome}
                   <span className="loja-badge" style={{ marginLeft: ".6rem" }}>{it.loja}</span>
                 </div>
-                <div className="dia-detalhe-preco">{it.preco ? formatBRL(it.preco) : "esgotado"}</div>
+                <div className="dia-detalhe-preco">{it.preco ? formatBRL(it.preco) : it.encontrado === false ? "não localizado" : "esgotado"}</div>
                 <div className={`dia-detalhe-var${it.variacao == null || it.variacao === 0 ? " dim" : it.variacao < 0 ? " green" : " red"}`}>
                   {it.variacao == null ? "—" : `${it.variacao > 0 ? "+" : ""}${it.variacao.toFixed(1)}%`}
                 </div>

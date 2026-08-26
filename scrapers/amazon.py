@@ -82,7 +82,7 @@ class AmazonScraper(ScraperBase):
         if self._detectar_challenge(titulo, page.url, body_snip) or "continuar comprando" in body_snip.lower():
             logger.warning("[amazon] Challenge/interstitial anti-bot detectada: título='%s'", titulo)
             logger.warning("[amazon] body snippet: %s", body_snip[:200])
-            return DadosProduto(nome="Challenge/Bloqueio Amazon", preco=None, disponivel=False, url=url)
+            return DadosProduto(nome="Challenge/Bloqueio Amazon", preco=None, disponivel=False, url=url, encontrado=False)
 
         nome = self._extrair_nome(page)
         preco = self._extrair_preco_jsonld(page)
@@ -97,7 +97,7 @@ class AmazonScraper(ScraperBase):
 
         if preco is None:
             logger.warning("Preço não encontrado na Amazon: %s", url)
-            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome, preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Amazon: R$ %.2f", preco)
         return DadosProduto(nome=nome, preco=preco, disponivel=True, url=url)

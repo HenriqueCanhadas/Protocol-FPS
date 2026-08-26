@@ -13,6 +13,7 @@ import { useState, useEffect } from "react";
 import { formatBRL } from "@/utils/format";
 import { horaBRT, dataHoraBRT } from "@/utils/datas";
 import { buscarAtividadeRecente } from "@/services/dashboard.service";
+import { statusItem } from "@/pages/Dashboard/Dashboard.constants";
 
 const ATUALIZA_MS = 60000; // acompanha o ritmo de "algo vivo" sem exagerar em queries
 
@@ -27,10 +28,7 @@ export default function ItemDetailPanel({ item }) {
     return () => { ativo = false; clearInterval(id); };
   }, []);
 
-  const monitorando  = item ? item.monitorando !== false : null;
-  const abaixoDaMeta = item && monitorando && item.preco_meta && item.preco && item.preco < item.preco_meta;
-  const statusClass   = !item ? "" : !monitorando ? "off" : !item.disponivel ? "out" : abaixoDaMeta ? "alert" : "ok";
-  const statusTxt      = !item ? "" : !monitorando ? "OFF" : !item.disponivel ? "ESGOTADO" : abaixoDaMeta ? "ALERTA" : "OK";
+  const { classe: statusClass, texto: statusTxt } = item ? statusItem(item) : { classe: "", texto: "" };
   const deltaMeta = item?.preco && item?.preco_meta ? ((item.preco - item.preco_meta) / item.preco_meta) * 100 : null;
 
   return (
@@ -77,7 +75,7 @@ export default function ItemDetailPanel({ item }) {
               <li key={a.id}>
                 <span className="atividade-hora dim">{horaBRT(a.coletado_em, { hour: "2-digit", minute: "2-digit" })}</span>
                 <span className="atividade-nome">{a.itens?.nome_na_loja || "—"}</span>
-                <span className={a.preco ? "green" : "red"}>{a.preco ? formatBRL(a.preco) : "esgotado"}</span>
+                <span className={a.preco ? "green" : "red"}>{a.preco ? formatBRL(a.preco) : a.encontrado === false ? "não localizado" : "esgotado"}</span>
               </li>
             ))}
           </ul>

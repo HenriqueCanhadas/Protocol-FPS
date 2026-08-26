@@ -109,7 +109,7 @@ it exists to mirror the Vercel rewrite in dev.
 3. `CATEGORIA` and/or `LOJA` and/or `USER_ID` set → **segmented**: monitored items of
    that category (`GPU`/`CPU`/`RAM`/`PSU`/`MOBO`/`STORAGE`/`DIVERSOS`), store slug
    (`kabum`/`terabyteshop`/`pichau`/`tuyo`/`playstation`/`logitec`/`tangleteezer`/
-   `amazon`) and/or owner (`itens.user_id`). Combinable. The
+   `amazon`/`shopee`/`aliexpress`/`mocadopop`/`mercadolivre`) and/or owner (`itens.user_id`). Combinable. The
    category/store filters run in Python; the user filter is in the PostgREST query.
    The SPA sends `user_id` automatically for a non-admin "collect all" with no filters
    (Sprint 9); admins and the cron stay global.
@@ -178,6 +178,40 @@ add a `ScraperBase` subclass and an entry to the `SCRAPERS` dict in `main.py`.
 (recorded decision — no HTTP fallback, it always 403s from datacenters). The scraper
 retries up to 3× in CI, but CI coverage is effectively Kabum + Terabyte. Don't treat
 a Pichau failure in Actions logs as a scraper regression.
+
+**Known limitation — Shopee never collects (Sprint 40)**: unlike Pichau (a rate-limit
+that retry can outrun), Shopee's block is an authentication gate — any anonymous/
+automated visit gets JS-redirected to `shopee.com.br/verify/traffic/error` ("Login
+Necessário"), confirmed 3/3 with the real collector's Playwright (headless and
+non-headless alike, different `tracking_id` each time). Retrying doesn't help without
+a persisted logged-in session, which is out of scope. `scrapers/shopee.py` detects
+this honestly (`_eh_parede_de_login`) and returns `disponivel=False`/no price in a
+few seconds instead of retrying or guessing — treat every Shopee item as expected to
+never populate `historico_precos` until the project supports a persisted session.
+**CI confirms the same outcome through a different mechanism**: run
+[32674108485](https://github.com/HenriqueCanhadas/Protocol-FPS/actions/runs/32674108485)
+(`workflow_dispatch loja=shopee` on `Duplicate-Main`) never even got the login
+redirect — the page stayed at `título=''` for the full 40s timeout, i.e. the
+runner's datacenter IP gets an even more silent block than a local dev IP. Don't
+treat a Shopee failure in Actions logs as a scraper regression, and don't spend
+time trying to make it work harder without a persisted session.
+
+**Known limitation — AliExpress redirects to a different country domain in CI
+(Sprint 47)**: `scrapers/aliexpress.py` works correctly locally — validated
+headless=True and headless=False against the test URL (`pt.aliexpress.com`),
+matching the real page exactly (JSON-LD `Product`, R$29,56, `disponivel=True`).
+In CI (GitHub Actions datacenter IP), AliExpress's own geo-IP routing redirects
+the same `pt.aliexpress.com` URL to `www.aliexpress.us` (a different item id, the
+US storefront) and that page never finishes rendering within the timeout
+(`título=''`) — confirmed **3/3** via `workflow_dispatch loja=aliexpress` on
+`Duplicate-Main`. Unlike Pichau (an IP-based rate-limit, where retry/backoff can
+outrun it), this is a structural region redirect tied to the runner's IP
+geolocation — no amount of retrying changes which country that IP resolves to.
+The scraper doesn't attempt to work around it: when JSON-LD/CSS extraction comes
+up empty, it returns `encontrado=False` ("não localizado"), never a false
+"esgotado". The `aliexpress` slug is registered in `SCRAPERS` (`main.py`) and in
+`lojas` (Supabase) — items can be added normally — but the daily CI cron won't be
+able to collect this store; it only works run locally.
 
 ## Commands
 

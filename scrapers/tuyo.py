@@ -117,7 +117,7 @@ class TuyoScraper(ScraperBase):
 
         if preco is None:
             logger.warning("Preço não encontrado na Tuyo: %s", url)
-            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url)
+            return DadosProduto(nome=nome or "Nome não encontrado", preco=None, disponivel=False, url=url, encontrado=False)
 
         logger.info("Preço encontrado na Tuyo: R$ %.2f", preco)
         return DadosProduto(nome=nome or "Nome não encontrado", preco=preco, disponivel=True, url=url)

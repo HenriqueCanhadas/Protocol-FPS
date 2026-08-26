@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { diaBRT } from "@/utils/datas";
 import { buscarItensDoDia } from "@/services/dashboard.service";
-import { LOJAS_FILTER } from "@/pages/Dashboard/Dashboard.constants";
+import { LOJAS_FILTER, statusItem } from "@/pages/Dashboard/Dashboard.constants";
 
 // Busca persiste entre sessões (pedido do usuário: "mantenha sempre o último
 // texto salvo") — mesmo precedente de localStorage do useAutoLogout (fps_*).
@@ -89,9 +89,16 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
         ? d.filter((x) => itensDoDia.has(x.item_id))
         : d.filter((x) => x.coletado_em && diaBRT(x.coletado_em) === filtroDia);
     }
+    // Campos de texto (Sprint 50, todo:256 — mesmo critério acionado pelo
+    // dropdown "Ordenar" e pelo clique no cabeçalho da coluna, ProductTable):
+    // nome (Produto) · loja (Loja) · categoria (Categoria, pela sigla salva
+    // em produtos.categoria — mesma comparação usada nos filtros, não pelo
+    // rótulo amigável) · status (Status, pelo texto do badge — statusItem).
+    const CAMPOS_TEXTO = { nome: "nome_na_loja", loja: "loja", categoria: "categoria" };
     d.sort((a, b) => {
-      if (sortCampo === "nome") {
-        const cmp = (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR");
+      if (CAMPOS_TEXTO[sortCampo] || sortCampo === "status") {
+        const texto = (x) => sortCampo === "status" ? statusItem(x).texto : (x[CAMPOS_TEXTO[sortCampo]] || "");
+        const cmp = texto(a).localeCompare(texto(b), "pt-BR");
         return sortDir === "asc" ? cmp : -cmp;
       }
       // Campos numéricos (Sprints 12/14): preco (atual) · menor (menor valor
