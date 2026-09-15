@@ -17,7 +17,7 @@ import { statusItem } from "@/pages/Dashboard/Dashboard.constants";
 
 const ATUALIZA_MS = 60000; // acompanha o ritmo de "algo vivo" sem exagerar em queries
 
-export default function ItemDetailPanel({ item }) {
+export default function ItemDetailPanel({ item, onDefinirMeta }) {
   const [atividade, setAtividade] = useState(null);
 
   useEffect(() => {
@@ -48,9 +48,24 @@ export default function ItemDetailPanel({ item }) {
           <div>
             <dt>Meta</dt>
             <dd>
-              {item.preco_meta ? formatBRL(item.preco_meta) : "—"}
-              {deltaMeta != null && (
-                <span className={deltaMeta <= 0 ? " green" : " amber"}> ({deltaMeta > 0 ? "+" : ""}{deltaMeta.toFixed(1)}%)</span>
+              {item.preco_meta ? (
+                <>
+                  {formatBRL(item.preco_meta)}
+                  {deltaMeta != null && (
+                    <span className={deltaMeta <= 0 ? " green" : " amber"}> ({deltaMeta > 0 ? "+" : ""}{deltaMeta.toFixed(1)}%)</span>
+                  )}
+                </>
+              ) : (
+                /* Sprint 74 (todo:318): mesmo marcador ◌ da tabela, mesma cor
+                   neutra e mesmo destino — clicar abre o modal de meta já no
+                   modo de edição, em vez de só avisar da ausência */
+                <button
+                  type="button"
+                  className="item-meta-sem-meta"
+                  onClick={() => onDefinirMeta?.(item)}
+                >
+                  ◌ sem meta · definir
+                </button>
               )}
             </dd>
           </div>

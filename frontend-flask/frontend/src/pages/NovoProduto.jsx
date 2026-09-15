@@ -5,6 +5,7 @@
 import { useState, useEffect } from "react";
 import { getSupabase } from "@/services/supabase";
 import ConfirmModal from "@/components/ConfirmModal";
+import { compararRotulos } from "@/pages/Dashboard/Dashboard.constants";
 
 const css = `
 .np-main { flex:1; padding:2rem 1.5rem; display:flex; justify-content:center; }
@@ -36,6 +37,9 @@ const css = `
 .form-select:hover { border-color:var(--green-dim); }
 .form-select:focus { border-color:var(--green-dim); box-shadow:0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03); }
 .form-select option { background:var(--bg2); color:var(--text); }
+.form-select optgroup { background:var(--bg3); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.08em; font-weight:600; padding:.4rem 0; }
+.form-select optgroup:first-of-type { color:var(--green); }
+.form-select optgroup:last-of-type  { color:var(--amber); }
 .form-divider { height:1px; background:var(--border2); margin:.25rem 0; }
 
 .toggle-row { display:flex; align-items:center; gap:1rem; padding:.9rem 1.1rem; background:var(--bg3); border:1px solid var(--border2); cursor:pointer; transition:border-color .15s; }
@@ -52,16 +56,28 @@ const css = `
 
 .form-actions { display:flex; gap:.9rem; justify-content:flex-end; padding:1.4rem 2rem; border-top:1px solid var(--border2); background:var(--bg3); }
 
-/* 2 colunas (não as 4 originais) — a fila agora mora na sidebar estreita
-   (380px, Sprint 53), então o item quebra em 2 linhas (info+loja / meta+ações)
-   em vez de tentar caber tudo numa linha só */
-.item-row { display:grid; grid-template-columns:1fr auto; gap:.5rem 1.1rem; align-items:center; padding:.9rem 1.1rem; background:var(--bg2); border:1px solid var(--border2); border-left:3px solid var(--green-dim); font-size:var(--fs-base); margin-bottom:.6rem; }
+/* Sprint 69a (todo:308): a Sprint 53 mudou a grade de 4 colunas (1fr auto auto
+   auto, uma por filho, de quando a fila ocupava a página inteira) para 2, mas
+   manteve os 4 filhos diretos no JSX — o grid então distribuía sozinho: linha 1
+   [texto | loja], linha 2 [meta | ações], com a coluna 2 dimensionada pelo maior
+   entre loja e ações e a meta desalinhada embaixo do nome. Agora a estrutura é
+   explícita: loja e meta viraram uma sub-linha própria (.item-sub) que ocupa as
+   duas colunas, e cada região fica onde foi posta, não onde sobrou. */
+.item-row { display:grid; grid-template-columns:1fr auto; gap:.45rem .9rem; align-items:start; padding:.9rem 1.1rem; background:var(--bg2); border:1px solid var(--border2); border-left:3px solid var(--green-dim); font-size:var(--fs-base); margin-bottom:.6rem; }
 .item-row.editing { border-left-color:var(--amber); box-shadow:inset 3px 0 0 var(--amber); }
+/* min-width:0 é o que permite o ellipsis do nome/URL funcionar dentro do grid
+   (sem isso a coluna 1fr cresce até caber o texto e estoura a sidebar) */
+.item-head { min-width:0; }
 .item-actions { display:flex; gap:.35rem; }
+.item-sub { grid-column:1 / -1; display:flex; justify-content:space-between; align-items:baseline; gap:.5rem .9rem; flex-wrap:wrap; }
 .item-nome { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.item-cat  { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.1em; text-transform:uppercase; margin-top:.15rem; }
+.item-cat  { font-size:var(--fs-xs); color:var(--text-dim); letter-spacing:.1em; text-transform:uppercase; margin-top:.15rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* a URL fica fora do uppercase da categoria: em maiúsculas ela vira um bloco
+   ilegível (HTTPS://WWW.MERCADOLIVRE...), e agora que o texto é a URL inteira
+   (não mais um substring de 45 caracteres) isso ficou evidente */
+.item-url  { text-transform:none; letter-spacing:0; }
 .item-loja { font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
-.item-meta { font-size:var(--fs-sm); color:var(--amber); }
+.item-meta { font-size:var(--fs-sm); color:var(--amber); white-space:nowrap; }
 .btn-remove-item { background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem; padding:.25rem .5rem; transition:color .15s; }
 .btn-remove-item:hover { color:var(--red); }
 .empty-itens { padding:2.5rem; text-align:center; color:var(--text-dim); font-size:var(--fs-base); letter-spacing:.12em; border:1px dashed var(--border2); line-height:1.8; }
@@ -96,10 +112,6 @@ const LOJAS_DETECTADAS = {
   "mocadopop.com.br":      "mocadopop",
   "mercadolivre.com.br":   "mercadolivre",
 };
-// Ordem fixa das categorias originais (rótulo próprio, ver rotuloCategoria).
-// Categorias novas (todo, criadas por admin — ver criarCategoria) entram
-// depois destas, ordenadas por nome.
-const CATEGORIA_ORDEM_FIXA = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
 const CATEGORIA_LABEL_FIXA = { GPU: "GPU", CPU: "CPU", RAM: "RAM", PSU: "Fonte", MOBO: "Placa Mãe", STORAGE: "Armazenamento", DIVERSOS: "Diversos" };
 const LOJAS_LABEL = {
   kabum: "KaBuM", terabyteshop: "Terabyte", pichau: "Pichau",
@@ -115,6 +127,7 @@ const LOJAS_SEM_COLETA = {
   pichau: "A Pichau bloqueia coletas feitas a partir de IP de datacenter — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária (GitHub Actions) este item tende a aparecer como \"não localizado\".",
   shopee: "A Shopee exige login para mostrar o preço — o projeto não consegue coletar essa loja em nenhum ambiente hoje (nem local, nem automático). O item pode ser cadastrado, mas o preço nunca vai atualizar sozinho.",
   aliexpress: "O AliExpress redireciona a coleta automática (GitHub Actions) para o site americano (aliexpress.us), que não carrega — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária este item tende a aparecer como \"não localizado\".",
+  mercadolivre: "O Mercado Livre redireciona a coleta automática (GitHub Actions) para uma página de verificação de conta — só funciona quando a coleta roda localmente no seu computador. Na coleta automática diária este item tende a aparecer como \"não localizado\".",
 };
 
 function rotuloCategoria(categoria, nomeDb) {
@@ -131,16 +144,26 @@ function slugCategoria(nome) {
     .replace(/^_+|_+$/g, "");
 }
 
+// Sprint 71 (todo:314): mesma regra do Dashboard — alfabética pelo rótulo
+// exibido, no lugar da ordem fixa por histórico que mandava toda categoria
+// nova para o fim da lista. O comparador vem de Dashboard.constants para as
+// duas telas não divergirem de novo (a lógica de categoria ainda está
+// duplicada aqui e lá — ver a skill sugerida `categoria-dinamica`).
 function ordenarCategorias(lista) {
-  return [...lista].sort((a, b) => {
-    const ia = CATEGORIA_ORDEM_FIXA.indexOf(a.categoria);
-    const ib = CATEGORIA_ORDEM_FIXA.indexOf(b.categoria);
-    if (ia === -1 && ib === -1) return a.nome.localeCompare(b.nome);
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
+  return [...lista].sort((a, b) =>
+    compararRotulos(rotuloCategoria(a.categoria, a.nome), rotuloCategoria(b.categoria, b.nome)));
 }
+
+// Sprint 76 (todo:300): separação no seletor de Loja entre lojas que coletam
+// 100% de forma automática (diária via CI) das que possuem limitações conhecidas
+// (Pichau, Shopee, AliExpress, Mercado Livre). Ambas ordenadas em ordem alfabética.
+const LOJAS_FUNCIONAIS = Object.entries(LOJAS_LABEL)
+  .filter(([slug]) => !LOJAS_SEM_COLETA[slug])
+  .sort(([, a], [, b]) => compararRotulos(a, b));
+
+const LOJAS_LIMITADAS = Object.entries(LOJAS_LABEL)
+  .filter(([slug]) => !!LOJAS_SEM_COLETA[slug])
+  .sort(([, a], [, b]) => compararRotulos(a, b));
 
 function detectarLoja(url) {
   try {
@@ -341,7 +364,7 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
                   <div className={`url-preview${urlPreview.valid ? "" : " invalid"}`}>
                     {urlPreview.valid
                       ? <><span className="loja-tag">{LOJAS_LABEL[urlPreview.slug]}</span><span className="preview-text">{url}</span><span className="green">✓</span></>
-                      : "✗ Loja não suportada. Use: KaBuM, Terabyte ou Pichau"}
+                      : "✗ Loja não suportada pelo sistema"}
                   </div>
                 )}
                 {erros.url && <div className="field-error">URL inválida ou loja não suportada</div>}
@@ -372,9 +395,16 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
                   <select className="form-select" value={loja}
                     onChange={(e) => { setLoja(e.target.value); setErros((x) => ({ ...x, loja: false })); }}>
                     <option value="">— selecione a loja —</option>
-                    {Object.entries(LOJAS_LABEL).map(([slug, label]) => (
-                      <option key={slug} value={slug}>{label}</option>
-                    ))}
+                    <optgroup label="✓ Coleta automática diária (100%)">
+                      {LOJAS_FUNCIONAIS.map(([slug, label]) => (
+                        <option key={slug} value={slug}>{label}</option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="⚠ Lojas com limitações conhecidas">
+                      {LOJAS_LIMITADAS.map(([slug, label]) => (
+                        <option key={slug} value={slug}>{label}</option>
+                      ))}
+                    </optgroup>
                   </select>
                   {erros.loja && <div className="field-error">Selecione a loja</div>}
                   {LOJAS_SEM_COLETA[loja] && (
@@ -468,15 +498,19 @@ export default function NovoProduto({ showToast, user, isAdmin }) {
               ) : (
                 fila.map((item) => (
                   <div key={item.id_temp} className={`item-row${item.id_temp === editandoId ? " editing" : ""}`}>
-                    <div>
-                      <div className="item-nome">{item.nome_na_loja}</div>
-                      <div className="item-cat">{item.categoria} · {item.url.substring(0, 45)}…</div>
+                    <div className="item-head">
+                      <div className="item-nome" title={item.nome_na_loja}>{item.nome_na_loja}</div>
+                      {/* o corte da URL agora é do CSS (ellipsis), não um substring
+                          fixo de 45 caracteres que não cabia mais na sidebar */}
+                      <div className="item-cat" title={item.url}>{item.categoria} · <span className="item-url">{item.url}</span></div>
                     </div>
-                    <div className="item-loja">{LOJAS_LABEL[item.loja_slug] || item.loja_slug}</div>
-                    <div className="item-meta">{item.preco_meta ? `Meta: R$ ${Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Sem meta"}</div>
                     <div className="item-actions">
                       <button className="btn-remove-item" title="Editar" onClick={() => editarItem(item)}>✎</button>
                       <button className="btn-remove-item" title="Remover" onClick={() => removerDaFila(item.id_temp)}>✕</button>
+                    </div>
+                    <div className="item-sub">
+                      <span className="item-loja">{LOJAS_LABEL[item.loja_slug] || item.loja_slug}</span>
+                      <span className="item-meta">{item.preco_meta ? `Meta: R$ ${Number(item.preco_meta).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "Sem meta"}</span>
                     </div>
                   </div>
                 ))

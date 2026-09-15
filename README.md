@@ -2,10 +2,10 @@
 
 **Monitor de preços para lojas brasileiras** — coleta diária automatizada de preços
 na **KaBuM**, **Terabyteshop**, **Pichau**, **Tuyo**, **Playstation Store**,
-**Logitech Store**, **Tangle Teezer** e **Amazon** (a Shopee e o AliExpress estão
-registrados no código mas não coletam de forma confiável em CI — ver limitação
-conhecida abaixo), histórico no Supabase e alertas por **Email + Telegram** quando
-o preço cai ou fura a meta que você definiu.
+**Logitech Store**, **Tangle Teezer**, **Amazon** e **Moça do Pop** (a Shopee, o
+AliExpress e o Mercado Livre estão registrados no código mas não coletam de forma
+confiável em CI — ver limitação conhecida abaixo), histórico no Supabase e alertas
+por **Email + Telegram** quando o preço cai ou fura a meta que você definiu.
 
 > Coletor em Python (Playwright + stealth) rodando no GitHub Actions · SPA em React
 > hospedada na Vercel · banco e autenticação no Supabase · **multiusuário com papel
@@ -82,6 +82,21 @@ encontrado, retorna `encontrado=False` (marcado como "não localizado", nunca um
 falso "esgotado"), mesmo comportamento já usado pela Amazon/Shopee. A loja fica
 registrada em `SCRAPERS`/`lojas`/no cadastro do frontend, mas a coleta automática
 diária só vai funcionar de fato quando rodada localmente.
+
+O **Mercado Livre** (Sprint 49) tem um quarto mecanismo de bloqueio: localmente a
+URL de teste carrega normal — JSON-LD `Product` limpo, preço batendo com o visível
+na página (`R$65,99`) — validado **local, headless=True e headless=False, com a
+URL completa (parâmetros de campanha) e com a URL "limpa"**. No CI (IP de
+datacenter do GitHub Actions), porém, o Mercado Livre redireciona toda visita para
+`/gz/account-verification` — uma página de **verificação de conta** (título
+"Mercado Libre", em espanhol) — confirmado **3/3** via
+`workflow_dispatch loja=mercadolivre`. É parecido em espírito com a Shopee (um
+portão que exige autenticação/verificação antes de mostrar o produto), mas por um
+mecanismo diferente (verificação de conta, não login). O scraper
+(`scrapers/mercadolivre.py`) não tenta contornar isso — retorna `encontrado=False`
+("não localizado"), nunca um falso "esgotado". A loja fica registrada em
+`SCRAPERS`/`lojas`/no cadastro do frontend, mas a coleta automática diária só
+funciona rodando localmente.
 
 ---
 

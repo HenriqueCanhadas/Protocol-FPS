@@ -8,11 +8,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuth }       from "@/hooks/useAuth";
 import { useToast }      from "@/hooks/useToast";
 import { useAutoLogout } from "@/hooks/useAutoLogout";
+import { useKonami, playKonamiSound } from "@/hooks/useKonami";
 
-import LoginScreen from "@/components/LoginScreen";
+import LoginScreen   from "@/components/LoginScreen";
+import BlockedScreen from "@/components/BlockedScreen";
 import NavDrawer   from "@/components/NavDrawer";
 import AppHeader   from "@/components/AppHeader";
 import Toast       from "@/components/Toast";
+import KonamiModal from "@/components/KonamiModal";
 
 import Dashboard   from "@/pages/Dashboard";
 import NovoProduto from "@/pages/NovoProduto";
@@ -21,9 +24,17 @@ import Admin       from "@/pages/Admin";
 import Conta       from "@/pages/Conta";
 
 export default function App() {
-  const { user, perfil, isAdmin, podeVerBanco, loading, perfilLoading, signIn, signOut } = useAuth();
+  const { user, perfil, isAdmin, podeVerBanco, bloqueado, loading, perfilLoading, signIn, signOut } = useAuth();
   const { toast, showToast } = useToast();
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [konamiOpen, setKonamiOpen] = useState(false);
+
+  // Sprint 79: Easter Egg Konami Code com som 8-bit e modal retrô
+  useKonami(() => {
+    playKonamiSound();
+    setKonamiOpen(true);
+    showToast("🎮 CHEAT CODE ATIVADO! +30 Vidas no PROTOCOL FPS", "ok");
+  });
 
   // Sprint 13: sessão expira após 30 min sem atividade (ou janela fechada)
   useAutoLogout(user, () => {
@@ -45,6 +56,20 @@ export default function App() {
     return (
       <>
         <LoginScreen onLogin={signIn} />
+        <Toast toast={toast} />
+        <KonamiModal open={konamiOpen} onClose={() => setKonamiOpen(false)} />
+      </>
+    );
+  }
+
+  // Sprint 78 (todo:310): conta bloqueada pelo dono → nem chega à SPA.
+  // O perfil é relido de minuto em minuto (useAuth), então um bloqueio
+  // aplicado no meio de uma sessão já aberta cai aqui na verificação
+  // seguinte, em vez de deixar a pessoa navegando até o token expirar.
+  if (bloqueado) {
+    return (
+      <>
+        <BlockedScreen email={user.email} onSair={() => signOut()} />
         <Toast toast={toast} />
       </>
     );
@@ -84,6 +109,7 @@ export default function App() {
         </Routes>
 
         <Toast toast={toast} />
+        <KonamiModal open={konamiOpen} onClose={() => setKonamiOpen(false)} />
       </div>
     </BrowserRouter>
   );

@@ -55,6 +55,19 @@ const css = `
 .stat-sub   { font-size:var(--fs-xs); color:var(--text-muted); line-height:1.2; word-break:break-word; }
 .stat-value.amber { color:var(--amber); }
 .stat-value.red { color:var(--red); }
+.stat-value.muted { color:var(--text-muted); }
+/* Sprint 74 (todo:318): faixa "Itens sem meta" — entra abaixo da grade 2×2
+   (grid-column:1/-1) em vez de virar um 5º card, que deixaria a última linha
+   com uma célula só. É um botão: liga/desliga o filtro "sem meta" da tabela. */
+.kpi-cell.kpi-sem-meta {
+  grid-column:1/-1; text-align:left; font-family:inherit;
+  background:none; border:1px dashed var(--border2); border-left:2px solid var(--text-muted);
+  padding:.5rem .7rem; cursor:pointer; transition:border-color .15s, background .15s;
+}
+.kpi-cell.kpi-sem-meta:hover:not(:disabled) { border-color:var(--green-dim); border-left-color:var(--green); }
+.kpi-cell.kpi-sem-meta.on { border-style:solid; border-color:var(--green-dim); border-left-color:var(--green); background:var(--green-soft); }
+.kpi-cell.kpi-sem-meta:disabled { cursor:default; opacity:.6; }
+.kpi-sem-meta-linha { display:flex; align-items:baseline; gap:.5rem; }
 
 .dash-main { flex:1; padding:1.75rem 1.5rem; display:flex; flex-direction:column; gap:2rem; }
 
@@ -94,6 +107,18 @@ const css = `
 .dia-detalhe-nome { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .dia-detalhe-preco { color:var(--text); text-align:right; white-space:nowrap; }
 .dia-detalhe-var { text-align:right; font-size:var(--fs-xs); min-width:56px; }
+/* Sprint 73 (todo:312): cabeçalho ordenável da lista do dia. Reusa as classes
+   .sortable/.sort-arrow (aqui declaradas para divs, já que esta lista é um
+   grid e não uma <table>) e fica grudado no topo ao rolar o modal. */
+/* Quem rola é o .modal inteiro, e o .modal-header já é sticky (top:0, z-index:1).
+   Por isso o cabeçalho das colunas gruda LOGO ABAIXO dele (top = altura do
+   header, 1.1rem de padding em cima e embaixo + 1 linha = 63px medidos, 4rem) e com
+   z-index MENOR: medido ao vivo, com top:0/z-index:2 ele subia por cima do
+   título "COLETAS — <dia>" e do ✕ ao rolar a lista. */
+.dia-detalhe-head { position:sticky; top:4rem; z-index:0; background:var(--bg2); border-bottom:1px solid var(--border2); font-size:var(--fs-xs); letter-spacing:.14em; text-transform:uppercase; color:var(--text-dim); padding:.5rem 0; }
+.dia-detalhe-head .sortable { cursor:pointer; user-select:none; white-space:nowrap; }
+.dia-detalhe-head .sortable:hover { color:var(--green); }
+.dia-detalhe-head .col-dir { text-align:right; }
 
 /* detalhe do item + atividade recente (Sprint 21) */
 .item-detail-panel { background:var(--bg2); border:1px solid var(--border2); padding:1.1rem 1.25rem; }
@@ -102,6 +127,14 @@ const css = `
 .item-detail-kv > div:last-child { border-bottom:none; padding-bottom:0; }
 .item-detail-kv dt { color:var(--text-dim); letter-spacing:.08em; text-transform:uppercase; font-size:var(--fs-xs); flex-shrink:0; }
 .item-detail-kv dd { color:var(--text); text-align:right; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* Sprint 74 (todo:318): mesma linguagem do marcador ◌ da tabela — neutro em
+   repouso, verde no hover, e clicar abre o modal de meta */
+.item-meta-sem-meta {
+  background:none; border:none; padding:0; margin:0;
+  color:var(--text-muted); font-size:var(--fs-xs); letter-spacing:.05em;
+  font-family:var(--mono); cursor:pointer; transition:color .15s;
+}
+.item-meta-sem-meta:hover, .item-meta-sem-meta:focus-visible { color:var(--green); outline:none; }
 .item-detail-atividade { margin-top:1.1rem; padding-top:1rem; border-top:1px dashed var(--border); }
 .item-detail-atividade-title { font-size:var(--fs-xs); letter-spacing:.2em; text-transform:uppercase; color:var(--text-dim); margin-bottom:.65rem; }
 .atividade-list { display:flex; flex-direction:column; gap:.4rem; max-height:220px; overflow-y:auto; }
@@ -185,6 +218,31 @@ const css = `
 .filter-select.active { border-color:var(--green); color:var(--green); background:var(--green-soft); }
 .filter-select option { background:var(--bg2); color:var(--text); }
 .filter-sep { align-self:stretch; width:1px; background:var(--border2); margin:0 .1rem; }
+
+/* Sprint 70 (todo:306): botão que abre o pop-up de filtros + botão de limpar.
+   Mesma altura/padding dos .filter-select vizinhos para a linha não desalinhar. */
+.filtros-btn, .limpar-filtros-btn {
+  display:flex; align-items:center; gap:.5rem;
+  background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim);
+  font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.04em;
+  padding:.45rem .8rem; cursor:pointer; line-height:1.35;
+  transition:border-color .15s, color .15s, background .15s, box-shadow .15s;
+}
+.filtros-btn:hover { border-color:var(--green-dim); color:var(--text); }
+.filtros-btn.active {
+  border-color:var(--green); color:var(--green); background:var(--green-soft);
+  box-shadow:0 0 8px var(--green-glow);
+}
+.filtros-btn .fb-badge {
+  background:var(--green); color:var(--bg); font-size:var(--fs-xs);
+  padding:0 .38rem; border-radius:2px; line-height:1.5;
+}
+.limpar-filtros-btn { border-color:var(--red); color:var(--red); }
+.limpar-filtros-btn:hover { background:rgba(255,68,68,.12); box-shadow:0 0 8px rgba(255,68,68,.25); }
+
+/* (o CSS do pop-up de filtros fica logo depois do bloco .meta-modal, mais
+   abaixo — .filtros-modal e .meta-modal têm a mesma especificidade, então
+   quem vem depois é que vence) */
 .sort-compact { display:flex; gap:.4rem; }
 .sort-dir-btn {
   background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim);
@@ -251,6 +309,23 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .prod-cat  { font-size:var(--fs-xs); color:var(--text-dim); margin-top:.15rem; letter-spacing:.1em; text-transform:uppercase; }
 .loja-badge { display:inline-block; border:1px solid var(--border2); padding:.25rem .45rem; font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; color:var(--text-dim); }
 .price-current { font-family:var(--display); font-size:1.3rem; letter-spacing:.03em; color:var(--green); }
+/* Sprint 74 (todo:318): marcador de item sem preço-meta. Duas decisões:
+   1. NA MESMA LINHA do valor (glifo, não uma tag em bloco embaixo) — uma tag
+      própria acrescentava uma 2ª linha só em algumas linhas da tabela, altura
+      irregular e o oposto do que a Sprint 25/V4 tinha feito com esta célula;
+   2. COR NEUTRA — verde/âmbar/vermelho/azul já são a escala de Status
+      (OK/ALERTA/ESGOTADO/OFF/NÃO LOCALIZADO) e "sem meta" não é um alerta, é
+      configuração ausente. O verde entra só no hover, dizendo "isto é um
+      botão" (abre o modal de meta). */
+.price-sem-meta {
+  background:none; border:none; margin:0; padding:0 0 0 .3rem;
+  font-family:var(--mono); font-size:.9rem; line-height:1;
+  color:var(--text-muted); cursor:pointer; vertical-align:middle;
+  transition:color .15s, text-shadow .15s;
+}
+.price-sem-meta:hover, .price-sem-meta:focus-visible {
+  color:var(--green); text-shadow:0 0 8px var(--green-glow); outline:none;
+}
 /* meta/★ menor/data de coleta saíram da célula e viraram tooltip no hover
    do preço atual (Sprint 25/V4 — antes ficavam sempre visíveis, 3 linhas
    extras por célula) */
@@ -270,13 +345,18 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
   transition:opacity .12s ease;
   pointer-events:none;
 }
+/* :focus-within também (Sprint 74): o marcador ◌ é um <button> DENTRO do
+   .price-hover — focá-lo pelo teclado tem de abrir o mesmo tooltip */
 .price-hover:hover .price-tooltip,
-.price-hover:focus-visible .price-tooltip {
+.price-hover:focus-visible .price-tooltip,
+.price-hover:focus-within .price-tooltip {
   opacity:1; visibility:visible; max-height:none; overflow:visible;
   border-color:var(--green-dim); padding:.5rem .7rem;
   box-shadow:0 4px 14px rgba(0,0,0,.55);
 }
 .price-tooltip .pt-menor { color:var(--amber); }
+/* era âmbar — mesma razão do .price-sem-meta: não competir com o Status */
+.price-tooltip .pt-sem-meta { color:var(--text); }
 .catm-grid { display:flex; flex-wrap:wrap; gap:.6rem; }
 .catm-chip { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-sm); letter-spacing:.12em; text-transform:uppercase; padding:.55rem 1rem; cursor:pointer; transition:all .15s; user-select:none; }
 .catm-chip:hover { border-color:var(--green-dim); color:var(--text); }
@@ -392,9 +472,34 @@ td { padding:.55rem 1.1rem; vertical-align:middle; }
 .btn-remover-meta { background:none; border:none; color:var(--text-muted); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.1em; text-transform:uppercase; cursor:pointer; padding:0; transition:color .2s; }
 .btn-remover-meta:hover { color:var(--red); }
 
+/* pop-up de filtros (Sprint 70, todo:306): mesma caixa do .meta-modal, em
+   verde — é recorte de lista, não edição de valor (o âmbar do meta-modal é a
+   cor de "alterar dado"). Precisa vir DEPOIS do bloco .meta-modal acima:
+   mesma especificidade (0,1,0), então a ordem é que decide. */
+.filtros-modal { border-top-color:var(--green-dim); }
+.filtros-modal::before { color:var(--green-dim); }
+.filtros-modal .filtro-campo { display:flex; flex-direction:column; gap:.4rem; }
+/* o max-width:150px do .filter-select existe para a barra caber numa linha
+   (Sprint 64) — dentro do modal não há essa disputa de espaço */
+.filtros-modal .filter-select { max-width:none; width:100%; padding:.6rem .7rem; font-size:var(--fs-base); }
+.filtros-modal .meta-modal-footer .btn-primary { border-color:var(--green-dim); color:var(--green); }
+.filtros-modal .meta-modal-footer .btn-primary:hover { background:var(--green-soft); }
+.filtros-modal .btn-limpar-filtros { border-color:var(--red); color:var(--red); }
+.filtros-modal .btn-limpar-filtros:hover:not(:disabled) { background:rgba(255,68,68,.12); }
+.filtros-modal .btn-limpar-filtros:disabled { opacity:.35; cursor:not-allowed; }
+
 /* botão "Opções" do painel de filtros */
 .action-btn.opcoes-trigger { color:var(--green); border-color:var(--green-dim); }
 .action-btn.opcoes-trigger:hover { background:var(--green-soft); border-color:var(--green); box-shadow:0 0 12px var(--green-glow); }
+
+/* Sprint 72 (todo:298/316): "Abrir todos" — azul (--blue), o mesmo tom que o
+   projeto já usa para "leitura/externo" (NÃO LOCALIZADO, tag de dono), para
+   não competir com o verde de ação principal nem com o vermelho de remover */
+.action-btn.abrir-todos { color:var(--blue); border-color:rgba(77,166,255,.4); }
+.action-btn.abrir-todos:hover:not(:disabled) { border-color:var(--blue); background:rgba(77,166,255,.08); box-shadow:0 0 12px rgba(77,166,255,.2); }
+/* dentro do pop-up de filtros o botão ocupa a largura toda, acima do rodapé */
+.filtros-abrir-todos { padding:0 1.5rem 1.25rem; }
+.filtros-abrir-todos .action-btn { padding:.6rem 1rem .6rem 2rem; }
 
 /* modal de opções (menu de ações do produto) */
 .opcoes-overlay { position:fixed; inset:0; background:rgba(0,0,0,.88); display:flex; align-items:center; justify-content:center; z-index:260; animation:fadeIn .2s ease; padding:1rem; }
@@ -472,6 +577,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const [progresso,     setProgresso]     = useState({ visible: false, txt: "", pct: 0 });
   const [historicoItem, setHistoricoItem] = useState(null);
   const [acoesItem,     setAcoesItem]     = useState(null); // ProductActionsDialog (Sprint 20: era metaItem/nomeItem/catItem/opcoesItem separados)
+  const [acoesModo,     setAcoesModo]     = useState("menu"); // tela em que o dialog abre (Sprint 74: "meta" direto)
   const [diaDetalhe,    setDiaDetalhe]    = useState(null); // CollectionDayDialog (Sprint 21)
   const [confirm,       setConfirm]       = useState(null);
 
@@ -481,7 +587,12 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const rotuloCat = (slug) => rotuloCategoria(slug, categorias.find((c) => c.categoria === slug)?.nome);
 
   const filters = useDashboardFilters({ dados, isAdmin, user });
-  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos, sortCampo, sortDir, toggleSort } = filters;
+  const { filtro, filtroLoja, filtroProduto, filtroUsuario, filtroMeta, alternarSemMeta, filtroDia, setFiltroDia, dadosFiltrados, lojaAtiva, donos, sortCampo, sortDir, toggleSort } = filters;
+
+  // Sprint 74 (todo:318): abrir o ProductActionsDialog direto numa tela. O
+  // marcador ◌ da tabela e o "sem meta · definir" da sidebar entram por "meta";
+  // o botão Opções da ControlBar continua entrando pelo menu.
+  const abrirAcoes = (item, modo = "menu") => { setAcoesModo(modo); setAcoesItem(item); };
 
   // Sprint 19/V3: seleção de linha da ActionBar + navegação por teclado.
   // Desabilitada enquanto qualquer modal está aberto, para não competir com
@@ -572,6 +683,10 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       const dono = donos.find((d) => d.id === filtroUsuario);
       partes.push(filtroUsuario === user?.id ? "somente os seus produtos" : `usuário ${dono?.rotulo || "selecionado"}`);
     }
+    // Sprint 74 (todo:318): o recorte por meta conta como filtro aqui também —
+    // sem isto, "sem meta" sozinho não entraria em `partes` e a coleta cairia
+    // no modo COMPLETO, o oposto do que está na tela
+    if (filtroMeta !== "all")      partes.push(filtroMeta === "sem" ? "sem meta definida" : "com meta definida");
     if (filters.termoBusca.trim()) partes.push(`busca "${filters.termoBusca.trim()}"`);
     if (filtroDia)                 partes.push(`coletados em ${dataBRT(`${filtroDia}T12:00:00-03:00`)}`);
 
@@ -702,6 +817,73 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
   const confirmar = (titulo, corpo, icone, cb, isDanger = true) =>
     setConfirm({ titulo, corpo, icone, isDanger, cb });
 
+  // ── Abrir os itens da lista filtrada em novas abas (Sprint 72, todo:298 e
+  // todo:316) ──────────────────────────────────────────────────────────────
+  // Acima deste total a ação pede confirmação: abrir dezenas de abas de uma vez
+  // é irreversível do ponto de vista de quem está usando o navegador.
+  const LIMITE_ABAS_SEM_CONFIRMAR = 10;
+
+  /**
+   * Abre uma aba por item. Duas restrições do NAVEGADOR governam esta função:
+   * 1. Tem de rodar SÍNCRONO dentro do gesto do usuário (o clique) — qualquer
+   *    `await`/`setTimeout` entre as chamadas faz o Chrome perder o vínculo com
+   *    o gesto e bloquear tudo a partir da 2ª aba. Por isso nada de async aqui.
+   * 2. Mesmo assim o bloqueador de pop-ups pode recusar: window.open devolve
+   *    null nesse caso, então contamos as recusas e avisamos, em vez de falhar
+   *    em silêncio (o usuário veria "só abriu uma aba" sem explicação).
+   * 3. NÃO passar "noopener" nas features: com ele o window.open devolve null
+   *    SEMPRE, por especificação (o handle é suprimido de propósito) — medido
+   *    ao vivo na Sprint 72, as 2 abas do teste retornaram null mesmo tendo
+   *    aberto, o que faria o aviso de bloqueio disparar toda vez. Em vez disso
+   *    abrimos normalmente e cortamos o vínculo com `opener = null` logo em
+   *    seguida, mantendo a proteção sem perder a detecção.
+   */
+  const abrirEmAbas = (itens) => {
+    let abertas = 0;
+    let bloqueadas = 0;
+    for (const item of itens) {
+      const janela = window.open(item.url, "_blank");
+      if (janela) {
+        janela.opener = null; // a página aberta não controla esta aba
+        abertas++;
+      } else {
+        bloqueadas++;
+      }
+    }
+    if (bloqueadas > 0) {
+      showToast(
+        `${abertas} aba(s) aberta(s); ${bloqueadas} bloqueada(s) pelo navegador — libere os pop-ups para este site.`,
+        "error",
+      );
+    } else {
+      showToast(`✓ ${abertas} ${abertas === 1 ? "item aberto" : "itens abertos"} em novas abas.`, "ok");
+    }
+  };
+
+  const onAbrirTodos = () => {
+    // Itens sem URL cadastrada não geram aba (nem uma aba em branco)
+    const comUrl = filters.dadosFiltrados.filter((x) => x.url);
+    const semUrl = filters.dadosFiltrados.length - comUrl.length;
+
+    if (comUrl.length === 0) {
+      showToast("Nenhum item com link na lista atual.", "error");
+      return;
+    }
+    if (comUrl.length <= LIMITE_ABAS_SEM_CONFIRMAR) {
+      abrirEmAbas(comUrl);
+      return;
+    }
+    confirmar(
+      "ABRIR TODOS OS ITENS",
+      `Isso vai abrir <strong>${comUrl.length} abas</strong> no seu navegador, uma para cada item da lista filtrada.` +
+        (semUrl > 0 ? `<br><br><span style="color:var(--amber)">⚠ ${semUrl} item(ns) sem link serão ignorados</span>` : "") +
+        `<br><br>O navegador pode pedir permissão para abrir pop-ups.`,
+      "⧉",
+      () => abrirEmAbas(comUrl),
+      false,
+    );
+  };
+
   const onColetarClick = () => {
     const esc = escopoColeta();
     const segmentada = esc.item_id || !!esc.item_ids;
@@ -772,6 +954,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
       />
       <ProductActionsDialog
         item={acoesItem}
+        modoInicial={acoesModo}
         categorias={categorias}
         onClose={() => setAcoesItem(null)}
         onSalvarMeta={salvarMeta}
@@ -800,8 +983,9 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
             onColetarClick={onColetarClick}
             filters={filters}
             selected={selecao.selected}
-            onOpcoes={(item) => setAcoesItem(item)}
+            onOpcoes={(item) => abrirAcoes(item)}
             onRemover={opcRemover}
+            onAbrirTodos={onAbrirTodos}
           />
 
           {progresso.visible && (
@@ -829,6 +1013,7 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
             sortCampo={sortCampo}
             sortDir={sortDir}
             toggleSort={toggleSort}
+            onDefinirMeta={(item) => abrirAcoes(item, "meta")}
           />
         </section>
       </div>
@@ -840,6 +1025,9 @@ export default function Dashboard({ showToast, isAdmin = false, user = null }) {
         filtroDia={filtroDia}
         onSelectDia={setFiltroDia}
         onOpenDia={(dia) => setDiaDetalhe(dia)}
+        filtroMeta={filtroMeta}
+        onAlternarSemMeta={alternarSemMeta}
+        onDefinirMeta={(item) => abrirAcoes(item, "meta")}
       />
       </div>
       </main>

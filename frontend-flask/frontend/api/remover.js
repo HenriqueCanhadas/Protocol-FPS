@@ -45,13 +45,22 @@ async function usuarioDoToken(url, key, accessToken) {
   const { id: uid } = await resp.json();
   if (!uid) return null;
 
+  // Sprint 78 (todo:310): `bloqueado` acompanha o nível — uma conta barrada
+  // não remove nada, mesmo com um JWT ainda válido emitido antes do
+  // banimento. Coluna ausente (migração sprint78 não rodada) cai no select
+  // antigo; só a tabela inexistente ativa o modo legado.
+  let perfil;
   try {
-    const perfil = await supabaseGet(url, key, `usuarios?id=eq.${uid}&select=nivel`);
-    const nivel = perfil.length ? perfil[0].nivel : 1;
-    return { uid, isAdmin: nivel >= 2 };
+    perfil = await supabaseGet(url, key, `usuarios?id=eq.${uid}&select=nivel,bloqueado`);
   } catch {
-    return { uid, isAdmin: true }; // migração multiusuário pendente
+    try {
+      perfil = await supabaseGet(url, key, `usuarios?id=eq.${uid}&select=nivel`);
+    } catch {
+      return { uid, isAdmin: true, bloqueado: false }; // migração multiusuário pendente
+    }
   }
+  const linha = perfil.length ? perfil[0] : {};
+  return { uid, isAdmin: (linha.nivel ?? 1) >= 2, bloqueado: Boolean(linha.bloqueado) };
 }
 
 /**
@@ -136,6 +145,9 @@ export default async function handler(req, res) {
   const quem = await usuarioDoToken(url, key, token);
   if (!quem) {
     return res.status(401).json({ error: "Sessão inválida ou expirada — faça login novamente." });
+  }
+  if (quem.bloqueado) {
+    return res.status(403).json({ error: "Acesso bloqueado — fale com o administrador do sistema." });
   }
   if (!(await autorizarRemocao(url, key, quem.uid, quem.isAdmin, tipo, ids))) {
     return res.status(403).json({

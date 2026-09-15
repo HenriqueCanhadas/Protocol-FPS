@@ -5,7 +5,7 @@
 import { useState, useEffect } from "react";
 import { diaBRT } from "@/utils/datas";
 import { buscarItensDoDia } from "@/services/dashboard.service";
-import { LOJAS_FILTER, statusItem } from "@/pages/Dashboard/Dashboard.constants";
+import { LOJAS_FILTER, statusItem, compararRotulos } from "@/pages/Dashboard/Dashboard.constants";
 
 // Busca persiste entre sessões (pedido do usuário: "mantenha sempre o último
 // texto salvo") — mesmo precedente de localStorage do useAutoLogout (fps_*).
@@ -28,6 +28,7 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
   const [filtroLoja,    setFiltroLoja]    = useState("all");
   const [filtroProduto, setFiltroProduto] = useState("all"); // produto dentro da loja selecionada
   const [filtroUsuario, setFiltroUsuario] = useState("all"); // admin: dono dos itens
+  const [filtroMeta,    setFiltroMeta]    = useState("all"); // all | sem | com (Sprint 74, todo:318)
   const [filtroDia,     setFiltroDia]     = useState("");    // dia de coleta (YYYY-MM-DD em BRT; "" = todos)
   const [itensDoDia,    setItensDoDia]    = useState(null);  // Set de item_ids com ALGUMA leitura no dia (null = carregando)
 
@@ -55,6 +56,39 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
     } catch { /* localStorage indisponível (modo privado etc.) — só não persiste */ }
   };
 
+  // ── Sprint 70 (todo:306) ──────────────────────────────────────────────
+  // Categoria/Loja/Produto/Usuário saíram da barra para um pop-up próprio
+  // (FiltersDialog). Estas duas contagens moram aqui, e não no ControlBar,
+  // porque quem conhece o conjunto completo de filtros é o hook — o botão só
+  // consome. São separadas de propósito:
+  //   · filtrosPopup = só o que o pop-up controla → pinta o botão de verde
+  //     (ficar verde por causa da busca, que tem botão próprio, confundiria);
+  //   · filtrosAtivos = TUDO que recorta a tabela, busca e dia inclusive →
+  //     decide se o "REMOVER FILTROS" aparece, e é o que ele limpa.
+  const filtrosPopup = [
+    filtro !== "all",
+    filtroLoja !== "all",
+    filtroProduto !== "all",
+    isAdmin && filtroUsuario !== "all",
+    filtroMeta !== "all",
+  ].filter(Boolean).length;
+
+  const filtrosAtivos = filtrosPopup + [!!termoBusca.trim(), !!filtroDia].filter(Boolean).length;
+
+  const limparFiltros = () => {
+    setFiltro("all");
+    setFiltroLoja("all");
+    setFiltroProduto("all");
+    setFiltroUsuario("all");
+    setFiltroMeta("all");
+    setTermoBusca("");   // também apaga o termo salvo em localStorage
+    setFiltroDia("");
+  };
+
+  // Sprint 74 (todo:318): atalho do card "Itens sem meta" do KpiRibbon —
+  // liga/desliga o recorte "só sem meta" sem mexer nos outros filtros.
+  const alternarSemMeta = () => setFiltroMeta((v) => (v === "sem" ? "all" : "sem"));
+
   const toggleSort = (campo) => {
     if (sortCampo === campo) setSortDir((d) => d === "asc" ? "desc" : "asc");
     else { setSortCampo(campo); setSortDir("asc"); }
@@ -79,6 +113,12 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
     }
     if (filtroProduto !== "all") {
       d = d.filter(x => x.item_id === filtroProduto);
+    }
+    // Sprint 74 (todo:318): recorte por presença de preço-meta. Mesmo teste
+    // (`!x.preco_meta`) usado no marcador da tabela e no Detalhe do item, para
+    // contador, marcação e lista nunca discordarem entre si.
+    if (filtroMeta !== "all") {
+      d = filtroMeta === "sem" ? d.filter((x) => !x.preco_meta) : d.filter((x) => !!x.preco_meta);
     }
     // Sprint 14: recorte por dia de coleta (dia civil de Brasília, mesmo
     // formato YYYY-MM-DD do <input type="date">). Usa os IDs vindos do banco
@@ -120,10 +160,13 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
 
   // ── Escopo de coleta (Sprint 4: coleta segmentada) ───────────
   // Produtos da loja selecionada (para o filtro "produto de loja")
+  // Já era alfabético desde a Sprint 4; a Sprint 71 (todo:314) só trocou o
+  // comparador pelo único do projeto (pt-BR, sensitivity "base"), para um
+  // produto começando com minúscula não ser jogado para o fim da lista.
   const produtosDaLoja = filtroLoja === "all" ? [] :
     dados
       .filter((x) => slugLoja(x.loja).includes(filtroLoja))
-      .sort((a, b) => (a.nome_na_loja || "").localeCompare(b.nome_na_loja || "", "pt-BR"));
+      .sort((a, b) => compararRotulos(a.nome_na_loja, b.nome_na_loja));
 
   const lojaAtiva = LOJAS_FILTER.find((l) => l.key === filtroLoja);
 
@@ -131,7 +174,7 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
   const donos = isAdmin
     ? [...new Map(dados.filter((x) => x.dono_id).map((x) =>
         [x.dono_id, { id: x.dono_id, rotulo: x.dono_nome || x.dono_email || x.dono_id.slice(0, 8) }]
-      )).values()].sort((a, b) => a.rotulo.localeCompare(b.rotulo, "pt-BR"))
+      )).values()].sort((a, b) => compararRotulos(a.rotulo, b.rotulo))
     : [];
   const rotuloDono = (item) =>
     item.dono_id === user?.id ? "você" : (item.dono_nome || item.dono_email || "—");
@@ -143,7 +186,9 @@ export function useDashboardFilters({ dados, isAdmin, user }) {
     filtroLoja, selecionarLoja,
     filtroProduto, setFiltroProduto,
     filtroUsuario, setFiltroUsuario,
+    filtroMeta, setFiltroMeta, alternarSemMeta,
     filtroDia, setFiltroDia,
+    filtrosPopup, filtrosAtivos, limparFiltros,
     dadosFiltrados,
     produtosDaLoja,
     lojaAtiva,

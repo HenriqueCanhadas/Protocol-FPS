@@ -3,6 +3,21 @@
  */
 import { useState } from "react";
 
+/**
+ * Sprint 78 (todo:310): uma conta bloqueada é banida na admin API do
+ * Supabase (`ban_duration`), e o GoTrue responde a esse login com "User is
+ * banned" / código `user_banned` — que, traduzido como "Credenciais
+ * inválidas", faria a pessoa ficar tentando de novo achando que errou a
+ * senha. Qualquer outra falha continua sendo credencial inválida.
+ */
+function mensagemDeErro(error) {
+  const texto = `${error?.code || ""} ${error?.message || ""}`.toLowerCase();
+  if (texto.includes("banned")) {
+    return "Acesso bloqueado — fale com o administrador do sistema.";
+  }
+  return "Credenciais inválidas.";
+}
+
 export default function LoginScreen({ onLogin }) {
   const [email,  setEmail]  = useState("");
   const [senha,  setSenha]  = useState("");
@@ -13,7 +28,7 @@ export default function LoginScreen({ onLogin }) {
     if (!email || !senha) { setErro("Preencha email e senha."); return; }
     setLoading(true); setErro("");
     const { error } = await onLogin(email, senha);
-    if (error) { setErro("Credenciais inválidas."); setLoading(false); }
+    if (error) { setErro(mensagemDeErro(error)); setLoading(false); }
   };
 
   return (

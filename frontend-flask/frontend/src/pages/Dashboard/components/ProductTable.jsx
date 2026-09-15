@@ -21,6 +21,10 @@
  * tabela "Detalhe por usuário e item" do Admin (Sprint 43). Abaixo de 700px
  * o <thead> já é escondido (Sprint 39, layout de cards) — cabeçalho clicável
  * é um recurso de desktop, o dropdown continua sendo o único caminho no celular.
+ *
+ * Sprint 74/V6 (todo:318): itens sem preço-meta ganham um marcador ◌ ao lado
+ * do valor — neutro, na mesma linha (não é um estado de Status) e clicável,
+ * abrindo o modal de meta já no modo de edição.
  */
 import { dataBRT, dataHoraBRT } from "@/utils/datas";
 import { formatBRL } from "@/utils/format";
@@ -36,7 +40,7 @@ function ThOrdenavel({ campo, label, sortCampo, sortDir, toggleSort }) {
 
 export default function ProductTable({
   dados, dadosFiltrados, termoBusca, filtroDia, isAdmin, user, rotuloDono,
-  selectedId, onSelectRow, sortCampo, sortDir, toggleSort,
+  selectedId, onSelectRow, sortCampo, sortDir, toggleSort, onDefinirMeta,
 }) {
   return (
     <div className="price-table-wrap">
@@ -74,6 +78,24 @@ export default function ProductTable({
               const { classe: statusClass, texto: statusTxt } = statusItem(item);
               const precoFmt     = item.preco ? formatBRL(item.preco) : null;
               const selecionada  = item.item_id === selectedId;
+              /* Sprint 74 (todo:318): marcador de item sem preço-meta — fica na
+                 MESMA linha do valor (glifo, não uma tag em bloco abaixo dele:
+                 isso devolvia à célula a altura que a Sprint 25/V4 tinha tirado,
+                 e só em algumas linhas, deixando a tabela irregular). Neutro de
+                 propósito — âmbar/verde/vermelho/azul são a escala de Status, e
+                 "sem meta" é configuração ausente, não alerta. Clicar abre o
+                 modal de meta já no modo de edição (stopPropagation: não deve
+                 selecionar/deselecionar a linha por baixo). */
+              const marcadorSemMeta = item.preco_meta ? null : (
+                <button
+                  type="button"
+                  className="price-sem-meta"
+                  aria-label={`Sem preço-meta — definir meta para ${item.nome_na_loja}`}
+                  onClick={(e) => { e.stopPropagation(); onDefinirMeta?.(item); }}
+                >
+                  ◌
+                </button>
+              );
               return (
                 <tr
                   key={item.item_id}
@@ -100,35 +122,39 @@ export default function ProductTable({
                   <td><span className="loja-badge">{item.loja}</span></td>
                   <td className="td-categoria">{CAT_LABEL[item.categoria] || item.categoria}</td>
                   <td>
-                    {precoFmt
-                      ? <div className="price-hover" tabIndex={0}>
-                          <div className="price-current">{precoFmt}</div>
-                          {(item.preco_meta || item.menor != null || item.coletado_em) && (
-                            <div className="price-tooltip" onClick={(e) => e.stopPropagation()}>
-                              {item.preco_meta && (
-                                <div>meta: {formatBRL(item.preco_meta)}</div>
-                              )}
-                              {item.menor != null && (
-                                <div className="pt-menor">
-                                  ★ menor: {formatBRL(item.menor)}
-                                  {item.menor_em && ` · ${dataHoraBRT(item.menor_em, { day: "2-digit", month: "2-digit", year: "numeric" })}`}
-                                </div>
-                              )}
-                              {item.coletado_em && (
-                                <div>
-                                  coleta: {dataHoraBRT(item.coletado_em, {
-                                    day:    "2-digit",
-                                    month:  "2-digit",
-                                    year:   "numeric",
-                                    hour:   "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      : <div className="price-unavailable">indisponível</div>}
+                    {/* Sprint 74 (todo:318): valor (ou "indisponível") e tooltip
+                        passaram a dividir o MESMO .price-hover — antes o ramo sem
+                        preço não tinha tooltip nenhum, e um item esgotado também
+                        tem meta/★ menor/última coleta para mostrar */}
+                    <div className="price-hover" tabIndex={0}>
+                      {precoFmt
+                        ? <div className="price-current">{precoFmt}{marcadorSemMeta}</div>
+                        : <div className="price-unavailable">indisponível{marcadorSemMeta}</div>}
+                      <div className="price-tooltip" onClick={(e) => e.stopPropagation()}>
+                        {item.preco_meta ? (
+                          <div>meta: {formatBRL(item.preco_meta)}</div>
+                        ) : (
+                          <div className="pt-sem-meta">◌ meta: não definida</div>
+                        )}
+                        {item.menor != null && (
+                          <div className="pt-menor">
+                            ★ menor: {formatBRL(item.menor)}
+                            {item.menor_em && ` · ${dataHoraBRT(item.menor_em, { day: "2-digit", month: "2-digit", year: "numeric" })}`}
+                          </div>
+                        )}
+                        {item.coletado_em && (
+                          <div>
+                            coleta: {dataHoraBRT(item.coletado_em, {
+                              day:    "2-digit",
+                              month:  "2-digit",
+                              year:   "numeric",
+                              hour:   "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </td>
                   <td><span className={`status-badge ${statusClass}`}>{statusTxt}</span></td>
                 </tr>

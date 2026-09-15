@@ -227,6 +227,33 @@ header {
   border-color: var(--green-dim);
   box-shadow: 0 0 0 1px var(--green-dim), inset 0 0 10px rgba(57,255,20,.03);
 }
+/* Autofill (Sprint 69b, todo:304) — global, porque o bug atinge todo campo que
+   o navegador preenche, não só o login: enquanto o Chrome mantém o estado
+   :-webkit-autofill ele pinta o campo com fundo E FONTE próprios (fonte do
+   sistema, menor que a --fs-md monoespaçada do tema), o que deixava o texto
+   visivelmente "compacto"; ao interagir (hover/clique) o estado cai e o campo
+   volta ao normal sozinho — exatamente o sintoma relatado. A Sprint 51 já tinha
+   corrigido cor e fundo na tela de login, mas não a fonte, que é a causa do
+   "compacto". !important é necessário: o estilo interno do autofill vence
+   declarações normais de autor. O fundo só é sobrescrevível por box-shadow
+   inset (background-color é ignorado nesse estado). */
+.field-input:-webkit-autofill,
+.field-input:-webkit-autofill:hover,
+.field-input:-webkit-autofill:focus,
+.field-input:-webkit-autofill:active {
+  font-family: var(--mono) !important;
+  font-size: var(--fs-md) !important;
+  -webkit-text-fill-color: var(--text);
+  -webkit-box-shadow: 0 0 0 1000px var(--bg) inset;
+  caret-color: var(--text);
+}
+/* Regra separada de propósito: `:autofill` (padrão, Firefox/Safari novos) num
+   grupo junto com `:-webkit-autofill` invalidaria a lista inteira de seletores
+   nos navegadores que só entendem a versão prefixada. */
+.field-input:autofill {
+  font-family: var(--mono) !important;
+  font-size: var(--fs-md) !important;
+}
 .field-error { font-size: var(--fs-xs); color: var(--red); margin-top: .35rem; letter-spacing: .05em; }
 .field-warn { font-size: var(--fs-xs); color: var(--amber); margin-top: .5rem; letter-spacing: .03em; line-height: 1.5; border: 1px solid var(--amber); background: rgba(255,184,0,.08); padding: .6rem .8rem; }
 
@@ -293,12 +320,22 @@ header {
   background: var(--bg3); color: var(--green); caret-color: var(--green);
 }
 .login-box .field-input::placeholder { color: var(--text-muted); }
+/* Mantém as cores próprias do login (verde sobre --bg3) sobre a regra global de
+   autofill acima; a fonte é repetida porque o !important global não vence o do
+   navegador sozinho em cascata com esta regra mais específica. */
 .login-box .field-input:-webkit-autofill,
 .login-box .field-input:-webkit-autofill:hover,
-.login-box .field-input:-webkit-autofill:focus {
+.login-box .field-input:-webkit-autofill:focus,
+.login-box .field-input:-webkit-autofill:active {
+  font-family: var(--mono) !important;
+  font-size: var(--fs-md) !important;
   -webkit-text-fill-color: var(--green);
   -webkit-box-shadow: 0 0 0 1000px var(--bg3) inset;
   caret-color: var(--green);
+}
+.login-box .field-input:autofill {
+  font-family: var(--mono) !important;
+  font-size: var(--fs-md) !important;
 }
 .login-error { font-size: var(--fs-base); color: var(--red); text-align: center; min-height: 1.2rem; }
 .login-footer { font-size: var(--fs-xs); color: var(--text-muted); letter-spacing: .2em; text-align: center; }

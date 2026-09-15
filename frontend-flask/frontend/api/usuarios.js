@@ -18,13 +18,18 @@
  *   { "acao": "listar" }
  *   { "acao": "telegram",     "user_id": ..., "ativo": true|false }
  *   { "acao": "ver_banco",    "user_id": ..., "ativo": true|false }  (só o dono da conta)
+ *   { "acao": "bloquear",     "user_id": ..., "ativo": true|false }  (só o dono da conta)
  *   { "acao": "excluir",      "user_id": ... }
  */
 
-// Único email autorizado a liberar/revogar o acesso a /admin (ver_banco) de
-// outra pessoa (Sprint 32b, pedido do usuário) — checagem própria deste
-// endpoint, não é nível de RLS.
+// Único email autorizado a liberar/revogar o acesso a /admin (ver_banco,
+// Sprint 32b) e a bloquear/liberar a entrada de um usuário (bloqueado,
+// Sprint 78) — checagem própria deste endpoint, não é nível de RLS.
 const DONO_EMAIL = "pedrosacanhadas@gmail.com";
+// Duração do banimento na admin API do Supabase (Sprint 78). Não existe
+// "para sempre" na API: o bloqueio é por tempo, então usamos 100 anos e
+// desfazemos com "none" ao liberar.
+const BAN_DURATION = "876000h";
 
 async function usuarioDoToken(url, key, accessToken) {
   const resp = await fetch(`${url}/auth/v1/user`, {
@@ -34,12 +39,22 @@ async function usuarioDoToken(url, key, accessToken) {
   const { id: uid } = await resp.json();
   if (!uid) return null;
 
-  const perfilResp = await fetch(`${url}/rest/v1/usuarios?id=eq.${uid}&select=nivel`, {
+  // Sprint 78 (todo:310): `bloqueado` acompanha o nível — uma conta barrada
+  // perde o acesso a este endpoint mesmo com um JWT ainda válido, emitido
+  // antes do banimento. Se a coluna não existir (migração sprint78 não
+  // rodada), cai no select antigo em vez de derrubar a autorização.
+  let perfilResp = await fetch(`${url}/rest/v1/usuarios?id=eq.${uid}&select=nivel,bloqueado`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
-  if (!perfilResp.ok) return { uid, isAdmin: false };
+  if (!perfilResp.ok) {
+    perfilResp = await fetch(`${url}/rest/v1/usuarios?id=eq.${uid}&select=nivel`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+    });
+  }
+  if (!perfilResp.ok) return { uid, isAdmin: false, bloqueado: false };
   const perfil = await perfilResp.json();
-  return { uid, isAdmin: perfil.length ? perfil[0].nivel >= 2 : false };
+  const linha = perfil.length ? perfil[0] : {};
+  return { uid, isAdmin: (linha.nivel ?? 1) >= 2, bloqueado: Boolean(linha.bloqueado) };
 }
 
 async function adminApi(url, key, path, data, method = "POST") {
@@ -117,6 +132,9 @@ export default async function handler(req, res) {
   if (!quem) {
     return res.status(401).json({ error: "Sessão inválida ou expirada — faça login novamente." });
   }
+  if (quem.bloqueado) {
+    return res.status(403).json({ error: "Acesso bloqueado — fale com o administrador do sistema." });
+  }
   if (!quem.isAdmin) {
     return res.status(403).json({ error: "Permissão negada: apenas administradores gerenciam usuários." });
   }
@@ -128,8 +146,8 @@ export default async function handler(req, res) {
   const { acao } = body || {};
   const senha = body?.senha || "";
 
-  if (!["criar", "trocar_senha", "listar", "telegram", "ver_banco", "excluir"].includes(acao)) {
-    return res.status(400).json({ error: "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram', 'ver_banco' ou 'excluir')" });
+  if (!["criar", "trocar_senha", "listar", "telegram", "ver_banco", "bloquear", "excluir"].includes(acao)) {
+    return res.status(400).json({ error: "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram', 'ver_banco', 'bloquear' ou 'excluir')" });
   }
   if (["criar", "trocar_senha"].includes(acao) && senha.length < 8) {
     return res.status(400).json({ error: "A senha deve ter pelo menos 8 caracteres." });
@@ -138,23 +156,30 @@ export default async function handler(req, res) {
   try {
     if (acao === "listar") {
       // Perfis (usuarios) — com fallback caso as migrações sprint9
-      // (notificar_telegram) e/ou sprint32b (ver_banco) ainda não tenham
-      // rodado no banco.
-      let telegramOk = true;
-      let verBancoOk = true;
-      let perfis;
-      try {
-        perfis = await supabaseGet(url, key,
-          "usuarios?select=id,email,nome,nivel,notificar_telegram,ver_banco&order=email.asc");
-      } catch {
-        verBancoOk = false;
+      // (notificar_telegram), sprint32b (ver_banco) e/ou sprint78
+      // (bloqueado) ainda não tenham rodado no banco. Tentativas da mais
+      // completa para a mais pobre; a primeira que passar vence.
+      const TENTATIVAS = [
+        ["id,email,nome,nivel,notificar_telegram,ver_banco,bloqueado", true,  true,  true],
+        ["id,email,nome,nivel,notificar_telegram,ver_banco",           true,  true,  false],
+        ["id,email,nome,nivel,notificar_telegram",                     true,  false, false],
+        ["id,email,nome,nivel",                                        false, false, false],
+      ];
+      let telegramOk = false;
+      let verBancoOk = false;
+      let bloqueioOk = false;
+      let perfis = null;
+      for (const [colunas, tgOk, vbOk, blqOk] of TENTATIVAS) {
         try {
-          perfis = await supabaseGet(url, key,
-            "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc");
+          perfis = await supabaseGet(url, key, `usuarios?select=${colunas}&order=email.asc`);
         } catch {
-          telegramOk = false;
-          perfis = await supabaseGet(url, key, "usuarios?select=id,email,nome,nivel&order=email.asc");
+          continue;
         }
+        [telegramOk, verBancoOk, bloqueioOk] = [tgOk, vbOk, blqOk];
+        break;
+      }
+      if (!perfis) {
+        return res.status(502).json({ error: "Não foi possível ler a tabela usuarios." });
       }
 
       // Contagem de itens por dono — paginada (teto de 1000 do PostgREST)
@@ -185,13 +210,19 @@ export default async function handler(req, res) {
           nivel:              p.nivel ?? 1,
           notificar_telegram: telegramOk ? (p.notificar_telegram ?? false) : null,
           ver_banco:          verBancoOk ? (p.ver_banco ?? false) : null,
+          bloqueado:          bloqueioOk ? Boolean(p.bloqueado) : null,
           itens:              contagem[p.id] || 0,
           criado_em:          au.created_at || null,
           ultimo_acesso:      au.last_sign_in_at || null,
           confirmado:         Boolean(au.email_confirmed_at),
         };
       });
-      return res.status(200).json({ ok: true, usuarios, telegram_disponivel: telegramOk, ver_banco_disponivel: verBancoOk });
+      return res.status(200).json({
+        ok: true, usuarios,
+        telegram_disponivel: telegramOk,
+        ver_banco_disponivel: verBancoOk,
+        bloqueio_disponivel: bloqueioOk,
+      });
     }
 
     if (acao === "telegram") {
@@ -257,6 +288,60 @@ export default async function handler(req, res) {
         throw err;
       }
       return res.status(200).json({ ok: true, ver_banco: ativo });
+    }
+
+    if (acao === "bloquear") {
+      // Sprint 78 (todo:310) — barrar/liberar a entrada de um usuário.
+      // Mesma regra de dono da ação ver_banco: nem um admin comum pode.
+      const chamador = await supabaseGet(url, key, `usuarios?id=eq.${quem.uid}&select=email`);
+      const emailChamador = (chamador[0]?.email || "").toLowerCase();
+      if (emailChamador !== DONO_EMAIL) {
+        return res.status(403).json({ error: "Permissão negada: só o dono da conta pode bloquear ou liberar o acesso de um usuário." });
+      }
+      const userId = String(body?.user_id || "").trim();
+      if (!userId) {
+        return res.status(400).json({ error: "user_id não informado." });
+      }
+      if (userId === quem.uid) {
+        return res.status(400).json({ error: "Não é possível bloquear a própria conta." });
+      }
+      const alvo = await supabaseGet(url, key, `usuarios?id=eq.${userId}&select=id,email`);
+      if (!alvo.length) {
+        return res.status(404).json({ error: "Usuário não encontrado." });
+      }
+      const ativo = Boolean(body?.ativo);   // true = bloquear
+
+      // 1º a flag no banco: é ela que a RLS (rede de segurança) e o front
+      // (mensagem clara) leem, e é ela que confirma que a migração rodou —
+      // se falhar, nada foi banido pela metade.
+      const resp = await fetch(`${url}/rest/v1/usuarios?id=eq.${userId}`, {
+        method: "PATCH",
+        headers: {
+          apikey:         key,
+          Authorization:  `Bearer ${key}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ bloqueado: ativo }),
+      });
+      if (!resp.ok) {
+        if (resp.status === 400) {
+          return res.status(400).json({
+            error: "Coluna bloqueado ausente — rode a migração " +
+                   "sprint78_bloquear_usuario.sql no SQL Editor do Supabase.",
+          });
+        }
+        const err = new Error(await resp.text());
+        err.status = resp.status;
+        throw err;
+      }
+
+      // 2º a barreira de verdade: o Supabase Auth não conhece a tabela
+      // usuarios, então sem o ban a pessoa continuaria conseguindo
+      // autenticar. "none" remove o banimento (libera de volta).
+      await adminApi(url, key, `/admin/users/${userId}`,
+        { ban_duration: ativo ? BAN_DURATION : "none" }, "PUT");
+
+      return res.status(200).json({ ok: true, bloqueado: ativo, email: alvo[0].email });
     }
 
     if (acao === "excluir") {

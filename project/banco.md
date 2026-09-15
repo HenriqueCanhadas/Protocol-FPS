@@ -71,6 +71,8 @@ Espelho leve de `auth.users`, criado pela migração `sprint5_multiusuario.sql`.
 | `nome` | `text` | sim | — | nome de exibição (opcional; UI usa email como fallback) |
 | `nivel` | `integer` | não | `1` | **papel**: `1` = normal · `2` = admin |
 | `notificar_telegram` | `boolean` | não | `false` | Sprint 9: recebe alertas no Telegram (bot/chat pessoal); toggle por usuário na página **Usuários** (Sprint 11, `/api/usuarios` `acao=telegram`) |
+| `ver_banco` | `boolean` | não | `false` | Sprint 32b: enxerga a página `/admin` (métricas do banco), **independente de `nivel`**; só o dono libera (`/api/usuarios` `acao=ver_banco`) |
+| `bloqueado` | `boolean` | não | `false` | Sprint 78: conta barrada — não entra e não vê dado nenhum; só o dono bloqueia/libera (`/api/usuarios` `acao=bloquear`) |
 | `criado_em` | `timestamptz` | não | `now()` | — |
 
 - Preenchida automaticamente pelo trigger `trg_criar_perfil` a cada signup.
@@ -80,6 +82,13 @@ Espelho leve de `auth.users`, criado pela migração `sprint5_multiusuario.sql`.
 - **Exclusão de usuário (Sprint 11):** `/api/usuarios` `acao=excluir` faz a cascata
   manual `alertas → historico_precos → itens` e então remove a conta em
   `auth.users` — só esta última cascateia para `usuarios`. Auto-exclusão → 400.
+- **Bloqueio de usuário (Sprint 78):** `/api/usuarios` `acao=bloquear` marca
+  `bloqueado` **e** bane a conta na admin API do GoTrue (`ban_duration`, 100 anos;
+  `"none"` libera). A flag sozinha não barra nada — o Supabase Auth não conhece
+  esta tabela —, então ela serve às outras duas camadas: o veto do RLS (abaixo)
+  e a tela de aviso do front (`useAuth` → `BlockedScreen`). Só o email do dono
+  aciona (checagem dentro do endpoint, nos dois espelhos); auto-bloqueio → 400.
+  Os dados do usuário bloqueado são **mantidos** — o bloqueio é reversível.
 
 ### 3.2 `lojas` — lojas suportadas
 
@@ -242,6 +251,15 @@ deduplicação — a cadência de 1 coleta diária evita repetição na prática
 Usada dentro das políticas de RLS (evita recursão na própria tabela `usuarios`).
 Fonte: `migrations/sprint5_multiusuario.sql`.
 
+### 5.2b RPCs `pode_ver_banco()` (Sprint 32b) e `esta_bloqueado()` (Sprint 78)
+
+Mesmo padrão de `is_admin()` (`SECURITY DEFINER`, sem recursão de RLS):
+`pode_ver_banco()` é `usuarios.ver_banco = true` **e** `bloqueado = false`
+(Sprint 78 acrescentou a segunda condição — bloquear alguém também tira o
+`/admin`); `esta_bloqueado()` é `usuarios.bloqueado = true` e entra como veto
+em todas as políticas de RLS. Fontes: `migrations/sprint32b_ver_banco.sql` e
+`migrations/sprint78_bloquear_usuario.sql`.
+
 ### 5.3 Trigger `trg_criar_perfil` → `criar_perfil_usuario()` (Sprint 5)
 
 `AFTER INSERT ON auth.users`; cria a linha correspondente em `usuarios`
@@ -257,12 +275,18 @@ Sem sessão (anon puro), **todas retornam 0 linhas**. Políticas (todas `to auth
 
 | Tabela | Política | Comando | Regra |
 |---|---|---|---|
-| `usuarios` | `usuarios_select` | SELECT | `id = auth.uid() OR is_admin()` |
-| `itens` | `itens_select` | SELECT | `user_id = auth.uid() OR is_admin()` |
-| `itens` | `itens_insert` | INSERT | `user_id = auth.uid() OR is_admin()` |
-| `itens` | `itens_update` | UPDATE | dono ou admin (USING e WITH CHECK) |
-| `historico_precos` | `historico_select` | SELECT | item pai é do usuário, ou admin |
-| `alertas` | `alertas_select` | SELECT | item pai é do usuário, ou admin |
+| `usuarios` | `usuarios_select` | SELECT | `id = auth.uid() OR (is_admin() AND NOT esta_bloqueado())` |
+| `itens` | `itens_select` | SELECT | `NOT esta_bloqueado() AND (user_id = auth.uid() OR is_admin())` |
+| `itens` | `itens_insert` | INSERT | `NOT esta_bloqueado() AND (user_id = auth.uid() OR is_admin())` |
+| `itens` | `itens_update` | UPDATE | não bloqueado, e dono ou admin (USING e WITH CHECK) |
+| `historico_precos` | `historico_select` | SELECT | não bloqueado, e item pai é do usuário ou admin |
+| `alertas` | `alertas_select` | SELECT | não bloqueado, e item pai é do usuário ou admin |
+
+O veto `NOT esta_bloqueado()` entrou na Sprint 78 como **rede de segurança**: uma
+sessão aberta antes do banimento continua tecnicamente válida até o JWT expirar,
+mas deixa de enxergar qualquer dado. A exceção é o próprio perfil em `usuarios`
+(`id = auth.uid()` segue sem o veto) — é essa leitura que permite ao front dizer
+"acesso bloqueado" em vez de mostrar um app vazio.
 
 **Ausências deliberadas** (a operação passa só pela SERVICE_KEY server-side):
 - `DELETE` em qualquer tabela → apenas `/api/remover` (que valida dono/admin via token);
@@ -328,6 +352,7 @@ Tabelas de fases antigas do projeto, fora do fluxo atual. **Situação em 08/07/
 | `sprint5_multiusuario.sql` | S5 (05/07/2026) | `usuarios`, trigger de perfil, `itens.user_id` + backfill, `is_admin()`, políticas RLS |
 | `sprint8_diversos_migracao.sql` | S8 (07/07/2026) | categoria `DIVERSOS`, troca `itens_url_key` → `unique (url, user_id)`, migração dos dados legados Kabum (itens + histórico) p/ pedrosacanhadas |
 | `sprint9_alertas_por_usuario.sql` | S9 (07/07/2026) | `usuarios.notificar_telegram` (flag do bot pessoal; `true` só p/ pedrosacanhadas) — email do alerta passa a ir ao dono do item |
+| `sprint78_bloquear_usuario.sql` | S78 (15/09/2026) | `usuarios.bloqueado`, `esta_bloqueado()`, veto de bloqueio nas 6 políticas de RLS e em `pode_ver_banco()` |
 
 O que **não** está versionado (criado antes da convenção): `lojas`, `produtos`,
 `itens` (colunas originais), `historico_precos`, `alertas`, a view `ultimo_preco`

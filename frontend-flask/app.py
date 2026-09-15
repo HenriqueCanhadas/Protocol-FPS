@@ -50,10 +50,15 @@ _GITHUB_WORKFLOW = os.getenv("GITHUB_WORKFLOW", "coletar.yml")
 # (ex.: Duplicate-Main) para testar inputs novos ANTES do merge na main —
 # o GitHub responde 422 se o workflow da branch alvo não conhecer os inputs.
 _GITHUB_BRANCH   = os.getenv("GITHUB_BRANCH",   "main")
-# Único email autorizado a liberar/revogar o acesso a /admin (ver_banco) de
-# outra pessoa (Sprint 32b, pedido do usuário — não é um nível de RLS, é uma
-# checagem própria deste endpoint).
+# Único email autorizado a liberar/revogar o acesso a /admin (ver_banco,
+# Sprint 32b) e a bloquear/liberar a entrada de um usuário (bloqueado,
+# Sprint 78) — pedido do usuário; não é um nível de RLS, é uma checagem
+# própria deste endpoint.
 _DONO_EMAIL = "pedrosacanhadas@gmail.com"
+# Duração do banimento na admin API do Supabase (Sprint 78). Não existe
+# "para sempre" na API: o bloqueio é por tempo, então usamos 100 anos e
+# desfazemos com "none" ao liberar.
+_BAN_DURATION = "876000h"
 
 
 def _supabase_get(path):
@@ -91,13 +96,24 @@ def _usuario_do_token(access_token):
     if not uid:
         raise PermissionError("Sessão inválida ou expirada — faça login novamente.")
 
+    # Sprint 78 (todo:310): uma conta bloqueada perde o acesso a qualquer
+    # endpoint autenticado — inclusive com um JWT ainda válido, emitido
+    # antes do banimento. O fallback para `select=nivel` existe porque a
+    # coluna `bloqueado` pode não existir (migração sprint78 não rodada), e
+    # um 400 por coluna ausente NÃO pode cair no modo legado abaixo (que
+    # trata todo autenticado como admin).
     try:
-        perfil = _supabase_get(f"usuarios?id=eq.{uid}&select=nivel")
-        nivel = perfil[0]["nivel"] if perfil else 1
-        return uid, nivel >= 2
+        perfil = _supabase_get(f"usuarios?id=eq.{uid}&select=nivel,bloqueado")
     except urllib.error.HTTPError:
-        # Tabela usuarios ainda não existe (migração multiusuário pendente)
-        return uid, True
+        try:
+            perfil = _supabase_get(f"usuarios?id=eq.{uid}&select=nivel")
+        except urllib.error.HTTPError:
+            # Tabela usuarios ainda não existe (migração multiusuário pendente)
+            return uid, True
+    linha = perfil[0] if perfil else {}
+    if linha.get("bloqueado"):
+        raise PermissionError("Acesso bloqueado — fale com o administrador do sistema.")
+    return uid, int(linha.get("nivel") or 1) >= 2
 
 
 def _autorizar_remocao(uid, is_admin, tipo, ids):
@@ -306,6 +322,7 @@ def api_usuarios():
       { "acao": "listar" }
       { "acao": "telegram",     "user_id": ..., "ativo": true|false }
       { "acao": "ver_banco",    "user_id": ..., "ativo": true|false }  (só o dono da conta)
+      { "acao": "bloquear",     "user_id": ..., "ativo": true|false }  (só o dono da conta)
       { "acao": "excluir",      "user_id": ... }
     """
     if not _SUPABASE_URL or not _SUPABASE_SERVICE_KEY:
@@ -327,8 +344,9 @@ def api_usuarios():
     acao  = payload.get("acao")
     senha = payload.get("senha") or ""
 
-    if acao not in ("criar", "trocar_senha", "listar", "telegram", "ver_banco", "excluir"):
-        return jsonify({"error": "acao inválida (use 'criar', 'trocar_senha', 'listar', 'telegram', 'ver_banco' ou 'excluir')"}), 400
+    if acao not in ("criar", "trocar_senha", "listar", "telegram", "ver_banco", "bloquear", "excluir"):
+        return jsonify({"error": "acao inválida (use 'criar', 'trocar_senha', 'listar', "
+                                 "'telegram', 'ver_banco', 'bloquear' ou 'excluir')"}), 400
     if acao in ("criar", "trocar_senha") and len(senha) < 8:
         return jsonify({"error": "A senha deve ter pelo menos 8 caracteres."}), 400
 
@@ -362,20 +380,26 @@ def api_usuarios():
     try:
         if acao == "listar":
             # Perfis (usuarios) — com fallback caso as migrações sprint9
-            # (notificar_telegram) e/ou sprint32b (ver_banco) ainda não
-            # tenham rodado no banco.
-            telegram_ok = ver_banco_ok = True
-            try:
-                perfis = _supabase_get(
-                    "usuarios?select=id,email,nome,nivel,notificar_telegram,ver_banco&order=email.asc")
-            except urllib.error.HTTPError:
-                ver_banco_ok = False
+            # (notificar_telegram), sprint32b (ver_banco) e/ou sprint78
+            # (bloqueado) ainda não tenham rodado no banco. Tentativas da
+            # mais completa para a mais pobre; a primeira que passar vence.
+            tentativas = (
+                ("id,email,nome,nivel,notificar_telegram,ver_banco,bloqueado", True,  True,  True),
+                ("id,email,nome,nivel,notificar_telegram,ver_banco",           True,  True,  False),
+                ("id,email,nome,nivel,notificar_telegram",                     True,  False, False),
+                ("id,email,nome,nivel",                                        False, False, False),
+            )
+            perfis = None
+            telegram_ok = ver_banco_ok = bloqueado_ok = False
+            for colunas, tg_ok, vb_ok, blq_ok in tentativas:
                 try:
-                    perfis = _supabase_get(
-                        "usuarios?select=id,email,nome,nivel,notificar_telegram&order=email.asc")
+                    perfis = _supabase_get(f"usuarios?select={colunas}&order=email.asc")
                 except urllib.error.HTTPError:
-                    telegram_ok = False
-                    perfis = _supabase_get("usuarios?select=id,email,nome,nivel&order=email.asc")
+                    continue
+                telegram_ok, ver_banco_ok, bloqueado_ok = tg_ok, vb_ok, blq_ok
+                break
+            if perfis is None:
+                return jsonify({"error": "Não foi possível ler a tabela usuarios."}), 502
 
             # Contagem de itens por dono — paginada (teto de 1000 do PostgREST)
             contagem, de = {}, 0
@@ -409,6 +433,7 @@ def api_usuarios():
                     "nivel":              p.get("nivel", 1),
                     "notificar_telegram": p.get("notificar_telegram") if telegram_ok else None,
                     "ver_banco":          p.get("ver_banco") if ver_banco_ok else None,
+                    "bloqueado":          bool(p.get("bloqueado")) if bloqueado_ok else None,
                     "itens":              contagem.get(p["id"], 0),
                     "criado_em":          au.get("created_at"),
                     "ultimo_acesso":      au.get("last_sign_in_at"),
@@ -416,7 +441,8 @@ def api_usuarios():
                 })
             return jsonify({"ok": True, "usuarios": usuarios,
                             "telegram_disponivel": telegram_ok,
-                            "ver_banco_disponivel": ver_banco_ok}), 200
+                            "ver_banco_disponivel": ver_banco_ok,
+                            "bloqueio_disponivel": bloqueado_ok}), 200
 
         if acao == "telegram":
             user_id = str(payload.get("user_id") or "").strip()
@@ -453,6 +479,44 @@ def api_usuarios():
                                              "SQL Editor do Supabase."}), 400
                 raise
             return jsonify({"ok": True, "ver_banco": ativo}), 200
+
+        if acao == "bloquear":
+            # Sprint 78 (todo:310) — barrar/liberar a entrada de um usuário.
+            # Mesma regra de dono da ação ver_banco: nem um admin comum pode.
+            chamador = _supabase_get(f"usuarios?id=eq.{uid}&select=email")
+            email_chamador = (chamador[0].get("email") or "").lower() if chamador else ""
+            if email_chamador != _DONO_EMAIL:
+                return jsonify({"error": "Permissão negada: só o dono da conta pode bloquear ou liberar o acesso de um usuário."}), 403
+            user_id = str(payload.get("user_id") or "").strip()
+            if not user_id:
+                return jsonify({"error": "user_id não informado."}), 400
+            if user_id == uid:
+                return jsonify({"error": "Não é possível bloquear a própria conta."}), 400
+            alvo = _supabase_get(f"usuarios?id=eq.{user_id}&select=id,email")
+            if not alvo:
+                return jsonify({"error": "Usuário não encontrado."}), 404
+            ativo = bool(payload.get("ativo"))   # true = bloquear
+
+            # 1º a flag no banco: é ela que a RLS (rede de segurança) e o
+            # front (mensagem clara) leem, e é ela que confirma que a
+            # migração rodou — se falhar, nada foi banido pela metade.
+            try:
+                _supabase_patch(f"usuarios?id=eq.{user_id}", {"bloqueado": ativo})
+            except urllib.error.HTTPError as exc:
+                if exc.code == 400:
+                    return jsonify({"error": "Coluna bloqueado ausente — rode a "
+                                             "migração sprint78_bloquear_usuario.sql no "
+                                             "SQL Editor do Supabase."}), 400
+                raise
+
+            # 2º a barreira de verdade: o Supabase Auth não conhece a tabela
+            # usuarios, então sem o ban a pessoa continuaria conseguindo
+            # autenticar. "none" remove o banimento (libera de volta).
+            _admin_api(f"/admin/users/{user_id}",
+                       {"ban_duration": _BAN_DURATION if ativo else "none"}, method="PUT")
+
+            return jsonify({"ok": True, "bloqueado": ativo,
+                            "email": alvo[0].get("email")}), 200
 
         if acao == "excluir":
             user_id = str(payload.get("user_id") or "").strip()
