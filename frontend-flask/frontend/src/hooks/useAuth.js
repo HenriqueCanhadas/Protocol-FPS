@@ -10,6 +10,9 @@ import { useState, useEffect } from "react";
 import { getSupabase } from "@/services/supabase";
 
 const PERFIL_PADRAO = { nivel: 1, nome: null };
+// De quanto em quanto tempo o perfil é relido (Sprint 78 — bloqueio no meio
+// de uma sessão aberta). É uma consulta de 1 linha por chave primária.
+const REVALIDA_PERFIL_MS = 60000;
 
 export function useAuth() {
   const [user, setUser]       = useState(null);
@@ -39,16 +42,26 @@ export function useAuth() {
     return () => unsub?.unsubscribe();
   }, []);
 
-  // Carrega o perfil (nivel/nome/ver_banco) quando o usuário loga
+  // Carrega o perfil (nivel/nome/ver_banco/bloqueado) quando o usuário loga,
+  // e REVALIDA periodicamente (Sprint 78): um usuário bloqueado no meio de
+  // uma sessão já aberta tem de perder o acesso na verificação seguinte, e
+  // não continuar navegando até o token expirar.
   useEffect(() => {
     if (!user) { setPerfil(PERFIL_PADRAO); setPerfilDe(null); return; }
     let ativo = true;
-    getSupabase().then(async (client) => {
+
+    const carregarPerfil = async () => {
+      const client = await getSupabase();
+      // Colunas opcionais degradam uma a uma: bloqueado (sprint78) e
+      // ver_banco (sprint32b) podem não existir se a migração não rodou —
+      // nada disso pode derrubar nivel/isAdmin.
       let { data, error } = await client.from("usuarios")
-        .select("nivel, nome, ver_banco").eq("id", user.id).single();
+        .select("nivel, nome, ver_banco, bloqueado").eq("id", user.id).single();
       if (error) {
-        // ver_banco pode não existir ainda (migração sprint32b pendente) —
-        // não deixa isso derrubar nivel/isAdmin, só cai sem ver_banco
+        ({ data, error } = await client.from("usuarios")
+          .select("nivel, nome, ver_banco").eq("id", user.id).single());
+      }
+      if (error) {
         ({ data, error } = await client.from("usuarios")
           .select("nivel, nome").eq("id", user.id).single());
       }
@@ -57,8 +70,20 @@ export function useAuth() {
         setPerfil(!error && data ? data : PERFIL_PADRAO);
         setPerfilDe(user.id);
       }
-    });
-    return () => { ativo = false; };
+    };
+
+    carregarPerfil();
+    const id = setInterval(carregarPerfil, REVALIDA_PERFIL_MS);
+    // Voltar para a aba também revalida — cobre a janela deixada aberta em
+    // segundo plano, onde o intervalo pode ter sido estrangulado pelo browser
+    const aoVoltar = () => { if (document.visibilityState === "visible") carregarPerfil(); };
+    document.addEventListener("visibilitychange", aoVoltar);
+
+    return () => {
+      ativo = false;
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", aoVoltar);
+    };
   }, [user]);
 
   const signIn = async (email, password) => {
@@ -79,9 +104,15 @@ export function useAuth() {
   // enxerga /admin (Sprint 32b: por padrão só o dono da conta; só ele pode
   // liberar para outra pessoa, pela tela Usuários).
   const podeVerBanco = Boolean(perfil?.ver_banco);
+  // Sprint 78 (todo:310): conta barrada pelo dono. Aqui é só a EXPERIÊNCIA
+  // (mostrar uma tela explicando, em vez de um app vazio) — a barragem real
+  // é o ban na admin API do Supabase + o veto do RLS (ver a migração
+  // sprint78_bloquear_usuario.sql). Enquanto o perfil não chegou, ninguém é
+  // tratado como bloqueado: o padrão é não expulsar quem talvez esteja ok.
+  const bloqueado = Boolean(perfil?.bloqueado);
   // true enquanto há sessão mas o perfil dela ainda não chegou — páginas
   // que dependem de isAdmin/podeVerBanco devem esperar antes de redirecionar
   const perfilLoading = Boolean(user) && perfilDe !== user.id;
 
-  return { user, perfil, isAdmin, podeVerBanco, loading, perfilLoading, sb, signIn, signOut };
+  return { user, perfil, isAdmin, podeVerBanco, bloqueado, loading, perfilLoading, sb, signIn, signOut };
 }

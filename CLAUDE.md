@@ -29,16 +29,30 @@ walkthrough (Vercel setup, env vars): `frontend-flask/DEPLOY_VERCEL.md`.
 
 **SPA structure (`frontend/src/`):** `App.jsx` is an auth gate — while `useAuth` resolves the
 Supabase session it shows a spinner, renders `LoginScreen` when logged out, and otherwise mounts
-`BrowserRouter` with four pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`,
-`Usuarios` `/usuarios` — admin-only user management — and `Conta` `/conta`)
-plus redirects for legacy HTML routes. Sessions auto-expire after 30 min of inactivity or
+`BrowserRouter` with five pages (`Dashboard` `/`, `NovoProduto` `/novo-produto`,
+`Usuarios` `/usuarios` — admin-only user management, gated on `isAdmin` —, `Admin` `/admin` —
+DB health/metrics panel, gated on the separate `podeVerBanco` flag, see below — and `Conta`
+`/conta`) plus redirects for legacy HTML routes. Sessions auto-expire after 30 min of inactivity or
 closed window (`useAutoLogout`, last-activity timestamp in localStorage), and password
 changes happen only through the admin flow in `/usuarios` — never self-service (Sprint 13).
-The Supabase client (`services/supabase.js`) is a lazy
-singleton: in prod it reads inlined `VITE_*` vars, in dev it fetches `/api/config` from Flask.
-`AppHeader` shows a live BRT clock via `hooks/useClock.js` (ticks every second off
-`utils/datas.js`'s `horaBRT`/`dataBRT`). Imports use the `@/` alias (→ `src/`, configured
-in `vite.config.js` **and** `jsconfig.json` — update both if you change it).
+`useAuth` exposes two independent permission flags read from the `usuarios` row: `isAdmin`
+(`nivel >= 2`) and `podeVerBanco` (`usuarios.ver_banco`, Sprint 32b) — the latter gates `/admin`
+and is deliberately *not* tied to `nivel`: by default only the account owner has it, and only
+that owner can grant it to someone else, from `/usuarios`. The Supabase client
+(`services/supabase.js`) is a lazy singleton: in prod it reads inlined `VITE_*` vars, in dev it
+fetches `/api/config` from Flask. `AppHeader` shows a live BRT clock via `hooks/useClock.js`
+(ticks every second off `utils/datas.js`'s `horaBRT`/`dataBRT`). Imports use the `@/` alias
+(→ `src/`, configured in `vite.config.js` **and** `jsconfig.json` — update both if you change it).
+
+**`/admin` page (`pages/Admin.jsx`, Sprint 32/32b/32c/38/46):** operational DB metrics — row
+counts (itens/leituras/alertas/usuários), a disk-quota meter (`pg_database_size` vs. the
+hardcoded Supabase plan quota in `Admin.jsx`) with a per-table breakdown, per-store collection
+health (last reading, count in the last 24h) as a proxy signal (not a read of GitHub Actions run
+history — that would need a separate GitHub API integration, out of scope), and a dense
+per-user/per-item detail table. All of it comes from one RPC, `admin_estatisticas()`
+(`services/admin.service.js`), which runs `SECURITY DEFINER` and checks `pode_ver_banco()`
+itself server-side — the frontend gate on `podeVerBanco` is a UX convenience, not the security
+boundary.
 
 **Dashboard (`pages/Dashboard/`):** reorganized in Sprint 17/V3 out of a single ~1620-line
 `Dashboard.jsx` into `index.jsx` (page shell/state) + `components/` (`ControlBar`,
@@ -82,11 +96,23 @@ dev) and Vercel functions (prod) — that are deliberate duplicates. **Keep them
 - `/api/usuarios` (Vercel: `api/usuarios.js`) — admin-only user management via the
   Supabase admin API. Ações: `criar` (email/senha/nivel), `trocar_senha`, `listar`
   (profiles + `auth.users` last-sign-in/confirmation + item counts), `telegram`
-  (toggles `usuarios.notificar_telegram`), and `excluir` (manual cascade
+  (toggles `usuarios.notificar_telegram`), `ver_banco` and `bloquear` (owner-only,
+  see below), and `excluir` (manual cascade
   alertas → historico_precos → itens, then deletes the auth account, which cascades
   to `usuarios`; self-deletion is rejected). Requires a session token whose profile
   has `nivel >= 2`; the signup trigger creates profiles at nivel 1 and the endpoint
   promotes to 2 when creating an admin.
+
+**Blocking a user (Sprint 78, `acao=bloquear`)**: three layers, because a flag in
+`usuarios` alone stops nothing — Supabase Auth doesn't know that table. (1) the real
+barrier is `ban_duration` on the GoTrue admin API (100 years; `"none"` unblocks),
+(2) `usuarios.bloqueado` feeds a `NOT esta_bloqueado()` veto added to every RLS
+policy (migration `sprint78_bloquear_usuario.sql`) so an already-open session sees no
+data, and (3) `useAuth` re-reads the profile every 60s and `App.jsx` swaps the SPA for
+`BlockedScreen`. Only the owner's email may call it (checked **inside** both endpoint
+copies, not just in the UI — an ordinary admin gets 403); self-blocking is rejected.
+`_usuario_do_token`/`usuarioDoToken` also reject a blocked caller on every
+authenticated endpoint, so a JWT minted before the ban stops working there too.
 
 **Route parity gotcha (Flask, `app.py`):** Vercel's prod rewrite is `/((?!api/).*)` → SPA.
 Because Flask is mounted with `static_url_path=""`, its catch-all static route would otherwise
@@ -122,7 +148,13 @@ Values flow frontend → `/api/trigger-coleta` (POST body) → `workflow_dispatc
 1. Query Supabase `itens` (scoped per the mode above).
 2. For each item, pick a scraper from the `SCRAPERS` dict keyed by the store name
    (`lojas.nome` lowercased + spaces stripped — e.g. `"terabyteshop"`).
-3. `Scraper().coletar(url)` returns a `DadosProduto` dataclass `(nome, preco, disponivel, url)`.
+3. `Scraper().coletar(url)` returns a `DadosProduto` dataclass `(nome, preco, disponivel, url,
+   encontrado)`. `encontrado` (Sprint 41, default `True`) is distinct from `disponivel`: it's
+   `False` only when the scraper couldn't confirm *anything* on the page (error, timeout,
+   challenge/block, or every selector fallback came up empty), vs. a real confirmed
+   out-of-stock read. This is what lets the CI-blocked stores (Shopee, AliExpress, Mercado
+   Livre) report an honest "não localizado" instead of a false "esgotado" — see the known
+   limitations below.
 4. Insert the price into `historico_precos`.
 5. Call the Supabase RPC `verificar_alertas(p_item_id, p_preco_atual)`; for each returned
    alert dispatch email + telegram and record it in the `alertas` table.
@@ -150,7 +182,10 @@ owner. RLS lets a user see/manage only their own `itens`/`historico_precos`/`ale
 SERVICE_KEY and bypasses RLS entirely. `/api/remover` requires the session's
 `Authorization: Bearer` token and returns 401 (no session) / 403 (not the owner and
 not admin). Frontend: `useAuth` exposes `perfil`/`isAdmin`; the Dashboard shows an
-admin-only per-user filter row and owner tags.
+admin-only per-user filter row and owner tags. Two permissions sit **outside**
+`nivel` and are granted only by the account owner: `usuarios.ver_banco` (Sprint 32b,
+gates `/admin`) and `usuarios.bloqueado` (Sprint 78, blocks the account entirely) —
+see the `/api/usuarios` notes above.
 
 ## Scraper architecture (`scrapers/`)
 
@@ -212,6 +247,21 @@ up empty, it returns `encontrado=False` ("não localizado"), never a false
 "esgotado". The `aliexpress` slug is registered in `SCRAPERS` (`main.py`) and in
 `lojas` (Supabase) — items can be added normally — but the daily CI cron won't be
 able to collect this store; it only works run locally.
+
+**Known limitation — Mercado Livre redirects to an account-verification wall in
+CI (Sprint 49)**: `scrapers/mercadolivre.py` works correctly locally — validated
+headless=True and headless=False, with both the full test URL (campaign tracking
+params) and the "clean" URL, matching the real page exactly (JSON-LD `Product`,
+R$65,99, `disponivel=True`). In CI (GitHub Actions datacenter IP), every request
+gets redirected to `/gz/account-verification` (page title "Mercado Libre", in
+Spanish) — confirmed **3/3** via `workflow_dispatch loja=mercadolivre` on
+`Duplicate-Main`. Similar in spirit to Shopee (a gate that demands
+authentication/verification before showing the product) but via a different
+mechanism (account verification, not a login wall). The scraper doesn't attempt
+to work around it: it returns `encontrado=False` ("não localizado"), never a
+false "esgotado". The `mercadolivre` slug is registered in `SCRAPERS` (`main.py`)
+and in `lojas` (Supabase) — items can be added normally — but the daily CI cron
+won't be able to collect this store; it only works run locally.
 
 ## Commands
 

@@ -8,6 +8,10 @@
  * troca de senha de qualquer usuário. As operações rodam server-side
  * em /api/usuarios (Flask em dev, Vercel Function em produção) com a
  * SERVICE_KEY; o browser só envia o access_token da sessão do admin.
+ *
+ * Sprint 78 (todo:310): coluna "Acesso" — bloquear/liberar a entrada de um
+ * usuário. Só a conta do dono aciona (nem um admin comum), e a checagem de
+ * verdade é a do endpoint, não o `disabled` do botão daqui.
  */
 import { useState, useEffect, useCallback } from "react";
 import { Navigate } from "react-router-dom";
@@ -76,6 +80,17 @@ const css = `
 .badge.b-normal { border-color:var(--border2); color:var(--text-dim); }
 .badge.b-ativo  { border-color:var(--green-dim); color:var(--green); }
 .badge.b-pend   { border-color:var(--amber); color:var(--amber); }
+/* Sprint 78 (todo:310): conta barrada — vermelho, o mesmo tom que o projeto
+   já usa para "desligado/negado" (OFF na tabela do Dashboard, Excluir aqui) */
+.badge.b-bloq   { border-color:var(--red); color:var(--red); background:rgba(255,68,68,.08); }
+/* Toggle de acesso: ao contrário do .tg-toggle (onde "on" é o estado
+   desejável e verde), aqui o normal já é verde (liberado) e o destaque é o
+   vermelho de bloqueado — um usuário barrado tem de saltar na lista */
+.acesso-toggle { background:var(--bg3); border:1px solid var(--green-dim); color:var(--green); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.15em; padding:.35rem .7rem; cursor:pointer; transition:all .15s; text-transform:uppercase; white-space:nowrap; }
+.acesso-toggle:hover:not(:disabled) { border-color:var(--red); color:var(--red); background:rgba(255,68,68,.08); }
+.acesso-toggle.bloqueado { border-color:var(--red); color:var(--red); background:rgba(255,68,68,.12); }
+.acesso-toggle.bloqueado:hover:not(:disabled) { border-color:var(--green); color:var(--green); background:var(--green-soft); }
+.acesso-toggle:disabled { opacity:.4; cursor:not-allowed; }
 .tg-toggle { background:var(--bg3); border:1px solid var(--border2); color:var(--text-dim); font-family:var(--mono); font-size:var(--fs-xs); letter-spacing:.15em; padding:.35rem .7rem; cursor:pointer; transition:all .15s; text-transform:uppercase; }
 .tg-toggle:hover { border-color:var(--green-dim); }
 .tg-toggle.on { border-color:var(--green); color:var(--green); background:var(--green-soft); }
@@ -99,8 +114,9 @@ const css = `
 `;
 
 // Único email que pode liberar/revogar o acesso de outra pessoa a /admin
-// (Sprint 32b, pedido do usuário) — a checagem real fica no endpoint
-// /api/usuarios; isto só decide se o botão aparece habilitado aqui.
+// (Sprint 32b) e bloquear/liberar a entrada de um usuário (Sprint 78) — a
+// checagem real fica no endpoint /api/usuarios; isto só decide se o botão
+// aparece habilitado aqui.
 const DONO_EMAIL = "pedrosacanhadas@gmail.com";
 
 async function chamarApiUsuarios(body) {
@@ -126,6 +142,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
   const [usuarios,    setUsuarios]    = useState([]);
   const [telegramOk,  setTelegramOk]  = useState(true);
   const [verBancoOk,  setVerBancoOk]  = useState(true);
+  const [bloqueioOk,  setBloqueioOk]  = useState(true);  // Sprint 78 (migração rodada?)
   const [carregando,  setCarregando]  = useState(true);
   const [ocupadoId,   setOcupadoId]   = useState(null); // linha com ação em andamento
 
@@ -156,6 +173,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
       setUsuarios(data.usuarios || []);
       setTelegramOk(Boolean(data.telegram_disponivel));
       setVerBancoOk(Boolean(data.ver_banco_disponivel));
+      setBloqueioOk(Boolean(data.bloqueio_disponivel));
     } catch (err) {
       showToast("Erro ao listar usuários: " + err.message, "error");
     }
@@ -210,6 +228,40 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
       showToast("Erro ao alterar acesso ao banco: " + err.message, "error");
     }
     setOcupadoId(null);
+  };
+
+  // Sprint 78 (todo:310): bloquear/liberar a entrada de um usuário. Passa
+  // pelo ConfirmModal nas duas direções — bloquear derruba a pessoa do
+  // sistema, liberar devolve o acesso a tudo; nenhuma das duas é um clique
+  // que se desfaz sozinho.
+  const alternarBloqueio = (u) => {
+    const bloquear = !u.bloqueado;
+    setConfirm({
+      titulo: bloquear ? "BLOQUEAR ACESSO" : "LIBERAR ACESSO",
+      corpo: bloquear
+        ? `Bloquear o acesso de <strong>${u.email}</strong>?<br><br>` +
+          `<span style='color:var(--amber)'>⚠ A conta é banida na autenticação:</span> ` +
+          `a pessoa não consegue mais entrar, e perde o acesso aos dados também ` +
+          `na sessão que já estiver aberta.<br><br>` +
+          `Os <strong>${u.itens}</strong> item(ns) e todo o histórico dela são <strong>mantidos</strong> ` +
+          `— o bloqueio é reversível a qualquer momento.`
+        : `Liberar o acesso de <strong>${u.email}</strong>?<br><br>` +
+          `A pessoa volta a entrar normalmente e a ver os próprios itens.`,
+      icone: bloquear ? "⊘" : "✓",
+      isDanger: bloquear,
+      cb: async () => {
+        setOcupadoId(u.id);
+        try {
+          const data = await chamarApiUsuarios({ acao: "bloquear", user_id: u.id, ativo: bloquear });
+          setUsuarios((lista) => lista.map((x) =>
+            x.id === u.id ? { ...x, bloqueado: data.bloqueado } : x));
+          showToast(`✓ Acesso de ${u.email} ${data.bloqueado ? "bloqueado" : "liberado"}.`, "ok");
+        } catch (err) {
+          showToast("Erro ao alterar o acesso: " + err.message, "error");
+        }
+        setOcupadoId(null);
+      },
+    });
   };
 
   const excluirUsuario = (u) => {
@@ -318,6 +370,7 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                       <th>Itens</th>
                       {telegramOk && <th>Telegram</th>}
                       {verBancoOk && <th>Banco</th>}
+                      {bloqueioOk && <th>Acesso</th>}
                       <th>Ações</th>
                     </tr>
                   </thead>
@@ -339,9 +392,16 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                           </td>
                           <td>{u.ultimo_acesso ? dataHoraBRT(u.ultimo_acesso, { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "nunca"}</td>
                           <td>
-                            <span className={`badge ${u.confirmado ? "b-ativo" : "b-pend"}`}>
-                              {u.confirmado ? "Ativo" : "Não confirmado"}
-                            </span>
+                            {/* Sprint 78: bloqueado tem precedência sobre
+                                confirmado/não confirmado — é o estado que
+                                decide se a pessoa entra ou não */}
+                            {u.bloqueado ? (
+                              <span className="badge b-bloq">Bloqueado</span>
+                            ) : (
+                              <span className={`badge ${u.confirmado ? "b-ativo" : "b-pend"}`}>
+                                {u.confirmado ? "Ativo" : "Não confirmado"}
+                              </span>
+                            )}
                           </td>
                           <td>{u.itens}</td>
                           {telegramOk && (
@@ -367,6 +427,26 @@ export default function Usuarios({ showToast, isAdmin, perfilLoading, user }) {
                                 onClick={() => alternarVerBanco(u)}
                               >
                                 {u.ver_banco ? "✓ ON" : "OFF"}
+                              </button>
+                            </td>
+                          )}
+                          {bloqueioOk && (
+                            <td>
+                              <button
+                                className={`acesso-toggle${u.bloqueado ? " bloqueado" : ""}`}
+                                disabled={!souDono || souEu || ocupadoId === u.id}
+                                title={
+                                  souEu
+                                    ? "Não é possível bloquear a própria conta"
+                                    : !souDono
+                                    ? "Só o dono da conta pode bloquear ou liberar o acesso"
+                                    : u.bloqueado
+                                    ? "Liberar a entrada deste usuário"
+                                    : "Bloquear a entrada deste usuário (reversível, mantém os dados)"
+                                }
+                                onClick={() => alternarBloqueio(u)}
+                              >
+                                {u.bloqueado ? "⊘ Bloqueado" : "✓ Liberado"}
                               </button>
                             </td>
                           )}

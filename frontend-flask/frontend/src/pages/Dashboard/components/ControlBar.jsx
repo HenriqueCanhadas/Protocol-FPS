@@ -1,8 +1,8 @@
 /**
  * pages/Dashboard/components/ControlBar.jsx — PROTOCOL FPS
  * Toolbar da Dashboard: um painel único e compacto que reúne o botão de
- * coleta, os filtros (busca, categoria, loja/produto, usuário admin,
- * ordenação, dia de coleta) e as ações sobre o item selecionado na tabela
+ * coleta, os filtros (busca e o pop-up de filtros — categoria, loja/produto e
+ * usuário admin —, ordenação, dia de coleta) e as ações sobre o item selecionado
  * (Opções/Remover — Sprint V4: a antiga ActionBar separada foi absorvida
  * aqui; o botão de Histórico saiu, pois o PriceChartPanel da sidebar já
  * cobre essa função). A busca é só um ícone que abre o SearchDialog em
@@ -11,8 +11,8 @@
  * useDashboardFilters). Recebe o retorno de useDashboardFilters em `filters`.
  */
 import { useState } from "react";
-import { rotuloCategoria, LOJAS_FILTER } from "@/pages/Dashboard/Dashboard.constants";
 import SearchDialog from "@/pages/Dashboard/dialogs/SearchDialog";
+import FiltersDialog from "@/pages/Dashboard/dialogs/FiltersDialog";
 
 // Sprint 50 (todo:256): ganhou loja/categoria/status — mesmos critérios que
 // o clique no cabeçalho da coluna da tabela agora também aciona (ver
@@ -31,21 +31,16 @@ const CRITERIOS_ORDENACAO = [
 
 export default function ControlBar({
   dados, categorias, isAdmin, user, coletando, onColetarClick, filters,
-  selected, onOpcoes, onRemover,
+  selected, onOpcoes, onRemover, onAbrirTodos,
 }) {
-  const [buscaAberta, setBuscaAberta] = useState(false); // controla o pop-up SearchDialog
+  const [buscaAberta, setBuscaAberta]     = useState(false); // controla o pop-up SearchDialog
+  const [filtrosAberto, setFiltrosAberto] = useState(false); // controla o pop-up FiltersDialog (Sprint 70)
   const {
     termoBusca, setTermoBusca,
     sortCampo, sortDir, toggleSort,
-    filtro, setFiltro,
-    filtroLoja, selecionarLoja,
-    filtroProduto, setFiltroProduto,
-    filtroUsuario, setFiltroUsuario,
     filtroDia, setFiltroDia,
+    filtrosPopup, filtrosAtivos, limparFiltros,
     dadosFiltrados,
-    produtosDaLoja,
-    lojaAtiva,
-    donos,
   } = filters;
 
   return (
@@ -71,60 +66,34 @@ export default function ControlBar({
           </button>
         </div>
 
+        {/* Sprint 70 (todo:306): Categoria/Loja/Produto/Usuário viraram um
+            pop-up só (FiltersDialog). O botão fica verde — e mostra quantos —
+            quando há filtro aplicado; o "REMOVER FILTROS" só existe enquanto
+            houver o que remover, e limpa TUDO (busca e dia inclusive). */}
         <div className="filter-group">
-          <label className="filter-group-label">Categoria</label>
-          <select
-            className={`filter-select${filtro !== "all" ? " active" : ""}`}
-            value={filtro} onChange={(e) => setFiltro(e.target.value)}
+          <label className="filter-group-label">Filtros</label>
+          <button
+            className={`filtros-btn${filtrosPopup > 0 ? " active" : ""}`}
+            title={filtrosPopup > 0 ? `${filtrosPopup} filtro(s) aplicado(s) — clique para editar` : "Filtrar por categoria, loja ou usuário"}
+            onClick={() => setFiltrosAberto(true)}
           >
-            <option value="all">Todos</option>
-            {categorias.map((c) => (
-              <option key={c.categoria} value={c.categoria}>{rotuloCategoria(c.categoria, c.nome)}</option>
-            ))}
-          </select>
+            <span className="fb-icon">▽</span>
+            <span className="fb-label">Filtros</span>
+            {filtrosPopup > 0 && <span className="fb-badge">{filtrosPopup}</span>}
+          </button>
         </div>
 
-        <div className="filter-group">
-          <label className="filter-group-label">Loja</label>
-          <select
-            className={`filter-select${filtroLoja !== "all" ? " active" : ""}`}
-            value={filtroLoja} onChange={(e) => selecionarLoja(e.target.value)}
-          >
-            {LOJAS_FILTER.map(({ key, label }) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </div>
-
-        {filtroLoja !== "all" && (
+        {filtrosAtivos > 0 && (
           <div className="filter-group">
-            <label className="filter-group-label">Produto</label>
-            <select
-              className={`filter-select${filtroProduto !== "all" ? " active" : ""}`}
-              value={filtroProduto} onChange={(e) => setFiltroProduto(e.target.value)}
-              title={`Filtrar por um produto da ${lojaAtiva?.label}`}
+            <label className="filter-group-label">&nbsp;</label>
+            <button
+              className="limpar-filtros-btn"
+              title="Remover todos os filtros, inclusive a busca e o dia de coleta"
+              onClick={limparFiltros}
             >
-              <option value="all">Todos · {lojaAtiva?.label}</option>
-              {produtosDaLoja.map((p) => (
-                <option key={p.item_id} value={p.item_id}>{p.nome_na_loja}</option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {isAdmin && donos.length > 0 && (
-          <div className="filter-group">
-            <label className="filter-group-label">Usuário</label>
-            <select
-              className={`filter-select${filtroUsuario !== "all" ? " active" : ""}`}
-              value={filtroUsuario} onChange={(e) => setFiltroUsuario(e.target.value)}
-            >
-              <option value="all">Todos ({dados.length})</option>
-              <option value={user?.id}>Eu ({dados.filter((x) => x.dono_id === user?.id).length})</option>
-              {donos.filter((d) => d.id !== user?.id).map((d) => (
-                <option key={d.id} value={d.id}>{d.rotulo} ({dados.filter((x) => x.dono_id === d.id).length})</option>
-              ))}
-            </select>
+              <span className="fb-icon">✕</span>
+              <span className="fb-label">Remover filtros</span>
+            </button>
           </div>
         )}
 
@@ -171,6 +140,16 @@ export default function ControlBar({
         <div className="filter-group filter-actions-group">
           <label className="filter-group-label">Ações</label>
           <div className="filter-actions">
+            {/* Sprint 72 (todo:298): age sobre a LISTA visível (não sobre o
+                item selecionado), por isso não depende de `selected` */}
+            <button
+              className="action-btn abrir-todos"
+              disabled={dadosFiltrados.length === 0}
+              onClick={onAbrirTodos}
+              title={`Abrir os ${dadosFiltrados.length} item(ns) da lista filtrada em novas abas`}
+            >
+              <span className="ab-icon">⧉</span><span className="ab-label">Abrir todos</span>
+            </button>
             <button
               className="action-btn opcoes-trigger" disabled={!selected}
               onClick={() => selected && onOpcoes(selected)}
@@ -194,6 +173,18 @@ export default function ControlBar({
         termoBusca={termoBusca}
         onChange={setTermoBusca}
         onClose={() => setBuscaAberta(false)}
+      />
+
+      <FiltersDialog
+        open={filtrosAberto}
+        onClose={() => setFiltrosAberto(false)}
+        dados={dados}
+        categorias={categorias}
+        isAdmin={isAdmin}
+        user={user}
+        filters={filters}
+        totalVisivel={dadosFiltrados.length}
+        onAbrirTodos={onAbrirTodos}
       />
     </div>
   );

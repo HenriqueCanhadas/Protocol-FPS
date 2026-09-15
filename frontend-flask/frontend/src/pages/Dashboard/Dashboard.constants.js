@@ -10,20 +10,25 @@ export const CAT_LABEL = {
   DIVERSOS: "Diversos",
 };
 
-// Ordem fixa das categorias originais; categorias criadas depois (via "+ Nova
-// categoria"/"Criar categoria" em Novo Produto, Sprints 31/33) entram na
-// sequência ordenadas por nome — mesma convenção usada em NovoProduto.jsx.
-const CATEGORIA_ORDEM_FIXA = ["GPU", "CPU", "RAM", "PSU", "MOBO", "STORAGE", "DIVERSOS"];
+// Comparador único de rótulos do projeto (Sprint 71, todo:314): pt-BR com
+// sensitivity "base" — acento e caixa não mudam a posição, então "AliExpress"
+// e "Amazon" ordenam por a/m, não por A maiúsculo vs. minúsculo.
+export const compararRotulos = (a, b) =>
+  (a || "").localeCompare(b || "", "pt-BR", { sensitivity: "base" });
 
+/**
+ * Sprint 71 (todo:314): a ordem das categorias era FIXA POR HISTÓRICO — um
+ * array `["GPU","CPU","RAM","PSU","MOBO","STORAGE","DIVERSOS"]` na ordem em que
+ * as categorias originais foram criadas, e toda categoria nova (criada por um
+ * admin em Novo Produto, Sprints 31/33) ia para o fim da lista. Agora é
+ * alfabética pelo RÓTULO EXIBIDO, não pela sigla: ordenar por sigla colocaria
+ * "STORAGE" longe de "Armazenamento", que é o texto que o usuário lê na tela.
+ * A opção agregadora ("Todos") não passa por aqui — é uma <option> fixa antes
+ * do map, então continua sendo sempre a primeira.
+ */
 export function ordenarCategorias(lista) {
-  return [...lista].sort((a, b) => {
-    const ia = CATEGORIA_ORDEM_FIXA.indexOf(a.categoria);
-    const ib = CATEGORIA_ORDEM_FIXA.indexOf(b.categoria);
-    if (ia === -1 && ib === -1) return (a.nome || "").localeCompare(b.nome || "", "pt-BR");
-    if (ia === -1) return 1;
-    if (ib === -1) return -1;
-    return ia - ib;
-  });
+  return [...lista].sort((a, b) =>
+    compararRotulos(rotuloCategoria(a.categoria, a.nome), rotuloCategoria(b.categoria, b.nome)));
 }
 
 // Rótulo de exibição de uma categoria: rótulo fixo conhecido > nome salvo no
@@ -33,7 +38,11 @@ export function rotuloCategoria(categoria, nome) {
 }
 
 // `slug` = chave do dict SCRAPERS no main.py (usado na coleta segmentada por loja)
-export const LOJAS_FILTER = [
+// A ordem da lista abaixo é a de CADASTRO das lojas no projeto (KaBuM primeiro,
+// Mercado Livre por último) e é irrelevante para a exibição: quem monta o
+// <select> é LOJAS_FILTER (logo abaixo), que ordena alfabeticamente. Mantida
+// assim para continuar legível como histórico de quando cada loja entrou.
+const LOJAS = [
   { key: "all",          label: "Todas Lojas",  slug: null           },
   { key: "kabum",        label: "KaBuM",        slug: "kabum"        },
   { key: "terabyte",     label: "Terabyte",     slug: "terabyteshop" },
@@ -47,6 +56,16 @@ export const LOJAS_FILTER = [
   { key: "aliexpress",   label: "AliExpress",   slug: "aliexpress"   },
   { key: "mocadopop",    label: "Mocadopop",    slug: "mocadopop"    },
   { key: "mercadolivre", label: "Mercado Livre",slug: "mercadolivre" },
+];
+
+/**
+ * Sprint 71 (todo:314): "Todas Lojas" primeiro, as demais em ordem alfabética.
+ * O agregador é fixado na cabeça da lista em vez de entrar na ordenação —
+ * ordenado junto, "Todas Lojas" cairia entre Shopee e Terabyte.
+ */
+export const LOJAS_FILTER = [
+  LOJAS[0],
+  ...LOJAS.slice(1).sort((a, b) => compararRotulos(a.label, b.label)),
 ];
 
 /**

@@ -12,13 +12,16 @@ import PriceChartPanel from "./PriceChartPanel";
 import CollectionsPanel from "./CollectionsPanel";
 import ItemDetailPanel from "./ItemDetailPanel";
 
-export default function Sidebar({ dados, selected, onExpandChart, filtroDia, onSelectDia, onOpenDia }) {
+export default function Sidebar({
+  dados, selected, onExpandChart, filtroDia, onSelectDia, onOpenDia,
+  filtroMeta, onAlternarSemMeta, onDefinirMeta,
+}) {
   return (
     <aside className="dash-sidebar">
-      <KpiRibbon dados={dados} />
+      <KpiRibbon dados={dados} filtroMeta={filtroMeta} onAlternarSemMeta={onAlternarSemMeta} />
       <PriceChartPanel item={selected} onExpand={onExpandChart} />
       <CollectionsPanel filtroDia={filtroDia} onSelectDia={onSelectDia} onOpenDia={onOpenDia} />
-      <ItemDetailPanel item={selected} />
+      <ItemDetailPanel item={selected} onDefinirMeta={onDefinirMeta} />
     </aside>
   );
 }

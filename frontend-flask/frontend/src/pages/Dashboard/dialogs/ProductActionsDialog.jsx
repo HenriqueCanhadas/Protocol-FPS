@@ -12,23 +12,27 @@ import { formatBRL } from "@/utils/format";
 import { rotuloCategoria } from "@/pages/Dashboard/Dashboard.constants";
 
 export default function ProductActionsDialog({
-  item, categorias = [], onClose, onSalvarMeta, onSalvarNome, onSalvarCategoria, onColetar, onToggle,
+  item, categorias = [], modoInicial = "menu",
+  onClose, onSalvarMeta, onSalvarNome, onSalvarCategoria, onColetar, onToggle,
 }) {
-  const [modo, setModo] = useState("menu"); // menu | meta | nome | categoria
+  const [modo, setModo] = useState(modoInicial); // menu | meta | nome | categoria
   const [valor, setValor] = useState("");
   const [erroMeta, setErroMeta] = useState(false);
   const [nome, setNome] = useState("");
   const [erroNome, setErroNome] = useState(false);
   const [cat, setCat] = useState("");
 
-  // Sempre reabre no menu — o dialog fica montado entre aberturas, então o
-  // `modo` da vez anterior não pode sobreviver (mesma regra de sempre: sair
-  // do menu e depois cancelar/salvar fecha tudo, nunca "volta" ao menu).
+  // Sempre reabre na tela de entrada — o dialog fica montado entre aberturas,
+  // então o `modo` da vez anterior não pode sobreviver (mesma regra de sempre:
+  // sair do menu e depois cancelar/salvar fecha tudo, nunca "volta" ao menu).
+  // Sprint 74 (todo:318): essa tela de entrada passou a ser parametrizável —
+  // quem abre pelo marcador ◌ de "sem meta" cai direto em "meta", quem abre
+  // pelo botão Opções continua caindo no menu (modoInicial padrão).
   const estavaAberto = useRef(false);
   useEffect(() => {
-    if (item && !estavaAberto.current) setModo("menu");
+    if (item && !estavaAberto.current) setModo(modoInicial);
     estavaAberto.current = !!item;
-  }, [item]);
+  }, [item, modoInicial]);
 
   // Preenche cada sub-form só ao entrar no modo correspondente
   useEffect(() => {
